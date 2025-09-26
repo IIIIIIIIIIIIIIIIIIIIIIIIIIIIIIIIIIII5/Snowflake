@@ -5,62 +5,64 @@ const app = express();
 app.use(express.json());
 
 const Cookie = process.env.ROBLOSECURITY;
-const GroupId = process.env.GROUPID;
 const AuthKey = process.env.AUTHKEY;
 const Port = process.env.PORT || 3000;
 
 let Roles = {};
 
-async function FetchRoles() {
+async function FetchRoles(GroupId) {
     try {
-        const response = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/roles`);
-        Roles = {};
-        response.data.roles.forEach((role, index) => {
-            Roles[index + 1] = { ID: role.name, RoleId: role.id };
+        const Response = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/roles`);
+        Roles[GroupId] = {};
+        Response.data.roles.forEach((Role, Index) => {
+            Roles[GroupId][Index + 1] = { ID: Role.name, RoleId: Role.id };
         });
-        console.log("Roles fetched");
-    } catch (err) {
-        console.error("Failed to fetch roles:", err.message);
+        console.log("Roles fetched for group", GroupId);
+    } catch (Err) {
+        console.error("Failed to fetch roles:", Err.message);
     }
 }
 
-FetchRoles();
-
-async function SetRank(UserId, RankNumber) {
-    if (!Roles[RankNumber]) await FetchRoles();
-    const RoleInfo = Roles[RankNumber];
+async function SetRank(GroupId, UserId, RankNumber) {
+    if (!Roles[GroupId] || !Roles[GroupId][RankNumber]) await FetchRoles(GroupId);
+    const RoleInfo = Roles[GroupId][RankNumber];
     if (!RoleInfo) throw new Error("Invalid rank number: " + RankNumber);
 
-    let xsrfToken = "";
-    const url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
+    let XsrfToken = "";
+    const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
 
     try {
-        await axios.patch(url, { roleId: RoleInfo.RoleId }, {
-            headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": xsrfToken }
+        await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
+            headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
         });
-    } catch (err) {
-        if (err.response?.status === 403 && err.response.headers['x-csrf-token']) {
-            xsrfToken = err.response.headers['x-csrf-token'];
-            return axios.patch(url, { roleId: RoleInfo.RoleId }, {
-                headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": xsrfToken }
+    } catch (Err) {
+        if (Err.response?.status === 403 && Err.response.headers['x-csrf-token']) {
+            XsrfToken = Err.response.headers['x-csrf-token'];
+            return axios.patch(Url, { roleId: RoleInfo.RoleId }, {
+                headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
             });
-        } else throw err;
+        } else throw Err;
     }
 }
 
-app.post("/rank", async (req, res) => {
+app.post("/:GroupId/rank", async (req, res) => {
     const { UserId, RankNumber, Auth } = req.body;
+    const GroupId = req.params.GroupId;
     if (Auth !== AuthKey) return res.status(403).send("Forbidden");
 
     try {
-        await SetRank(UserId, RankNumber);
-        res.json({ success: true, message: `Rank updated for user ${UserId}` });
-    } catch (err) {
-        console.error("Roblox API error:", err.response?.data || err.message);
-        res.status(500).json({ error: err.response?.data || err.message });
+        await SetRank(GroupId, UserId, RankNumber);
+        res.json({ success: true, message: `Rank updated for user ${UserId} in group ${GroupId}` });
+    } catch (Err) {
+        console.error("Roblox API error:", Err.response?.data || Err.message);
+        res.status(500).json({ error: Err.response?.data || Err.message });
     }
 });
 
-app.get("/roles", async (req, res) => res.json(Roles));
+app.get("/:GroupId/roles", async (req, res) => {
+    const GroupId = req.params.GroupId;
+    if (!Roles[GroupId]) await FetchRoles(GroupId);
+    res.json(Roles[GroupId] || {});
+});
 
 app.listen(Port, () => console.log(`Server running at http://localhost:${Port}`));
