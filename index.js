@@ -85,6 +85,38 @@ app.post("/:GroupId/rank", async (req, res) => {
     }
 });
 
+app.post("/:GroupId/promote", async (req, res) => {
+    const { UserId, CurrentRank, Auth, Issuer } = req.body;
+    const GroupId = req.params.GroupId;
+    if (Auth !== AuthKey) return res.status(403).send("Forbidden");
+
+    try {
+        if (!Roles[GroupId]) await FetchRoles(GroupId);
+        const NextRank = CurrentRank + 1;
+        await SetRank(GroupId, UserId, NextRank, Issuer);
+        res.json({ success: true, message: `User ${UserId} promoted to rank ${NextRank}` });
+    } catch (Err) {
+        console.error("Promote error:", Err.response?.data || Err.message);
+        res.status(500).json({ error: Err.response?.data || Err.message });
+    }
+});
+
+app.post("/:GroupId/demote", async (req, res) => {
+    const { UserId, CurrentRank, Auth, Issuer } = req.body;
+    const GroupId = req.params.GroupId;
+    if (Auth !== AuthKey) return res.status(403).send("Forbidden");
+
+    try {
+        if (!Roles[GroupId]) await FetchRoles(GroupId);
+        const NextRank = Math.max(CurrentRank - 1, 1);
+        await SetRank(GroupId, UserId, NextRank, Issuer);
+        res.json({ success: true, message: `User ${UserId} demoted to rank ${NextRank}` });
+    } catch (Err) {
+        console.error("Demote error:", Err.response?.data || Err.message);
+        res.status(500).json({ error: Err.response?.data || Err.message });
+    }
+});
+
 app.get("/:GroupId/roles", async (req, res) => {
     const GroupId = req.params.GroupId;
     if (!Roles[GroupId]) await FetchRoles(GroupId);
