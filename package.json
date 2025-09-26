@@ -1,5 +1,5 @@
 {
-  "name": "roblox-rank-server",
+  "name": "Roblox Rank API",
   "version": "1.0.0",
   "description": "Rank API",
   "main": "index.js",
@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "axios": "^1.6.0",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "firebase-admin": "^12.15.0"
   }
 }
