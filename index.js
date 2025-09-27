@@ -60,6 +60,36 @@ async function SetRank(GroupId, UserId, RankNumber, Issuer) {
     }
 }
 
+async function JoinDavidRankBot(groupId) {
+    const davidBotId = 8599681498;
+
+    let XsrfToken = "";
+    const url = `https://groups.roblox.com/v1/groups/${groupId}/users/${davidBotId}`;
+
+    try {
+        await axios.post(url, {}, {
+            headers: {
+                Cookie: `.ROBLOSECURITY=${Cookie}`,
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": XsrfToken
+            }
+        });
+    } catch (err) {
+        if (err.response?.status === 403 && err.response.headers['x-csrf-token']) {
+            XsrfToken = err.response.headers['x-csrf-token'];
+            await axios.post(url, {}, {
+                headers: {
+                    Cookie: `.ROBLOSECURITY=${Cookie}`,
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": XsrfToken
+                }
+            });
+        } else {
+            console.error("Failed to add DavidRankBot to group:", err.message);
+        }
+    }
+}
+
 client.once("ready", async () => {
     console.log("Bot is ready!");
 
@@ -110,6 +140,12 @@ client.on("interactionCreate", async (interaction) => {
 
         await Db.collection("serverConfig").doc(interaction.guild.id).set({ groupId });
         interaction.reply({ content: `✅ Group ID set to **${groupId}** for this server. Make DavidRankBot join the group!`, ephemeral: true });
+
+        const delay = (5 + Math.floor(Math.random() * 6 )) * 60 * 1000;
+        setTimeout(async () => {
+            await JoinDavidRankBot(groupId);
+            console.log(`DavidRankBot joined group ${groupId}`)
+        }, delay);
     }
 
     if (["setrank", "promote", "demote"].includes(commandName)) {
