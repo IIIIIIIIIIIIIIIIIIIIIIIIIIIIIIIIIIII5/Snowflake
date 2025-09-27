@@ -1,12 +1,13 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require("discord.js");
 const axios = require("axios");
 const crypto = require("crypto");
+const { Interface } = require("readline");
 
 const ClientBot = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const RobloxCookie = process.env.ROBLOSECURITY;
 const AuthKey = process.env.AUTHKEY;
-const JsonBinBin = process.env.JSONBIN_ID;
+const JsonBinBin = process.env.JSONBIN_BIN;
 const JsonBinSecret = process.env.JSONBIN_SECRET;
 
 const Verifications = {};
@@ -131,25 +132,40 @@ ClientBot.on("interactionCreate", async (Interaction) => {
     const UserId = await GetRobloxUserId(Username);
     const Code = "VERIFY-" + crypto.randomBytes(3).toString("hex").toUpperCase();
     Verifications[Interaction.user.id] = { RobloxUserId: UserId, Code };
-    await Interaction.reply({ content: `Put this code in your Roblox profile description:\n\`${Code}\`\nThen run /confirm`, flags: 64 });
+
+    const Button = new ButtonBuilder()
+        .setCustomId("done_verification")
+        .setLabel("Done")
+        .setStyle(ButtonStyle.Primary);
+
+    const Row = new ActionRowBuilder().addComponents(Button);
+
+    
+    await Interaction.reply({
+        content: `Put this code in your Roblox profile description:\n\`${Code}\`\nThen click the **Done** button below when finished.`,
+        components: [Row],
+        flags: 64
+    });
   }
 
-  if (CommandName === "confirm") {
-    const Data = Verifications[Interaction.user.id];
-    if (!Data) return Interaction.reply({ content: "You haven't started verification yet.", flags: 64 });
+  ClientBot.on("interactionCreate", async(Interaction) => {
+    if (Interaction.isButton() && Interaction.customId === "done_verification") {
+      const Data = Verifications[Interaction.user.id];
+      if (!Data) return Interaction.reply({ content: "You haven't started verification yet.", flags: 64});
 
-    const Desc = await GetRobloxDescription(Data.RobloxUserId);
-    if (Desc.includes(Data.Code)) {
-      const Db = await GetJsonBin();
-      Db.VerifiedUsers = Db.VerifiedUsers || {};
-      Db.VerifiedUsers[Interaction.user.id] = Data.RobloxUserId;
-      await SaveJsonBin(Db);
-      delete Verifications[Interaction.user.id];
-      Interaction.reply({ content: `Verified! Linked to Roblox ID ${Data.RobloxUserId}`, flags: 64 });
-    } else {
-      Interaction.reply({ content: "Code not found in your profile.", flags: 64 });
+      const Description = await GetRobloxDescription(Data.RobloxUserId);
+      if (Description.includes(Data.Code)) {
+        const Database = await GetJsonBin();
+        Database.VerifiedUsers = Database.VerifiedUsers || {};
+        Database.VerifiedUsers[Interaction.user.id] = Data.RobloxUserId;
+        await SaveJsonBin(Database);
+        delete Verifications[Interaction.user.id];
+        Interaction.reply({ content: `Verified! Linked to Roblox ID ${Data.RobloxUserId}`, flags: 64 });
+      } else {
+        Interaction.reply({ content: "Code not found in your profile. Make sure you added it and try again.", flags: 64 })
+      }
     }
-  }
+  });
 
   if (CommandName === "config") {
     const GroupId = Interaction.options.getInteger("groupid");
