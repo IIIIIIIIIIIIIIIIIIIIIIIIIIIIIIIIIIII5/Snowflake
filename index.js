@@ -17,7 +17,9 @@ if (OriginalServiceAcc.startsWith('"') && OriginalServiceAcc.endsWith('"')) {
 OriginalServiceAcc = OriginalServiceAcc.replace(/\\n/g, '\n');
 
 const ServiceAccount = JSON.parse(OriginalServiceAcc);
+
 initializeApp({ credential: cert(ServiceAccount) });
+
 const Db = getFirestore();
 
 const verifications = {};
