@@ -165,16 +165,16 @@ client.on("interactionCreate", async (interaction) => {
             if (commandName === "setrank") {
                 const rank = interaction.options.getInteger("rank");
                 await SetRank(groupId, userId, rank, interaction.user.username);
-                interaction.reply({ content: `✅ Set rank ${rank} for user ${userId}`, ephemeral: true });
+                interaction.reply({ content: `Set rank ${rank} for user ${userId}`, ephemeral: true });
             } else if (commandName === "promote") {
                 await SetRank(groupId, userId, currentRank + 1, interaction.user.username);
-                interaction.reply({ content: `✅ Promoted user ${userId} to rank ${currentRank + 1}`, ephemeral: true });
+                interaction.reply({ content: `Promoted user ${userId} to rank ${currentRank + 1}`, ephemeral: true });
             } else if (commandName === "demote") {
                 await SetRank(groupId, userId, Math.max(currentRank - 1, 1), interaction.user.username);
-                interaction.reply({ content: `✅ Demoted user ${userId} to rank ${Math.max(currentRank - 1, 1)}`, ephemeral: true });
+                interaction.reply({ content: `Demoted user ${userId} to rank ${Math.max(currentRank - 1, 1)}`, ephemeral: true });
             }
         } catch (err) {
-            interaction.reply({ content: `❌ Error: ${err.message}`, ephemeral: true });
+            interaction.reply({ content: `Error: ${err.message}`, ephemeral: true });
         }
     }
 });
