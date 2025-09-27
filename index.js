@@ -16,7 +16,7 @@ const serviceAccount = {
 MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDdzc+Q8+e1+lfI
 +ilIDUGG143zqxVNH5/9OSB4Ff4L99Ojp/vqecz+/hhTD7xlYQ3BFuoLYtRl4PvR
 ...rest of key...
------END PRIVATE KEY-----\n`,
+-----END PRIVATE KEY-----`,
   client_email: "firebase-adminsdk-fbsvc@rankingapi-27b94.iam.gserviceaccount.com",
   client_id: "104075673530044448097",
   auth_uri: "https://accounts.google.com/o/oauth2/auth",
