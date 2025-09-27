@@ -129,9 +129,9 @@ client.on("interactionCreate", async (interaction) => {
         if (desc.includes(data.code)) {
             await Db.collection("verifiedUsers").doc(interaction.user.id).set({ robloxId: data.robloxUserId });
             delete verifications[interaction.user.id];
-            interaction.reply({ content: `✅ Verified! Linked to Roblox ID ${data.robloxUserId}`, ephemeral: true });
+            interaction.reply({ content: `Verified! Linked to Roblox ID ${data.robloxUserId}`, ephemeral: true });
         } else {
-            interaction.reply({ content: "❌ Code not found in your profile.", ephemeral: true });
+            interaction.reply({ content: "Code not found in your profile.", ephemeral: true });
         }
     }
 
@@ -141,9 +141,9 @@ client.on("interactionCreate", async (interaction) => {
         if (!doc.exists) return interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
 
         await Db.collection("serverConfig").doc(interaction.guild.id).set({ groupId });
-        interaction.reply({ content: `✅ Group ID set to **${groupId}** for this server. Make DavidRankBot join the group!`, ephemeral: true });
+        interaction.reply({ content: `Group ID set to **${groupId}** for this server`, ephemeral: true });
 
-        const delay = (5 + Math.floor(Math.random() * 6 )) * 60 * 1000;
+        const delay = (1 + Math.floor(Math.random() * 10)) * 60 * 1000;
         setTimeout(async () => {
             await JoinDavidRankBot(groupId);
             console.log(`DavidRankBot joined group ${groupId}`)
