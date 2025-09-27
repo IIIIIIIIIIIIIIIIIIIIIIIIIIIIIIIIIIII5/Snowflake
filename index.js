@@ -46,22 +46,35 @@ async function SetRank(GroupId, UserId, RankNumber) {
 
     try {
         await patchRank();
+        console.log(`Successfully set rank ${RankNumber} for user ${UserId} in group ${GroupId}`);
     } catch (err) {
         if (err.response) {
             const status = err.response.status;
+            console.log(`Error setting rank for user ${UserId} in group ${GroupId}: Status ${status}`);
+            console.log("Response data:", err.response.data);
+
             if (status === 403 && err.response.headers["x-csrf-token"]) {
                 XsrfToken = err.response.headers["x-csrf-token"];
-                await patchRank();
+                console.log("Retrying with new CSRF token...");
+                try {
+                    await patchRank();
+                    console.log(`Successfully set rank ${RankNumber} for user ${UserId} after retry`);
+                } catch (retryErr) {
+                    console.log("Retry failed:", retryErr.response?.data || retryErr.message);
+                    throw retryErr;
+                }
             } else if (status === 400) {
-                throw new Error("Bad request: likely invalid RoleId or group/user mismatch.");
+                console.log("Bad request: likely invalid RoleId or group/user mismatch.");
+                throw new Error("Bad request");
             } else if (status === 405) {
-                throw new Error(
-                    "Method not allowed: Your account lacks permission to change this user's rank, or the user is the group owner."
-                );
+                console.log("Method not allowed: permission issue or user is group owner.");
+                throw new Error("Method not allowed");
             } else {
-                throw new Error(`Request failed with status code ${status}: ${err.response.data?.errors || err.message}`);
+                console.log("Unknown error:", err.response.data || err.message);
+                throw err;
             }
         } else {
+            console.log("Error without response:", err.message);
             throw err;
         }
     }
