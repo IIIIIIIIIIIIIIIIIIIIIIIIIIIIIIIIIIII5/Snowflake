@@ -124,7 +124,7 @@ async function startMemberCounter(GroupId) {
     setTimeout(() => startMemberCounter(GroupId), 60000);
 }
 
-ClientBot.once("ready", async () => {
+ClientBot.once("clientReady", async () => {
     const Commands = [
         new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("config").setDescription("Set the group ID for this server").addIntegerOption(opt => opt.setName("groupid").setDescription("Roblox group ID").setRequired(true)),
