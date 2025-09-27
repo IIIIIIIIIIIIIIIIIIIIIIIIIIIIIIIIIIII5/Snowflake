@@ -95,18 +95,32 @@ async function startMemberCounter(GroupId) {
     const Db = await GetJsonBin();
     const counter = Db.GroupMemberCounter?.[GroupId];
     if (!counter || !counter.enabled) return;
+
     try {
         const Res = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}`);
         const newCount = Res.data.memberCount;
+        const groupName = Res.data.name;
+        const milestoneStep = 100;
+        const nextMilestone = Math.ceil(newCount / milestoneStep) * milestoneStep;
+        const remaining = nextMilestone - newCount;
+
         if (newCount > (counter.lastCount || 0)) {
             const diff = newCount - (counter.lastCount || 0);
             const webhook = await ClientBot.channels.cache.get(counter.channelId)?.fetchWebhooks()
                 .then(ws => ws.find(w => w.id === counter.webhookId));
-            if (webhook) await webhook.send({ content: `${diff} new member(s) joined the group! Total members: ${newCount}` });
+            if (webhook) {
+                await webhook.send({
+                    content: `:tada: **${groupName}** has reached **${newCount}** members! We are **${remaining}** away from **${nextMilestone}** members!`
+                });
+            }
         }
+
         counter.lastCount = newCount;
         await SaveJsonBin(Db);
-    } catch {}
+    } catch (err) {
+        console.error("Member counter error:", err);
+    }
+
     setTimeout(() => startMemberCounter(GroupId), 60000);
 }
 
