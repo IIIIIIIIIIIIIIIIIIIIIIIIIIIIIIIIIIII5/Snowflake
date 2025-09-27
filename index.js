@@ -26,7 +26,7 @@ async function FetchRoles(GroupId) {
 async function SetRank(GroupId, UserId, RankNumber) {
     const Roles = await FetchRoles(GroupId);
     const RoleInfo = Roles[RankNumber];
-    if (!RoleInfo) throw new Error("Invalid rank number: " + RankNumber);
+    if (!RoleInfo) throw new Error(`Invalid rank number: ${RankNumber}`);
 
     let XsrfToken = "";
 
@@ -34,18 +34,33 @@ async function SetRank(GroupId, UserId, RankNumber) {
         return axios.patch(
             `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`,
             { roleId: RoleInfo.RoleId },
-            { headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "X-CSRF-TOKEN": XsrfToken, "Content-Type": "application/json" } }
+            {
+                headers: {
+                    Cookie: `.ROBLOSECURITY=${RobloxCookie}`,
+                    "X-CSRF-TOKEN": XsrfToken,
+                    "Content-Type": "application/json"
+                }
+            }
         );
     }
 
     try {
         await patchRank();
     } catch (err) {
-        if (err.response?.status === 403 && err.response.headers["x-csrf-token"]) {
-            XsrfToken = err.response.headers["x-csrf-token"];
-            await patchRank();
-        } else if (err.response?.status === 405) {
-            throw new Error("Method not allowed: make sure the user has permission and endpoint is correct");
+        if (err.response) {
+            const status = err.response.status;
+            if (status === 403 && err.response.headers["x-csrf-token"]) {
+                XsrfToken = err.response.headers["x-csrf-token"];
+                await patchRank();
+            } else if (status === 400) {
+                throw new Error("Bad request: likely invalid RoleId or group/user mismatch.");
+            } else if (status === 405) {
+                throw new Error(
+                    "Method not allowed: Your account lacks permission to change this user's rank, or the user is the group owner."
+                );
+            } else {
+                throw new Error(`Request failed with status code ${status}: ${err.response.data?.errors || err.message}`);
+            }
         } else {
             throw err;
         }
