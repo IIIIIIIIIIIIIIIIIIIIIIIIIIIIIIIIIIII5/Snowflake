@@ -33,29 +33,14 @@ async function SetRank(GroupId, UserId, RankNumber, Issuer) {
         await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
             headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
         });
-        await LogRankChange(GroupId, UserId, RoleInfo, Issuer);
     } catch (Err) {
         if (Err.response?.status === 403 && Err.response.headers['x-csrf-token']) {
             XsrfToken = Err.response.headers['x-csrf-token'];
             await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
                 headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
             });
-            await LogRankChange(GroupId, UserId, RoleInfo, Issuer);
         } else throw Err;
     }
-}
-
-async function LogRankChange(GroupId, UserId, RoleInfo, Issuer) {
-    const Data = await GetJsonBin();
-    Data.RankChanges = Data.RankChanges || [];
-    Data.RankChanges.push({
-        GroupId,
-        UserId,
-        NewRank: RoleInfo,
-        IssuedBy: Issuer || "API",
-        Timestamp: new Date().toISOString()
-    });
-    await SaveJsonBin(Data);
 }
 
 async function GetJsonBin() {
@@ -172,12 +157,9 @@ ClientBot.once("clientReady", async () => {
         new SlashCommandBuilder().setName("demote").setDescription("Demote a user by one rank").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
         new SlashCommandBuilder().setName("fire").setDescription("Set a user's rank to lowest").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
         new SlashCommandBuilder().setName("membercount").setDescription("Enable/disable live member count").addStringOption(opt => opt.setName("action").setDescription("Enable or Disable").setRequired(true).addChoices({ name: "Enable", value: "enable" }, { name: "Disable", value: "disable" })).addChannelOption(opt => opt.setName("channel").setDescription("Channel to send updates").setRequired(true)),
-        new SlashCommandBuilder().setName("auditlog").setDescription("Set a channel for audit logs").addChannelOption(opt => opt.setName("channel").setDescription("Channel to send audit logs").setRequired(true))
+        new SlashCommandBuilder().setName("auditlog").setDescription("Set a channel for audit logs").addChannelOption(opt => opt.setName("channel").setDescription("Channel to send audit logs").setRequired(true)),
+        new SlashCommandBuilder().setName("accept").setDescription("Accept a pending group config").addIntegerOption(opt => opt.setName("groupid").setDescription("Group ID to accept").setRequired(true)).setDefaultMemberPermissions(0).setDMPermission(false)
     ];
-
-    if (OWNER_ID) {
-        Commands.push(new SlashCommandBuilder().setName("accept").setDescription("Accept a pending group config").addIntegerOption(opt => opt.setName("groupid").setDescription("Group ID to accept").setRequired(true)));
-    }
 
     const rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
     await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: Commands.map(c => c.toJSON()) });
