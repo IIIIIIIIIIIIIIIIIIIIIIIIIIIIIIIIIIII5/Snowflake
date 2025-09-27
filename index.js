@@ -86,8 +86,6 @@ async function GetRobloxDescription(UserId) {
     return Res.data.description || "";
 }
 
-// ------------------- MEMBER COUNT -------------------
-
 async function startMemberCounter(GroupId) {
     const Db = await GetJsonBin();
     const counter = Db.GroupMemberCounter?.[GroupId];
@@ -165,7 +163,7 @@ async function GroupAuditLogs(GroupId) {
     setTimeout(() => GroupAuditLogs(GroupId), 30000);
 }
 
-ClientBot.once("ready", async () => {
+ClientBot.once("clientReady", async () => {
     const Commands = [
         new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("config").setDescription("Set the group ID for this server").addIntegerOption(opt => opt.setName("groupid").setDescription("Roblox group ID").setRequired(true)),
