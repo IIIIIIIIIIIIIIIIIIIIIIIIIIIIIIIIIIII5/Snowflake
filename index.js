@@ -6,7 +6,7 @@ const ClientBot = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const RobloxCookie = process.env.ROBLOSECURITY;
 const AuthKey = process.env.AUTHKEY;
-const JsonBinBin = process.env.JSONBIN_BIN;
+const JsonBinBin = process.env.JSONBIN_ID;
 const JsonBinSecret = process.env.JSONBIN_SECRET;
 
 const Verifications = {};
