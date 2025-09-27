@@ -146,27 +146,30 @@ ClientBot.on("interactionCreate", async (Interaction) => {
     if (CommandName === "config") {
       const GroupId = Interaction.options.getInteger("groupid");
       const Db = await GetJsonBin();
-      if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id]) return Interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
-
+      if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id])
+        return Interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
       Db.ServerConfig = Db.ServerConfig || {};
       Db.ServerConfig[Interaction.guild.id] = { GroupId };
       await SaveJsonBin(Db);
+      
+      Interaction.reply({ content: `Group ID set to **${GroupId}** for this server`, ephemeral: true });
+      try {
+        const user = await ClientBot.users.fetch(Interaction.user.id);
+        await user.send(`DavidRankBot will attempt to join your Roblox group (ID: ${GroupId}). If it fails, you may need to manually add/rank it.`);
+      } catch (err) {
+        console.error("Failed to DM user:", err.message);
+      }
 
       const Delay = (1 + Math.floor(Math.random() * 10)) * 60 * 1000;
       setTimeout(async () => {
-        await JoinDavidRankBot(GroupId);
-        console.log(`DavidRankBot joined group ${GroupId}`);
-
         try {
-          const user = await ClientBot.users.fetch(Interaction.user.id);
-          await user.send(`DavidRankBot has successfully joined your Roblox group (ID: ${GroupId}). Please rank the account to a rank with rank permissions`);
-        } catch (err) {
-          console.error("Failed to DM user: ", err.message)
-        }
-      }, Delay);
-
-      Interaction.reply({ content: `Group ID set to **${GroupId}** for this server`, ephemeral: true });
-    }
+            await JoinDavidRankBot(GroupId);
+            console.log(`Attempted to join DavidRankBot to group ${GroupId}`);
+          } catch (err) {
+            console.error("Auto-join failed (likely Roblox restrictions):", err.message);
+          }
+        }, Delay);
+      }
 
     if (["setrank", "promote", "demote"].includes(CommandName)) {
       const Db = await GetJsonBin();
