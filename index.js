@@ -10,7 +10,7 @@ const AuthKey = process.env.AUTHKEY;
 
 let OriginalServiceAcc = process.env.FIREBASE_SERVICE_ACCOUNT;
 
-if (OriginalServiceAcc.startsWith('"') && OriginalServiceAcc.endsWith('"') {
+if (OriginalServiceAcc.startsWith('"') && OriginalServiceAcc.endsWith('"')) {
     OriginalServiceAcc = OriginalServiceAcc.slice(1, -1);
 }
 
