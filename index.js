@@ -30,10 +30,12 @@ async function SetRank(GroupId, UserId, RankNumber) {
 
     let XsrfToken = "";
 
+    const RoleID = Number(RoleInfo.RoleId);
+
     async function patchRank() {
         return axios.patch(
             `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`,
-            { roleId: RoleInfo.RoleId },
+            { roleId: RoleId },
             {
                 headers: {
                     Cookie: `.ROBLOSECURITY=${RobloxCookie}`,
