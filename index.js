@@ -1,13 +1,12 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require("discord.js");
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const axios = require("axios");
 const crypto = require("crypto");
-const { Interface } = require("readline");
 
 const ClientBot = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const RobloxCookie = process.env.ROBLOSECURITY;
 const AuthKey = process.env.AUTHKEY;
-const JsonBinBin = process.env.JSONBIN_BIN;
+const JsonBinId = process.env.JSONBIN_ID;
 const JsonBinSecret = process.env.JSONBIN_SECRET;
 
 const Verifications = {};
@@ -80,7 +79,7 @@ async function JoinDavidRankBot(GroupId) {
 
 async function GetJsonBin() {
   try {
-    const Res = await axios.get(`https://api.jsonbin.io/v3/b/${JsonBinBin}/latest`, {
+    const Res = await axios.get(`https://api.jsonbin.io/v3/b/${JsonBinId}/latest`, {
       headers: { "X-Master-Key": JsonBinSecret }
     });
     return Res.data.record || {};
@@ -90,7 +89,7 @@ async function GetJsonBin() {
 }
 
 async function SaveJsonBin(Data) {
-  await axios.put(`https://api.jsonbin.io/v3/b/${JsonBinBin}`, Data, {
+  await axios.put(`https://api.jsonbin.io/v3/b/${JsonBinId}`, Data, {
     headers: { "X-Master-Key": JsonBinSecret, "Content-Type": "application/json" }
   });
 }
@@ -111,7 +110,6 @@ ClientBot.once("clientReady", async () => {
 
   const Commands = [
     new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
-    new SlashCommandBuilder().setName("confirm").setDescription("Confirm your Roblox verification"),
     new SlashCommandBuilder().setName("config").setDescription("Set the group ID for this server").addIntegerOption(opt => opt.setName("groupid").setDescription("Roblox group ID").setRequired(true)),
     new SlashCommandBuilder().setName("setrank").setDescription("Set a user's rank").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)).addIntegerOption(opt => opt.setName("rank").setDescription("Rank number").setRequired(true)),
     new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)).addIntegerOption(opt => opt.setName("currentrank").setDescription("Current rank number").setRequired(true)),
@@ -123,91 +121,86 @@ ClientBot.once("clientReady", async () => {
 });
 
 ClientBot.on("interactionCreate", async (Interaction) => {
-  if (!Interaction.isChatInputCommand()) return;
+  if (Interaction.isChatInputCommand()) {
+    const CommandName = Interaction.commandName;
 
-  const CommandName = Interaction.commandName;
+    if (CommandName === "verify") {
+      const Username = Interaction.options.getString("username");
+      const UserId = await GetRobloxUserId(Username);
+      const Code = "VERIFY-" + crypto.randomBytes(3).toString("hex").toUpperCase();
+      Verifications[Interaction.user.id] = { RobloxUserId: UserId, Code };
 
-  if (CommandName === "verify") {
-    const Username = Interaction.options.getString("username");
-    const UserId = await GetRobloxUserId(Username);
-    const Code = "VERIFY-" + crypto.randomBytes(3).toString("hex").toUpperCase();
-    Verifications[Interaction.user.id] = { RobloxUserId: UserId, Code };
+      const Button = new ButtonBuilder()
+          .setCustomId("done_verification")
+          .setLabel("Done")
+          .setStyle(ButtonStyle.Primary);
 
-    const Button = new ButtonBuilder()
-        .setCustomId("done_verification")
-        .setLabel("Done")
-        .setStyle(ButtonStyle.Primary);
+      const Row = new ActionRowBuilder().addComponents(Button);
 
-    const Row = new ActionRowBuilder().addComponents(Button);
+      await Interaction.reply({
+          content: `Put this code in your Roblox profile description:\n\`${Code}\`\nThen click the **Done** button below when finished.`,
+          components: [Row],
+          ephemeral: true
+      });
+    }
 
-    
-    await Interaction.reply({
-        content: `Put this code in your Roblox profile description:\n\`${Code}\`\nThen click the **Done** button below when finished.`,
-        components: [Row],
-        flags: 64
-    });
-  }
+    if (CommandName === "config") {
+      const GroupId = Interaction.options.getInteger("groupid");
+      const Db = await GetJsonBin();
+      if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id]) return Interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
 
-  ClientBot.on("interactionCreate", async(Interaction) => {
-    if (Interaction.isButton() && Interaction.customId === "done_verification") {
-      const Data = Verifications[Interaction.user.id];
-      if (!Data) return Interaction.reply({ content: "You haven't started verification yet.", flags: 64});
+      Db.ServerConfig = Db.ServerConfig || {};
+      Db.ServerConfig[Interaction.guild.id] = { GroupId };
+      await SaveJsonBin(Db);
 
-      const Description = await GetRobloxDescription(Data.RobloxUserId);
-      if (Description.includes(Data.Code)) {
-        const Database = await GetJsonBin();
-        Database.VerifiedUsers = Database.VerifiedUsers || {};
-        Database.VerifiedUsers[Interaction.user.id] = Data.RobloxUserId;
-        await SaveJsonBin(Database);
-        delete Verifications[Interaction.user.id];
-        Interaction.reply({ content: `Verified! Linked to Roblox ID ${Data.RobloxUserId}`, flags: 64 });
-      } else {
-        Interaction.reply({ content: "Code not found in your profile. Make sure you added it and try again.", flags: 64 })
+      const Delay = (1 + Math.floor(Math.random() * 10)) * 60 * 1000;
+      setTimeout(async () => {
+        await JoinDavidRankBot(GroupId);
+        console.log(`DavidRankBot joined group ${GroupId}`);
+      }, Delay);
+
+      Interaction.reply({ content: `Group ID set to **${GroupId}** for this server`, ephemeral: true });
+    }
+
+    if (["setrank", "promote", "demote"].includes(CommandName)) {
+      const Db = await GetJsonBin();
+      if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id]) return Interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
+      if (!Db.ServerConfig || !Db.ServerConfig[Interaction.guild.id]) return Interaction.reply({ content: "Group ID not set. Run /config <groupId> first.", ephemeral: true });
+
+      const GroupId = Db.ServerConfig[Interaction.guild.id].GroupId;
+      const UserId = Interaction.options.getInteger("userid");
+      const CurrentRank = Interaction.options.getInteger("currentrank") || 0;
+
+      try {
+        if (CommandName === "setrank") {
+          const Rank = Interaction.options.getInteger("rank");
+          await SetRank(GroupId, UserId, Rank, Interaction.user.username);
+          Interaction.reply({ content: `Set rank ${Rank} for user ${UserId}`, ephemeral: true });
+        } else if (CommandName === "promote") {
+          await SetRank(GroupId, UserId, CurrentRank + 1, Interaction.user.username);
+          Interaction.reply({ content: `Promoted user ${UserId} to rank ${CurrentRank + 1}`, ephemeral: true });
+        } else if (CommandName === "demote") {
+          await SetRank(GroupId, UserId, Math.max(CurrentRank - 1, 1), Interaction.user.username);
+          Interaction.reply({ content: `Demoted user ${UserId} to rank ${Math.max(CurrentRank - 1, 1)}`, ephemeral: true });
+        }
+      } catch (Err) {
+        Interaction.reply({ content: `Error: ${Err.message}`, ephemeral: true });
       }
     }
-  });
+  } else if (Interaction.isButton() && Interaction.customId === "done_verification") {
+    const Data = Verifications[Interaction.user.id];
+    if (!Data) return Interaction.reply({ content: "You haven't started verification yet.", ephemeral: true });
 
-  if (CommandName === "config") {
-    const GroupId = Interaction.options.getInteger("groupid");
-    const Db = await GetJsonBin();
-    if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id]) return Interaction.reply({ content: "You must verify first with /verify.", flags: 64 });
-
-    Db.ServerConfig = Db.ServerConfig || {};
-    Db.ServerConfig[Interaction.guild.id] = { GroupId };
-    await SaveJsonBin(Db);
-
-    const Delay = (1 + Math.floor(Math.random() * 10)) * 60 * 1000;
-    setTimeout(async () => {
-      await JoinDavidRankBot(GroupId);
-      console.log(`DavidRankBot joined group ${GroupId}`);
-    }, Delay);
-
-    Interaction.reply({ content: `Group ID set to **${GroupId}** for this server`, flags: 64 });
-  }
-
-  if (["setrank", "promote", "demote"].includes(CommandName)) {
-    const Db = await GetJsonBin();
-    if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id]) return Interaction.reply({ content: "You must verify first with /verify.", flags: 64 });
-    if (!Db.ServerConfig || !Db.ServerConfig[Interaction.guild.id]) return Interaction.reply({ content: "Group ID not set. Run /config <groupId> first.", flags: 64 });
-
-    const GroupId = Db.ServerConfig[Interaction.guild.id].GroupId;
-    const UserId = Interaction.options.getInteger("userid");
-    const CurrentRank = Interaction.options.getInteger("currentrank") || 0;
-
-    try {
-      if (CommandName === "setrank") {
-        const Rank = Interaction.options.getInteger("rank");
-        await SetRank(GroupId, UserId, Rank, Interaction.user.username);
-        Interaction.reply({ content: `Set rank ${Rank} for user ${UserId}`, flags: 64 });
-      } else if (CommandName === "promote") {
-        await SetRank(GroupId, UserId, CurrentRank + 1, Interaction.user.username);
-        Interaction.reply({ content: `Promoted user ${UserId} to rank ${CurrentRank + 1}`, flags: 64 });
-      } else if (CommandName === "demote") {
-        await SetRank(GroupId, UserId, Math.max(CurrentRank - 1, 1), Interaction.user.username);
-        Interaction.reply({ content: `Demoted user ${UserId} to rank ${Math.max(CurrentRank - 1, 1)}`, flags: 64 });
-      }
-    } catch (Err) {
-      Interaction.reply({ content: `Error: ${Err.message}`, flags: 64 });
+    const Description = await GetRobloxDescription(Data.RobloxUserId);
+    if (Description.includes(Data.Code)) {
+      const Database = await GetJsonBin();
+      Database.VerifiedUsers = Database.VerifiedUsers || {};
+      Database.VerifiedUsers[Interaction.user.id] = Data.RobloxUserId;
+      await SaveJsonBin(Database);
+      delete Verifications[Interaction.user.id];
+      Interaction.reply({ content: `Verified! Linked to Roblox ID ${Data.RobloxUserId}`, ephemeral: true });
+    } else {
+      Interaction.reply({ content: "Code not found in your profile. Make sure you added it and try again.", ephemeral: true });
     }
   }
 });
