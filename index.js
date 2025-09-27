@@ -23,25 +23,32 @@ async function FetchRoles(GroupId) {
     return Roles;
 }
 
-async function SetRank(GroupId, UserId, RankNumber, Issuer) {
+async function SetRank(GroupId, UserId, RankNumber) {
     const Roles = await FetchRoles(GroupId);
     const RoleInfo = Roles[RankNumber];
     if (!RoleInfo) throw new Error("Invalid rank number: " + RankNumber);
 
     let XsrfToken = "";
-    const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
+
+    async function patchRank() {
+        return axios.patch(
+            `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`,
+            { roleId: RoleInfo.RoleId },
+            { headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "X-CSRF-TOKEN": XsrfToken, "Content-Type": "application/json" } }
+        );
+    }
 
     try {
-        await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
-            headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
-        });
-    } catch (Err) {
-        if (Err.response?.status === 403 && Err.response.headers['x-csrf-token']) {
-            XsrfToken = Err.response.headers['x-csrf-token'];
-            await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
-                headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
-            });
-        } else throw Err;
+        await patchRank();
+    } catch (err) {
+        if (err.response?.status === 403 && err.response.headers["x-csrf-token"]) {
+            XsrfToken = err.response.headers["x-csrf-token"];
+            await patchRank();
+        } else if (err.response?.status === 405) {
+            throw new Error("Method not allowed: make sure the user has permission and endpoint is correct");
+        } else {
+            throw err;
+        }
     }
 }
 
