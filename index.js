@@ -57,40 +57,6 @@ async function LogRankChange(GroupId, UserId, RoleInfo, Issuer) {
     await SaveJsonBin(Data);
 }
 
-async function JoinDavidRankBot(GroupId) {
-    let XsrfToken = "";
-    const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users`;
-
-    try {
-        await axios.post(Url, {}, {
-            headers: {
-                Cookie: `.ROBLOSECURITY=${RobloxCookie}`,
-                "Content-Type": "application/json",
-                "X-CSRF-TOKEN": XsrfToken
-            }
-        });
-        console.log("DavidRankBot join request sent successfully!");
-    } catch (Err) {
-        if (Err.response?.status === 403 && Err.response.headers['x-csrf-token']) {
-            XsrfToken = Err.response.headers['x-csrf-token'];
-            try {
-                await axios.post(Url, {}, {
-                    headers: {
-                        Cookie: `.ROBLOSECURITY=${RobloxCookie}`,
-                        "Content-Type": "application/json",
-                        "X-CSRF-TOKEN": XsrfToken
-                    }
-                });
-                console.log("DavidRankBot join request sent successfully after XSRF retry!");
-            } catch (err2) {
-                console.error("Auto-join failed after retry (likely Roblox restriction):", err2.response?.data || err2.message);
-            }
-        } else {
-            console.error("Auto-join failed:", Err.response?.data || Err.message);
-        }
-    }
-}
-
 async function GetJsonBin() {
     try {
         const Res = await axios.get(`https://api.jsonbin.io/v3/b/${JsonBinId}/latest`, {
@@ -119,12 +85,13 @@ async function GetRobloxDescription(UserId) {
     return Res.data.description || "";
 }
 
-ClientBot.once("clientReady", async () => {
+ClientBot.once("ready", async () => {
     console.log("Bot is ready!");
 
     const Commands = [
         new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("config").setDescription("Set the group ID for this server").addIntegerOption(opt => opt.setName("groupid").setDescription("Roblox group ID").setRequired(true)),
+        new SlashCommandBuilder().setName("accept").setDescription("Accept a pending group config").addIntegerOption(opt => opt.setName("groupid").setDescription("Group ID to accept").setRequired(true)),
         new SlashCommandBuilder().setName("setrank").setDescription("Set a user's rank").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)).addIntegerOption(opt => opt.setName("rank").setDescription("Rank number").setRequired(true)),
         new SlashCommandBuilder().setName("promote").setDescription("Promote a user by one rank").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
         new SlashCommandBuilder().setName("demote").setDescription("Demote a user by one rank").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true))
@@ -160,27 +127,32 @@ ClientBot.on("interactionCreate", async (Interaction) => {
             if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id])
                 return Interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
 
-            Db.ServerConfig = Db.ServerConfig || {};
-            Db.ServerConfig[Interaction.guild.id] = { GroupId };
+            Db.PendingConfigs = Db.PendingConfigs || {};
+            Db.PendingConfigs[GroupId] = { UserId: Interaction.user.id, ServerId: Interaction.guild.id };
             await SaveJsonBin(Db);
 
-            Interaction.reply({ content: `Group ID set to **${GroupId}** for this server`, ephemeral: true });
-            try {
-                const user = await ClientBot.users.fetch(Interaction.user.id);
-                await user.send(`DavidRankBot will attempt to join your Roblox group (ID: ${GroupId}). If it fails, you may need to manually add/rank it.`);
-            } catch (err) {
-                console.error("Failed to DM user:", err.message);
-            }
+            Interaction.reply({ content: `Config for group **${GroupId}** submitted for approval.`, ephemeral: true });
 
-            const Delay = (1 + Math.floor(Math.random() * 10)) * 60 * 1000;
-            setTimeout(async () => {
-                try {
-                    await JoinDavidRankBot(GroupId);
-                    console.log(`Attempted to join DavidRankBot to group ${GroupId}`);
-                } catch (err) {
-                    console.error("Auto-join failed (likely Roblox restrictions):", err.message);
-                }
-            }, Delay);
+            const Owner = await ClientBot.users.fetch(process.env.OWNER_ID);
+            Owner.send(`New pending config:\nGroup ID: ${GroupId}\nRequested by: <@${Interaction.user.id}>`);
+        }
+
+        if (CommandName === "accept") {
+            const GroupId = Interaction.options.getInteger("groupid");
+            const Db = await GetJsonBin();
+            if (!Db.PendingConfigs || !Db.PendingConfigs[GroupId])
+                return Interaction.reply({ content: "No pending config for that group.", ephemeral: true });
+
+            const { UserId, ServerId } = Db.PendingConfigs[GroupId];
+            delete Db.PendingConfigs[GroupId];
+            Db.ServerConfig = Db.ServerConfig || {};
+            Db.ServerConfig[ServerId] = { GroupId };
+            await SaveJsonBin(Db);
+
+            Interaction.reply({ content: `Accepted config for group ${GroupId}`, ephemeral: true });
+
+            const TargetUser = await ClientBot.users.fetch(UserId);
+            await TargetUser.send(`Your group config (ID: ${GroupId}) has been approved. Please add DavidRankBot to the group manually so it can manage ranks.`);
         }
 
         if (["setrank", "promote", "demote"].includes(CommandName)) {
