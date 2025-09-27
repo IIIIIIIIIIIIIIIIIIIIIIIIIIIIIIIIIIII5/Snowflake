@@ -28,14 +28,15 @@ async function SetRank(GroupId, UserId, RankNumber) {
     const RoleInfo = Roles[RankNumber];
     if (!RoleInfo) throw new Error(`Invalid rank number: ${RankNumber}`);
 
-    let XsrfToken = "";
+    const roleId = Number(RoleInfo.RoleId);
+    console.log("Attempting to set roleId:", roleId, "for user:", UserId);
 
-    const RoleID = Number(RoleInfo.RoleId);
+    let XsrfToken = "";
 
     async function patchRank() {
         return axios.patch(
             `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`,
-            { roleId: RoleId },
+            { roleId: roleId },
             {
                 headers: {
                     Cookie: `.ROBLOSECURITY=${RobloxCookie}`,
@@ -50,33 +51,12 @@ async function SetRank(GroupId, UserId, RankNumber) {
         await patchRank();
         console.log(`Successfully set rank ${RankNumber} for user ${UserId} in group ${GroupId}`);
     } catch (err) {
-        if (err.response) {
-            const status = err.response.status;
-            console.log(`Error setting rank for user ${UserId} in group ${GroupId}: Status ${status}`);
-            console.log("Response data:", err.response.data);
-
-            if (status === 403 && err.response.headers["x-csrf-token"]) {
-                XsrfToken = err.response.headers["x-csrf-token"];
-                console.log("Retrying with new CSRF token...");
-                try {
-                    await patchRank();
-                    console.log(`Successfully set rank ${RankNumber} for user ${UserId} after retry`);
-                } catch (retryErr) {
-                    console.log("Retry failed:", retryErr.response?.data || retryErr.message);
-                    throw retryErr;
-                }
-            } else if (status === 400) {
-                console.log("Bad request: likely invalid RoleId or group/user mismatch.");
-                throw new Error("Bad request");
-            } else if (status === 405) {
-                console.log("Method not allowed: permission issue or user is group owner.");
-                throw new Error("Method not allowed");
-            } else {
-                console.log("Unknown error:", err.response.data || err.message);
-                throw err;
-            }
+        console.log("Error patching rank:", err.response?.data || err.message);
+        if (err.response?.status === 403 && err.response.headers["x-csrf-token"]) {
+            XsrfToken = err.response.headers["x-csrf-token"];
+            console.log("Retrying with new CSRF token...");
+            await patchRank();
         } else {
-            console.log("Error without response:", err.message);
             throw err;
         }
     }
