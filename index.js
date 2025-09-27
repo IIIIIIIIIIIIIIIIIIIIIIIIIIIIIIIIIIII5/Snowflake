@@ -8,7 +8,10 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const Cookie = process.env.ROBLOSECURITY;
 const AuthKey = process.env.AUTHKEY;
 
-const ServiceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+const OriginalServiceAcc = process.env.FIREBASE_SERVICE_ACCOUNT
+const FixedServiceAcc = OriginalServiceAcc.replace(/^"(.*)"$/, '$1');
+
+const ServiceAccount = JSON.parse(FixedServiceAcc);
 initializeApp({ credential: cert(ServiceAccount) });
 const Db = getFirestore();
 
