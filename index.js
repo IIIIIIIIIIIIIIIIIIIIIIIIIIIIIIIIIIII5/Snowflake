@@ -12,6 +12,8 @@ const OWNER_ID = process.env.OWNER_ID;
 
 const Verifications = {};
 
+let LastAuditIds = {};
+
 async function FetchRoles(GroupId) {
     const Res = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/roles`);
     const Roles = {};
@@ -144,6 +146,45 @@ async function startMemberCounter(GroupId) {
     }
 
     setTimeout(() => startMemberCounter(GroupId), 60000);
+}
+
+async function GroupAuditLogs(GroupId) {
+    const Db = await GetJsonBin();
+    const auditChannelId = Db.AuditLogs?.[GroupId]?.channelId;
+    if (!auditChannelId) return;
+
+    const channel = ClientBot.channels.cache.get(auditChannelId);
+    if (!channel) return;
+
+    try {
+        const res = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/audit-log?limit=50`, {
+            headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}` }
+        });
+
+        const events = res.data.data || [];
+        for (let i = events.length - 1; i >= 0; i--) {
+            const e = events[i];
+            if (lastAuditIds[GroupId] && e.id <= lastAuditIds[GroupId]) continue;
+
+            const userRes = await axios.get(`https://users.roblox.com/v1/users/${e.targetUserId}`);
+            const targetUsername = userRes.data.name;
+            const avatarUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${e.targetUserId}&width=150&height=150&format=png`;
+
+            const embed = new EmbedBuilder()
+                .setColor(0x0099ff)
+                .setAuthor({ name: targetUsername, iconURL: avatarUrl })
+                .setDescription(`**Action:** ${e.actionType.replace(/_/g, " ")}`)
+                .setFooter({ text: `Time: ${new Date(e.created).toLocaleString()}` });
+
+            channel.send({ embeds: [embed] });
+
+            lastAuditIds[GroupId] = e.id;
+        }
+    } catch (err) {
+        console.error("Error fetching group audit logs:", err);
+    }
+
+    setTimeout(() => GroupAuditLogs(GroupId), 30000);
 }
 
 ClientBot.once("clientReady", async () => {
