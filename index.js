@@ -8,22 +8,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const Cookie = process.env.ROBLOSECURITY;
 const AuthKey = process.env.AUTHKEY;
 
-const serviceAccount = {
-  type: "service_account",
-  project_id: "rankingapi-27b94",
-  private_key_id: "b29d7bc2859899f2cda71b31a353966b6ebb72e1",
-  private_key: `-----BEGIN PRIVATE KEY-----
-MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDdzc+Q8+e1+lfI
-+ilIDUGG143zqxVNH5/9OSB4Ff4L99Ojp/vqecz+/hhTD7xlYQ3BFuoLYtRl4PvR
-...rest of key...
------END PRIVATE KEY-----`,
-  client_email: "firebase-adminsdk-fbsvc@rankingapi-27b94.iam.gserviceaccount.com",
-  client_id: "104075673530044448097",
-  auth_uri: "https://accounts.google.com/o/oauth2/auth",
-  token_uri: "https://oauth2.googleapis.com/token",
-  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-  client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40rankingapi-27b94.iam.gserviceaccount.com"
-};
+const serviceAccount = require("./firebase-service-account.json");
 
 initializeApp({ credential: cert(serviceAccount) });
 
