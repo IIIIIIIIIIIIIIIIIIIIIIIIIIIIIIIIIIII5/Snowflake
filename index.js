@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
 const axios = require("axios");
 const crypto = require("crypto");
 
@@ -43,6 +43,8 @@ async function SetRank(GroupId, UserId, RankNumber, Issuer) {
     }
 }
 
+const { EmbedBuilder } = require("discord.js");
+
 async function LogRankChange(GroupId, UserId, RoleInfo, Issuer) {
     const Data = await GetJsonBin();
     Data.RankChanges = Data.RankChanges || [];
@@ -57,8 +59,28 @@ async function LogRankChange(GroupId, UserId, RoleInfo, Issuer) {
 
     if (Data.AuditLogs?.[GroupId]?.channelId) {
         const channel = ClientBot.channels.cache.get(Data.AuditLogs[GroupId].channelId);
-        if (channel) {
-            channel.send(`**Audit Log:** ${Issuer} set user ${UserId} to rank ${RoleInfo.Id} (${RoleInfo.RoleId})`);
+        if (!channel) return;
+
+        try {
+            const Res = await axios.get(`https://users.roblox.com/v1/users/${UserId}`);
+            const Username = Res.data.name;
+            const AvatarUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${UserId}&width=150&height=150&format=png`;
+
+            const Embed = new EmbedBuilder()
+                .setTitle("Audit Log")
+                .setColor(0x00FF00)
+                .setThumbnail(AvatarUrl)
+                .addFields(
+                    { name: "User", value: Username, inline: true },
+                    { name: "Rank Set To", value: `${RoleInfo.Id} (${RoleInfo.RoleId})`, inline: true },
+                    { name: "Issued By", value: Issuer || "API", inline: true },
+                    { name: "Timestamp", value: new Date().toLocaleString(), inline: false }
+                )
+                .setFooter({ text: `Roblox UserID: ${UserId}` });
+
+            channel.send({ embeds: [Embed] });
+        } catch (err) {
+            console.error("Error sending audit log embed:", err);
         }
     }
 }
