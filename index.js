@@ -54,6 +54,13 @@ async function LogRankChange(GroupId, UserId, RoleInfo, Issuer) {
         Timestamp: new Date().toISOString()
     });
     await SaveJsonBin(Data);
+
+    if (Data.AuditLogs?.[GroupId]?.channelId) {
+        const channel = ClientBot.channels.cache.get(Data.AuditLogs[GroupId].channelId);
+        if (channel) {
+            channel.send(`**Audit Log:** ${Issuer} set user ${UserId} to rank ${RoleInfo.Id} (${RoleInfo.RoleId})`);
+        }
+    }
 }
 
 async function GetJsonBin() {
@@ -95,7 +102,7 @@ async function startMemberCounter(GroupId) {
             const diff = newCount - (counter.lastCount || 0);
             const webhook = await ClientBot.channels.cache.get(counter.channelId)?.fetchWebhooks()
                 .then(ws => ws.find(w => w.id === counter.webhookId));
-            if (webhook) await webhook.send({ content: `🚀 ${diff} new member(s) joined the group! Total members: ${newCount}` });
+            if (webhook) await webhook.send({ content: `${diff} new member(s) joined the group! Total members: ${newCount}` });
         }
         counter.lastCount = newCount;
         await SaveJsonBin(Db);
@@ -111,7 +118,8 @@ ClientBot.once("ready", async () => {
         new SlashCommandBuilder().setName("promote").setDescription("Promote a user by one rank").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
         new SlashCommandBuilder().setName("demote").setDescription("Demote a user by one rank").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
         new SlashCommandBuilder().setName("fire").setDescription("Set a user's rank to lowest").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
-        new SlashCommandBuilder().setName("groupmembercounter").setDescription("Enable/disable live group member counter").addStringOption(opt => opt.setName("action").setDescription("Enable or Disable").setRequired(true).addChoices({ name: "Enable", value: "enable" }, { name: "Disable", value: "disable" })).addChannelOption(opt => opt.setName("channel").setDescription("Channel to send updates").setRequired(true))
+        new SlashCommandBuilder().setName("groupmembercounter").setDescription("Enable/disable live group member counter").addStringOption(opt => opt.setName("action").setDescription("Enable or Disable").setRequired(true).addChoices({ name: "Enable", value: "enable" }, { name: "Disable", value: "disable" })).addChannelOption(opt => opt.setName("channel").setDescription("Channel to send updates").setRequired(true)),
+        new SlashCommandBuilder().setName("auditlog").setDescription("Set a channel for audit logs").addChannelOption(opt => opt.setName("channel").setDescription("Channel to send audit logs").setRequired(true))
     ];
 
     if (OWNER_ID) {
@@ -124,8 +132,18 @@ ClientBot.once("ready", async () => {
 
 ClientBot.on("interactionCreate", async (Interaction) => {
     if (!Interaction.isChatInputCommand()) return;
-
     const CommandName = Interaction.commandName;
+    const Db = await GetJsonBin();
+
+    if (CommandName === "auditlog") {
+        const channel = Interaction.options.getChannel("channel");
+        const GroupId = Db.ServerConfig?.[Interaction.guild.id]?.GroupId;
+        if (!GroupId) return Interaction.reply({ content: "Group ID not set. Run /config first.", ephemeral: true });
+        Db.AuditLogs = Db.AuditLogs || {};
+        Db.AuditLogs[GroupId] = { channelId: channel.id };
+        await SaveJsonBin(Db);
+        return Interaction.reply({ content: `Audit log channel set to ${channel.name}`, ephemeral: true });
+    }
 
     if (CommandName === "accept" && Interaction.user.id !== OWNER_ID) {
         return Interaction.reply({ content: "You cannot use this command.", ephemeral: true });
