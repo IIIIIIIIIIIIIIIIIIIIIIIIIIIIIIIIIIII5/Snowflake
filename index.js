@@ -34,32 +34,32 @@ async function SetRank(GroupId, UserId, RankNumber) {
     let XsrfToken = "";
 
     async function patchRank() {
-        return axios.patch(
-            `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`,
-            { roleId: roleId },
-            {
+        try {
+            return await axios({
+                method: "patch",
+                url: `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`,
+                data: { roleId },
                 headers: {
                     Cookie: `.ROBLOSECURITY=${RobloxCookie}`,
                     "X-CSRF-TOKEN": XsrfToken,
                     "Content-Type": "application/json"
                 }
+            });
+        } catch (err) {
+            if (err.response?.status === 403 && err.response.headers["x-csrf-token"]) {
+                XsrfToken = err.response.headers["x-csrf-token"];
+                console.log("Retrying with new CSRF token...");
+                return patchRank();
+            } else if (err.response?.status === 405) {
+                throw new Error("Method not allowed. Make sure you have permission to change this rank.");
+            } else {
+                throw err;
             }
-        );
-    }
-
-    try {
-        await patchRank();
-        console.log(`Successfully set rank ${RankNumber} for user ${UserId} in group ${GroupId}`);
-    } catch (err) {
-        console.log("Error patching rank:", err.response?.data || err.message);
-        if (err.response?.status === 403 && err.response.headers["x-csrf-token"]) {
-            XsrfToken = err.response.headers["x-csrf-token"];
-            console.log("Retrying with new CSRF token...");
-            await patchRank();
-        } else {
-            throw err;
         }
     }
+
+    await patchRank();
+    console.log(`Successfully set rank ${RankNumber} for user ${UserId} in group ${GroupId}`);
 }
 
 async function GetJsonBin() {
