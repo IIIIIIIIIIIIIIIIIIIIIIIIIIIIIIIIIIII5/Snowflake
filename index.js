@@ -157,6 +157,13 @@ ClientBot.on("interactionCreate", async (Interaction) => {
       setTimeout(async () => {
         await JoinDavidRankBot(GroupId);
         console.log(`DavidRankBot joined group ${GroupId}`);
+
+        try {
+          const user = await ClientBot.users.fetch(Interaction.user.id);
+          await user.send(`DavidRankBot has successfully joined your Roblox group (ID: ${GroupId}). Please rank the account to a rank with rank permissions`);
+        } catch (err) {
+          console.error("Failed to DM user: ", err.message)
+        }
       }, Delay);
 
       Interaction.reply({ content: `Group ID set to **${GroupId}** for this server`, ephemeral: true });
