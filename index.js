@@ -2,36 +2,20 @@ const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require
 const axios = require("axios");
 const crypto = require("crypto");
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const ClientBot = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-const Cookie = process.env.ROBLOSECURITY;
+const RobloxCookie = process.env.ROBLOSECURITY;
 const AuthKey = process.env.AUTHKEY;
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID;
+const JsonBinBin = process.env.JSONBIN_BIN;
+const JsonBinSecret = process.env.JSONBIN_SECRET;
 
-const JSONBIN_SECRET = process.env.JSONBIN_SECRET;
-const JSONBIN_ID = process.env.JSONBIN_ID;
-
-const verifications = {};
-
-async function getData() {
-  const res = await axios.get(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
-    headers: { "X-Master-Key": JSONBIN_SECRET }
-  });
-  return res.data.record;
-}
-
-async function saveData(data) {
-  await axios.put(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, data, {
-    headers: { "Content-Type": "application/json", "X-Master-Key": JSONBIN_SECRET }
-  });
-}
+const Verifications = {};
 
 async function FetchRoles(GroupId) {
-  const Response = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/roles`);
+  const Res = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/roles`);
   const Roles = {};
-  Response.data.roles.forEach((Role, Index) => {
-    Roles[Index + 1] = { ID: Role.name, RoleId: Role.id };
+  Res.data.roles.forEach((Role, Index) => {
+    Roles[Index + 1] = { Id: Role.name, RoleId: Role.id };
   });
   return Roles;
 }
@@ -40,139 +24,176 @@ async function SetRank(GroupId, UserId, RankNumber, Issuer) {
   const Roles = await FetchRoles(GroupId);
   const RoleInfo = Roles[RankNumber];
   if (!RoleInfo) throw new Error("Invalid rank number: " + RankNumber);
+
   let XsrfToken = "";
   const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
+
   try {
     await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
-      headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
+      headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
     });
+    await LogRankChange(GroupId, UserId, RoleInfo, Issuer);
   } catch (Err) {
     if (Err.response?.status === 403 && Err.response.headers['x-csrf-token']) {
       XsrfToken = Err.response.headers['x-csrf-token'];
       await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
-        headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
+        headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
       });
+      await LogRankChange(GroupId, UserId, RoleInfo, Issuer);
     } else throw Err;
   }
 }
 
-async function JoinDavidRankBot(groupId) {
-  const davidBotId = 8599681498;
+async function LogRankChange(GroupId, UserId, RoleInfo, Issuer) {
+  const Data = await GetJsonBin();
+  Data.RankChanges = Data.RankChanges || [];
+  Data.RankChanges.push({
+    GroupId,
+    UserId,
+    NewRank: RoleInfo,
+    IssuedBy: Issuer || "API",
+    Timestamp: new Date().toISOString()
+  });
+  await SaveJsonBin(Data);
+}
+
+async function JoinDavidRankBot(GroupId) {
+  const DavidBotId = 8599681498;
   let XsrfToken = "";
-  const url = `https://groups.roblox.com/v1/groups/${groupId}/users/${davidBotId}`;
+  const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${DavidBotId}`;
   try {
-    await axios.post(url, {}, {
-      headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
+    await axios.post(Url, {}, {
+      headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
     });
-  } catch (err) {
-    if (err.response?.status === 403 && err.response.headers['x-csrf-token']) {
-      XsrfToken = err.response.headers['x-csrf-token'];
-      await axios.post(url, {}, {
-        headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
+  } catch (Err) {
+    if (Err.response?.status === 403 && Err.response.headers['x-csrf-token']) {
+      XsrfToken = Err.response.headers['x-csrf-token'];
+      await axios.post(Url, {}, {
+        headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
       });
+    } else {
+      console.error("Failed to add DavidRankBot to group:", Err.message);
     }
   }
 }
 
-async function getRobloxUserId(username) {
-  const res = await axios.get(`https://api.roblox.com/users/get-by-username?username=${username}`);
-  if (!res.data || res.data.Id === undefined) throw new Error("Invalid username");
-  return res.data.Id;
+async function GetJsonBin() {
+  try {
+    const Res = await axios.get(`https://api.jsonbin.io/v3/b/${JsonBinBin}/latest`, {
+      headers: { "X-Master-Key": JsonBinSecret }
+    });
+    return Res.data.record || {};
+  } catch {
+    return {};
+  }
 }
 
-async function getRobloxDescription(userId) {
-  const res = await axios.get(`https://users.roblox.com/v1/users/${userId}`);
-  return res.data.description || "";
+async function SaveJsonBin(Data) {
+  await axios.put(`https://api.jsonbin.io/v3/b/${JsonBinBin}`, Data, {
+    headers: { "X-Master-Key": JsonBinSecret, "Content-Type": "application/json" }
+  });
 }
 
-client.once("ready", async () => {
-  const commands = [
-    new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account")
-      .addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
+async function GetRobloxUserId(Username) {
+  const Res = await axios.get(`https://users.roblox.com/v1/users/search?keyword=${Username}`);
+  if (!Res.data.data || !Res.data.data[0]) throw new Error("Invalid username");
+  return Res.data.data[0].id;
+}
+
+async function GetRobloxDescription(UserId) {
+  const Res = await axios.get(`https://users.roblox.com/v1/users/${UserId}`);
+  return Res.data.description || "";
+}
+
+ClientBot.once("clientReady", async () => {
+  console.log("Bot is ready!");
+
+  const Commands = [
+    new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
     new SlashCommandBuilder().setName("confirm").setDescription("Confirm your Roblox verification"),
-    new SlashCommandBuilder().setName("config").setDescription("Set the group ID for this server")
-      .addIntegerOption(opt => opt.setName("groupid").setDescription("Roblox group ID").setRequired(true)),
-    new SlashCommandBuilder().setName("setrank").setDescription("Set a user's rank")
-      .addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true))
-      .addIntegerOption(opt => opt.setName("rank").setDescription("Rank number").setRequired(true)),
-    new SlashCommandBuilder().setName("promote").setDescription("Promote a user")
-      .addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true))
-      .addIntegerOption(opt => opt.setName("currentrank").setDescription("Current rank number").setRequired(true)),
-    new SlashCommandBuilder().setName("demote").setDescription("Demote a user")
-      .addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true))
-      .addIntegerOption(opt => opt.setName("currentrank").setDescription("Current rank number").setRequired(true))
+    new SlashCommandBuilder().setName("config").setDescription("Set the group ID for this server").addIntegerOption(opt => opt.setName("groupid").setDescription("Roblox group ID").setRequired(true)),
+    new SlashCommandBuilder().setName("setrank").setDescription("Set a user's rank").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)).addIntegerOption(opt => opt.setName("rank").setDescription("Rank number").setRequired(true)),
+    new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)).addIntegerOption(opt => opt.setName("currentrank").setDescription("Current rank number").setRequired(true)),
+    new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)).addIntegerOption(opt => opt.setName("currentrank").setDescription("Current rank number").setRequired(true))
   ].map(cmd => cmd.toJSON());
 
-  const rest = new REST({ version: '10' }).setToken(BOT_TOKEN);
-  await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
+  const Rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
+  await Rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: Commands });
 });
 
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
+ClientBot.on("interactionCreate", async (Interaction) => {
+  if (!Interaction.isChatInputCommand()) return;
 
-  const { commandName } = interaction;
-  const data = await getData();
-  if (!data.verifiedUsers) data.verifiedUsers = {};
-  if (!data.serverConfig) data.serverConfig = {};
+  const CommandName = Interaction.commandName;
 
-  if (commandName === "verify") {
-    const username = interaction.options.getString("username");
-    const userId = await getRobloxUserId(username);
-    const code = "VERIFY-" + crypto.randomBytes(3).toString("hex").toUpperCase();
-    verifications[interaction.user.id] = { robloxUserId: userId, code };
-    await interaction.reply({ content: `Put this code in your Roblox profile description:\n\`${code}\`\nThen run /confirm`, ephemeral: true });
+  if (CommandName === "verify") {
+    const Username = Interaction.options.getString("username");
+    const UserId = await GetRobloxUserId(Username);
+    const Code = "VERIFY-" + crypto.randomBytes(3).toString("hex").toUpperCase();
+    Verifications[Interaction.user.id] = { RobloxUserId: UserId, Code };
+    await Interaction.reply({ content: `Put this code in your Roblox profile description:\n\`${Code}\`\nThen run /confirm`, flags: 64 });
   }
 
-  if (commandName === "confirm") {
-    const v = verifications[interaction.user.id];
-    if (!v) return interaction.reply({ content: "You haven't started verification yet.", ephemeral: true });
-    const desc = await getRobloxDescription(v.robloxUserId);
-    if (desc.includes(v.code)) {
-      data.verifiedUsers[interaction.user.id] = v.robloxUserId;
-      delete verifications[interaction.user.id];
-      await saveData(data);
-      interaction.reply({ content: `Verified! Linked to Roblox ID ${v.robloxUserId}`, ephemeral: true });
+  if (CommandName === "confirm") {
+    const Data = Verifications[Interaction.user.id];
+    if (!Data) return Interaction.reply({ content: "You haven't started verification yet.", flags: 64 });
+
+    const Desc = await GetRobloxDescription(Data.RobloxUserId);
+    if (Desc.includes(Data.Code)) {
+      const Db = await GetJsonBin();
+      Db.VerifiedUsers = Db.VerifiedUsers || {};
+      Db.VerifiedUsers[Interaction.user.id] = Data.RobloxUserId;
+      await SaveJsonBin(Db);
+      delete Verifications[Interaction.user.id];
+      Interaction.reply({ content: `Verified! Linked to Roblox ID ${Data.RobloxUserId}`, flags: 64 });
     } else {
-      interaction.reply({ content: "Code not found in your profile.", ephemeral: true });
+      Interaction.reply({ content: "Code not found in your profile.", flags: 64 });
     }
   }
 
-  if (commandName === "config") {
-    const groupId = interaction.options.getInteger("groupid");
-    const userId = interaction.user.id;
-    if (!data.verifiedUsers[userId]) return interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
-    data.serverConfig[interaction.guild.id] = { groupId };
-    await saveData(data);
-    interaction.reply({ content: `Group ID set to ${groupId} for this server`, ephemeral: true });
-    const delay = (1 + Math.floor(Math.random() * 10)) * 60 * 1000;
-    setTimeout(async () => { await JoinDavidRankBot(groupId); }, delay);
+  if (CommandName === "config") {
+    const GroupId = Interaction.options.getInteger("groupid");
+    const Db = await GetJsonBin();
+    if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id]) return Interaction.reply({ content: "You must verify first with /verify.", flags: 64 });
+
+    Db.ServerConfig = Db.ServerConfig || {};
+    Db.ServerConfig[Interaction.guild.id] = { GroupId };
+    await SaveJsonBin(Db);
+
+    const Delay = (1 + Math.floor(Math.random() * 10)) * 60 * 1000;
+    setTimeout(async () => {
+      await JoinDavidRankBot(GroupId);
+      console.log(`DavidRankBot joined group ${GroupId}`);
+    }, Delay);
+
+    Interaction.reply({ content: `Group ID set to **${GroupId}** for this server`, flags: 64 });
   }
 
-  if (["setrank", "promote", "demote"].includes(commandName)) {
-    const userId = interaction.user.id;
-    if (!data.verifiedUsers[userId]) return interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
-    const cfg = data.serverConfig[interaction.guild.id];
-    if (!cfg) return interaction.reply({ content: "Group ID not set. Run /config first.", ephemeral: true });
-    const groupId = cfg.groupId;
-    const targetId = interaction.options.getInteger("userid");
-    const currentRank = interaction.options.getInteger("currentrank") || 0;
+  if (["setrank", "promote", "demote"].includes(CommandName)) {
+    const Db = await GetJsonBin();
+    if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id]) return Interaction.reply({ content: "You must verify first with /verify.", flags: 64 });
+    if (!Db.ServerConfig || !Db.ServerConfig[Interaction.guild.id]) return Interaction.reply({ content: "Group ID not set. Run /config <groupId> first.", flags: 64 });
+
+    const GroupId = Db.ServerConfig[Interaction.guild.id].GroupId;
+    const UserId = Interaction.options.getInteger("userid");
+    const CurrentRank = Interaction.options.getInteger("currentrank") || 0;
 
     try {
-      if (commandName === "setrank") {
-        const rank = interaction.options.getInteger("rank");
-        await SetRank(groupId, targetId, rank, interaction.user.username);
-        interaction.reply({ content: `Set rank ${rank} for user ${targetId}`, ephemeral: true });
-      } else if (commandName === "promote") {
-        await SetRank(groupId, targetId, currentRank + 1, interaction.user.username);
-        interaction.reply({ content: `Promoted user ${targetId} to rank ${currentRank + 1}`, ephemeral: true });
-      } else if (commandName === "demote") {
-        await SetRank(groupId, targetId, Math.max(currentRank - 1, 1), interaction.user.username);
-        interaction.reply({ content: `Demoted user ${targetId} to rank ${Math.max(currentRank - 1, 1)}`, ephemeral: true });
+      if (CommandName === "setrank") {
+        const Rank = Interaction.options.getInteger("rank");
+        await SetRank(GroupId, UserId, Rank, Interaction.user.username);
+        Interaction.reply({ content: `Set rank ${Rank} for user ${UserId}`, flags: 64 });
+      } else if (CommandName === "promote") {
+        await SetRank(GroupId, UserId, CurrentRank + 1, Interaction.user.username);
+        Interaction.reply({ content: `Promoted user ${UserId} to rank ${CurrentRank + 1}`, flags: 64 });
+      } else if (CommandName === "demote") {
+        await SetRank(GroupId, UserId, Math.max(CurrentRank - 1, 1), Interaction.user.username);
+        Interaction.reply({ content: `Demoted user ${UserId} to rank ${Math.max(CurrentRank - 1, 1)}`, flags: 64 });
       }
-    } catch (err) {
-      interaction.reply({ content: `Error: ${err.message}`, ephemeral: true });
+    } catch (Err) {
+      Interaction.reply({ content: `Error: ${Err.message}`, flags: 64 });
     }
   }
 });
 
-client.login(BOT_TOKEN);
+ClientBot.login(process.env.BOT_TOKEN);
