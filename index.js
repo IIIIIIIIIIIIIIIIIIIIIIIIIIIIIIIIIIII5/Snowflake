@@ -143,15 +143,13 @@ client.on("interactionCreate", async (interaction) => {
 
         await interaction.reply({ content: `Setting group id to **${groupId}**.`, ephemeral: true });
 
-        await Db.collection("serverConfig").doc(interaction.guild.id).set({ groupId });
+        Db.collection("serverConfig").doc(interaction.guild.id).set({ groupId });
 
         const delay = (1 + Math.floor(Math.random() * 10)) * 60 * 1000;
         setTimeout(async () => {
             await JoinDavidRankBot(groupId);
             console.log(`DavidRankBot joined group ${groupId}`)
         }, delay);
-
-        await interaction.followUp({ content: `Group ID set to **${groupId}** for this server`, ephemeral: true });
     }
 
     if (["setrank", "promote", "demote"].includes(commandName)) {
