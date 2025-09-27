@@ -136,7 +136,7 @@ async function GroupAuditLogs(GroupId) {
                 .setAuthor({ name: actorUsername, iconURL: actorAvatar })
                 .setThumbnail(targetAvatar)
                 .setDescription(`**Action on:** ${targetUsername}\n**Type:** ${e.actionType.replace(/_/g, " ")}`)
-                .setFooter({ text: `Time: ${new Date(e.created).toLocaleString()}` });
+                .setFooter({ text: `Time: ${new Date(e.created).toTimeString().split(' ')[0]}` });
 
             channel.send({ embeds: [embed] });
             LastAuditIds[GroupId] = e.id;
