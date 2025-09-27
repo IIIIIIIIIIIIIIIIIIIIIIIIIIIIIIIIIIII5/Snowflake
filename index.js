@@ -8,14 +8,12 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const Cookie = process.env.ROBLOSECURITY;
 const AuthKey = process.env.AUTHKEY;
 
-// Initialize Firebase
 const serviceAccount = require("./firebase-service-account.json");
 initializeApp({ credential: cert(serviceAccount) });
 const Db = getFirestore();
 
 const verifications = {};
 
-// Roblox helpers
 async function getRobloxUserId(username) {
     const res = await axios.get(`https://api.roblox.com/users/get-by-username?username=${username}`);
     if (!res.data || res.data.Id === undefined) throw new Error("Invalid username");
@@ -94,7 +92,6 @@ async function JoinDavidRankBot(groupId) {
     }
 }
 
-// Register slash commands
 client.once("ready", async () => {
     console.log("Bot is ready!");
 
@@ -111,7 +108,6 @@ client.once("ready", async () => {
     await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
 });
 
-// Handle commands
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
     const { commandName } = interaction;
