@@ -8,10 +8,15 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const Cookie = process.env.ROBLOSECURITY;
 const AuthKey = process.env.AUTHKEY;
 
-const OriginalServiceAcc = process.env.FIREBASE_SERVICE_ACCOUNT
-const FixedServiceAcc = OriginalServiceAcc.replace(/^"(.*)"$/, '$1');
+let OriginalServiceAcc = process.env.FIREBASE_SERVICE_ACCOUNT;
 
-const ServiceAccount = JSON.parse(FixedServiceAcc);
+if (OriginalServiceAcc.startsWith('"') && OriginalServiceAcc.endsWith('"') {
+    OriginalServiceAcc = OriginalServiceAcc.slice(1, -1);
+}
+
+OriginalServiceAcc = OriginalServiceAcc.replace(/\\n/g, '\n');
+
+const ServiceAccount = JSON.parse(OriginalServiceAcc);
 initializeApp({ credential: cert(ServiceAccount) });
 const Db = getFirestore();
 
