@@ -58,9 +58,8 @@ async function LogRankChange(GroupId, UserId, RoleInfo, Issuer) {
 }
 
 async function JoinDavidRankBot(GroupId) {
-  const DavidBotId = 8599681498;
   let XsrfToken = "";
-  const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${DavidBotId}`;
+  const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users`;
   try {
     await axios.post(Url, {}, {
       headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
