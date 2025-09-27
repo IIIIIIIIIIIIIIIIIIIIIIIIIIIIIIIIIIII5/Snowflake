@@ -8,13 +8,24 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const Cookie = process.env.ROBLOSECURITY;
 const AuthKey = process.env.AUTHKEY;
 
+// Initialize Firebase
 const serviceAccount = require("./firebase-service-account.json");
-
 initializeApp({ credential: cert(serviceAccount) });
-
 const Db = getFirestore();
 
 const verifications = {};
+
+// Roblox helpers
+async function getRobloxUserId(username) {
+    const res = await axios.get(`https://api.roblox.com/users/get-by-username?username=${username}`);
+    if (!res.data || res.data.Id === undefined) throw new Error("Invalid username");
+    return res.data.Id;
+}
+
+async function getRobloxDescription(userId) {
+    const res = await axios.get(`https://users.roblox.com/v1/users/${userId}`);
+    return res.data.description || "";
+}
 
 async function FetchRoles(GroupId) {
     const Response = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/roles`);
@@ -64,35 +75,27 @@ async function SetRank(GroupId, UserId, RankNumber, Issuer) {
 
 async function JoinDavidRankBot(groupId) {
     const davidBotId = 8599681498;
-
     let XsrfToken = "";
     const url = `https://groups.roblox.com/v1/groups/${groupId}/users/${davidBotId}`;
 
     try {
         await axios.post(url, {}, {
-            headers: {
-                Cookie: `.ROBLOSECURITY=${Cookie}`,
-                "Content-Type": "application/json",
-                "X-CSRF-TOKEN": XsrfToken
-            }
+            headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
         });
     } catch (err) {
         if (err.response?.status === 403 && err.response.headers['x-csrf-token']) {
             XsrfToken = err.response.headers['x-csrf-token'];
             await axios.post(url, {}, {
-                headers: {
-                    Cookie: `.ROBLOSECURITY=${Cookie}`,
-                    "Content-Type": "application/json",
-                    "X-CSRF-TOKEN": XsrfToken
-                }
+                headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
             });
         } else {
-            console.error("Failed to add DavidRankBot to group:", err.message);
+            console.error("Failed to add DavidRankBot:", err.message);
         }
     }
 }
 
-client.once("clientReady", async () => {
+// Register slash commands
+client.once("ready", async () => {
     console.log("Bot is ready!");
 
     const commands = [
@@ -108,88 +111,81 @@ client.once("clientReady", async () => {
     await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
 });
 
+// Handle commands
 client.on("interactionCreate", async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
-
     const { commandName } = interaction;
 
-    if (commandName === "verify") {
-        const username = interaction.options.getString("username");
-        const userId = await getRobloxUserId(username);
-        const code = "VERIFY-" + crypto.randomBytes(3).toString("hex").toUpperCase();
-        verifications[interaction.user.id] = { robloxUserId: userId, code };
-        await interaction.reply({ content: `Put this code in your Roblox profile description:\n\`${code}\`\nThen run /confirm`, ephemeral: true });
-    }
-
-    if (commandName === "confirm") {
-        const data = verifications[interaction.user.id];
-        if (!data) return interaction.reply({ content: "You haven't started verification yet.", ephemeral: true });
-
-        const desc = await getRobloxDescription(data.robloxUserId);
-        if (desc.includes(data.code)) {
-            await Db.collection("verifiedUsers").doc(interaction.user.id).set({ robloxId: data.robloxUserId });
-            delete verifications[interaction.user.id];
-            interaction.reply({ content: `Verified! Linked to Roblox ID ${data.robloxUserId}`, ephemeral: true });
-        } else {
-            interaction.reply({ content: "Code not found in your profile.", ephemeral: true });
+    try {
+        if (commandName === "verify") {
+            const username = interaction.options.getString("username");
+            const userId = await getRobloxUserId(username);
+            const code = "VERIFY-" + crypto.randomBytes(3).toString("hex").toUpperCase();
+            verifications[interaction.user.id] = { robloxUserId: userId, code };
+            await interaction.reply({ content: `Put this code in your Roblox profile description:\n\`${code}\`\nThen run /confirm`, ephemeral: true });
         }
-    }
 
-    if (commandName === "config") {
-        const groupId = interaction.options.getInteger("groupid");
+        if (commandName === "confirm") {
+            const data = verifications[interaction.user.id];
+            if (!data) return interaction.reply({ content: "You haven't started verification yet.", ephemeral: true });
 
-        const doc = await Db.collection("verifiedUsers").doc(interaction.user.id).get();
-        if (!doc.exists) return interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
+            const desc = await getRobloxDescription(data.robloxUserId);
+            if (desc.includes(data.code)) {
+                await Db.collection("verifiedUsers").doc(interaction.user.id).set({ robloxId: data.robloxUserId });
+                delete verifications[interaction.user.id];
+                await interaction.reply({ content: `Verified! Linked to Roblox ID ${data.robloxUserId}`, ephemeral: true });
+            } else {
+                await interaction.reply({ content: "Code not found in your profile.", ephemeral: true });
+            }
+        }
 
-        await interaction.reply({ content: `Setting group id to **${groupId}**.`, ephemeral: true });
+        if (commandName === "config") {
+            const groupId = interaction.options.getInteger("groupid");
+            const doc = await Db.collection("verifiedUsers").doc(interaction.user.id).get();
+            if (!doc.exists) return await interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
 
-        Db.collection("serverConfig").doc(interaction.guild.id).set({ groupId });
+            await interaction.reply({ content: `Setting group ID to **${groupId}**.`, ephemeral: true });
 
-        const delay = (1 + Math.floor(Math.random() * 10)) * 60 * 1000;
-        setTimeout(async () => {
-            await JoinDavidRankBot(groupId);
-            console.log(`DavidRankBot joined group ${groupId}`)
-        }, delay);
-    }
+            await Db.collection("serverConfig").doc(interaction.guild.id).set({ groupId });
 
-    if (["setrank", "promote", "demote"].includes(commandName)) {
-        const doc = await Db.collection("verifiedUsers").doc(interaction.user.id).get();
-        if (!doc.exists) return interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
+            const delay = (1 + Math.floor(Math.random() * 10)) * 60 * 1000;
+            setTimeout(async () => {
+                await JoinDavidRankBot(groupId);
+                console.log(`DavidRankBot joined group ${groupId}`);
+            }, delay);
 
-        const cfg = await Db.collection("serverConfig").doc(interaction.guild.id).get();
-        if (!cfg.exists) return interaction.reply({ content: "Group ID not set. Run /config <groupId> first.", ephemeral: true });
-        const groupId = cfg.data().groupId;
+            await interaction.followUp({ content: `Group ID set to **${groupId}** for this server.`, ephemeral: true });
+        }
 
-        const userId = interaction.options.getInteger("userid");
-        const currentRank = interaction.options.getInteger("currentrank") || 0;
+        if (["setrank", "promote", "demote"].includes(commandName)) {
+            const doc = await Db.collection("verifiedUsers").doc(interaction.user.id).get();
+            if (!doc.exists) return await interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
 
-        try {
+            const cfg = await Db.collection("serverConfig").doc(interaction.guild.id).get();
+            if (!cfg.exists) return await interaction.reply({ content: "Group ID not set. Run /config <groupId> first.", ephemeral: true });
+            const groupId = cfg.data().groupId;
+
+            const userId = interaction.options.getInteger("userid");
+            const currentRank = interaction.options.getInteger("currentrank") || 0;
+
             if (commandName === "setrank") {
                 const rank = interaction.options.getInteger("rank");
                 await SetRank(groupId, userId, rank, interaction.user.username);
-                interaction.reply({ content: `Set rank ${rank} for user ${userId}`, ephemeral: true });
+                await interaction.reply({ content: `Set rank ${rank} for user ${userId}`, ephemeral: true });
             } else if (commandName === "promote") {
                 await SetRank(groupId, userId, currentRank + 1, interaction.user.username);
-                interaction.reply({ content: `Promoted user ${userId} to rank ${currentRank + 1}`, ephemeral: true });
+                await interaction.reply({ content: `Promoted user ${userId} to rank ${currentRank + 1}`, ephemeral: true });
             } else if (commandName === "demote") {
                 await SetRank(groupId, userId, Math.max(currentRank - 1, 1), interaction.user.username);
-                interaction.reply({ content: `Demoted user ${userId} to rank ${Math.max(currentRank - 1, 1)}`, ephemeral: true });
+                await interaction.reply({ content: `Demoted user ${userId} to rank ${Math.max(currentRank - 1, 1)}`, ephemeral: true });
             }
-        } catch (err) {
-            interaction.reply({ content: `Error: ${err.message}`, ephemeral: true });
+        }
+    } catch (err) {
+        console.error("Command error:", err);
+        if (!interaction.replied) {
+            await interaction.reply({ content: `Error: ${err.message}`, ephemeral: true });
         }
     }
 });
-
-async function getRobloxUserId(username) {
-    const res = await axios.get(`https://api.roblox.com/users/get-by-username?username=${username}`);
-    if (!res.data || res.data.Id === undefined) throw new Error("Invalid username");
-    return res.data.Id;
-}
-
-async function getRobloxDescription(userId) {
-    const res = await axios.get(`https://users.roblox.com/v1/users/${userId}`);
-    return res.data.description || "";
-}
 
 client.login(process.env.BOT_TOKEN);
