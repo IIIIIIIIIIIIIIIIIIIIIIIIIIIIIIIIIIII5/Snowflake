@@ -92,7 +92,7 @@ async function JoinDavidRankBot(groupId) {
     }
 }
 
-client.once("ready", async () => {
+client.once("clientReady", async () => {
     console.log("Bot is ready!");
 
     const commands = [
