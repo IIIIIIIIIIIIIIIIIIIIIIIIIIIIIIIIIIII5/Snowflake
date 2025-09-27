@@ -17,49 +17,30 @@ let LastMemberCounts = {};
 async function FetchRoles(GroupId) {
     const Res = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/roles`);
     const Roles = {};
-    Res.data.roles.forEach(Role => {
-        Roles[Role.rank] = { Id: Role.name, RoleId: Role.id };
+    Res.data.roles.forEach((Role, Index) => {
+        Roles[Index + 1] = { Id: Role.name, RoleId: Role.id };
     });
     return Roles;
 }
 
-async function SetRank(GroupId, UserId, RankNumber) {
+async function SetRank(GroupId, UserId, RankNumber, Issuer) {
     const Roles = await FetchRoles(GroupId);
     const RoleInfo = Roles[RankNumber];
-    if (!RoleInfo) throw new Error(`Invalid rank number: ${RankNumber}`);
-
-    const roleId = Number(RoleInfo.RoleId);
-    console.log("Attempting to set roleId:", roleId, "for user:", UserId);
-
+    if (!RoleInfo) throw new Error("Invalid rank number: " + RankNumber);
     let XsrfToken = "";
-
-    async function patchRank() {
-        try {
-            return await axios({
-                method: "patch",
-                url: `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`,
-                data: { roleId },
-                headers: {
-                    Cookie: `.ROBLOSECURITY=${RobloxCookie}`,
-                    "X-CSRF-TOKEN": XsrfToken,
-                    "Content-Type": "application/json"
-                }
+    const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
+    try {
+        await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
+            headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
+        });
+    } catch (Err) {
+        if (Err.response?.status === 403 && Err.response.headers['x-csrf-token']) {
+            XsrfToken = Err.response.headers['x-csrf-token'];
+            await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
+                headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
             });
-        } catch (err) {
-            if (err.response?.status === 403 && err.response.headers["x-csrf-token"]) {
-                XsrfToken = err.response.headers["x-csrf-token"];
-                console.log("Retrying with new CSRF token...");
-                return patchRank();
-            } else if (err.response?.status === 405) {
-                throw new Error("Method not allowed. Make sure you have permission to change this rank.");
-            } else {
-                throw err;
-            }
-        }
+        } else throw Err;
     }
-
-    await patchRank();
-    console.log(`Successfully set rank ${RankNumber} for user ${UserId} in group ${GroupId}`);
 }
 
 async function GetJsonBin() {
@@ -253,8 +234,7 @@ ClientBot.on("interactionCreate", async (Interaction) => {
 
     if (CommandName === "config") {
         const GroupId = Interaction.options.getInteger("groupid");
-        if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id])
-            return Interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
+        if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id]) return Interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
         Db.PendingConfigs = Db.PendingConfigs || {};
         Db.PendingConfigs[GroupId] = { UserId: Interaction.user.id, ServerId: Interaction.guild.id };
         await SaveJsonBin(Db);
@@ -280,49 +260,27 @@ ClientBot.on("interactionCreate", async (Interaction) => {
     }
 
     if (["setrank", "promote", "demote", "fire"].includes(CommandName)) {
-        if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id])
-            return Interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
-
+        if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id]) return Interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
         const GroupId = Db.ServerConfig?.[Interaction.guild.id]?.GroupId;
         if (!GroupId) return Interaction.reply({ content: "Group ID not set. Run /config first.", ephemeral: true });
-
         const UserId = Interaction.options.getInteger("userid");
         try {
-            const Roles = await FetchRoles(GroupId);
-            const Res = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`);
-            const CurrentRank = Res.data.role?.rank || 0;
-
-            let NewRank;
-
             if (CommandName === "setrank") {
-                const RequestedRank = Interaction.options.getInteger("rank");
-                if (!Roles[RequestedRank])
-                    return Interaction.reply({ content: `Invalid rank number: ${RequestedRank}`, ephemeral: true });
-                NewRank = RequestedRank;
-
+                const Rank = Interaction.options.getInteger("rank");
+                await SetRank(GroupId, UserId, Rank, Interaction.user.username);
+                return Interaction.reply({ content: `Set rank ${Rank} for user ${UserId}`, ephemeral: true });
             } else if (CommandName === "fire") {
+                const Roles = await FetchRoles(GroupId);
                 const lowestRank = Math.min(...Object.keys(Roles).map(k => parseInt(k)));
-                NewRank = lowestRank;
-
-            } else if (CommandName === "promote") {
-                const higherRanks = Object.keys(Roles).map(k => parseInt(k)).filter(r => r > CurrentRank);
-                if (higherRanks.length === 0)
-                    return Interaction.reply({ content: "Cannot promote further.", ephemeral: true });
-                NewRank = Math.min(...higherRanks);
-
-            } else if (CommandName === "demote") {
-                const lowerRanks = Object.keys(Roles).map(k => parseInt(k)).filter(r => r < CurrentRank);
-                if (lowerRanks.length === 0)
-                    return Interaction.reply({ content: "Cannot demote further.", ephemeral: true });
-                NewRank = Math.max(...lowerRanks);
+                await SetRank(GroupId, UserId, lowestRank, Interaction.user.username);
+                return Interaction.reply({ content: `User ${UserId} fired (set to lowest rank).`, ephemeral: true });
+            } else {
+                const Res = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`);
+                const CurrentRank = Res.data.role?.rank || 0;
+                const NewRank = CommandName === "promote" ? CurrentRank + 1 : Math.max(CurrentRank - 1, 1);
+                await SetRank(GroupId, UserId, NewRank, Interaction.user.username);
+                return Interaction.reply({ content: `${CommandName === "promote" ? "Promoted" : "Demoted"} user ${UserId} to rank ${NewRank}`, ephemeral: true });
             }
-
-            await SetRank(GroupId, UserId, NewRank, Interaction.user.username);
-            return Interaction.reply({
-                content: `${CommandName === "promote" ? "Promoted" : CommandName === "demote" ? "Demoted" : CommandName === "fire" ? "Fired" : "Set rank"} user ${UserId} to rank ${NewRank}`,
-                ephemeral: true
-            });
-
         } catch (Err) {
             return Interaction.reply({ content: `Error: ${Err.message}`, ephemeral: true });
         }
