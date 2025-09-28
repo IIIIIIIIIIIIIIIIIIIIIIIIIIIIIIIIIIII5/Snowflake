@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
 const axios = require("axios");
 const crypto = require("crypto");
 
@@ -201,19 +201,42 @@ ClientBot.on("interactionCreate", async (Interaction) => {
       const CurrentRank = Interaction.options.getInteger("currentrank") || 0;
 
       try {
+        let NewRank;
+        let Action;
+
         if (CommandName === "setrank") {
           const Rank = Interaction.options.getInteger("rank");
           await SetRank(GroupId, UserId, Rank, Interaction.user.username);
-          Interaction.reply({ content: `Set rank ${Rank} for user ${UserId}`, ephemeral: true });
+          Action = `Rank set to **${NewRank}**`;
         } else if (CommandName === "promote") {
+          NewRank = CurrentRank + 1;
           await SetRank(GroupId, UserId, CurrentRank + 1, Interaction.user.username);
-          Interaction.reply({ content: `Promoted user ${UserId} to rank ${CurrentRank + 1}`, ephemeral: true });
+          Action = `Promoted to **${NewRank}**`;
         } else if (CommandName === "demote") {
+          NewRank = CurrentRank - 1;
           await SetRank(GroupId, UserId, Math.max(CurrentRank - 1, 1), Interaction.user.username);
-          Interaction.reply({ content: `Demoted user ${UserId} to rank ${Math.max(CurrentRank - 1, 1)}`, ephemeral: true });
+          Action = `Demoted to **${NewRank}**`;
         }
+
+        const Embed = new EmbedBuilder()
+        .setColor(0x2ecc71)
+          .setTitle("Updated!")
+          .addFields(
+            { name: "User ID", value: String(UserId), inline: true },
+            { name: "Group ID", value: String(GroupId), inline: true },
+            { name: "Action", value: Action, inline: false },
+            { name: "Issued By", value: Interaction.user.tag, inline: true }
+          )
+          .setTimestamp();
+
       } catch (Err) {
-        Interaction.reply({ content: `Error: ${Err.message}`, ephemeral: true });
+        const ErrorEmbed = new EmbedBuilder()
+          .setColor(0xe74c3c)
+          .setTitle("Failed!")
+          .setDescription(Err.message || "An unknown error occurred")
+          .setTimestamp();
+
+        Interaction.reply({ embeds: [ErrorEmbed] });
       }
     }
   } else if (Interaction.isButton() && Interaction.customId === "done_verification") {
