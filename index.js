@@ -59,7 +59,8 @@ async function SetRank(GroupId, UserId, RankNumber, Issuer) {
 async function LogRankChange(GroupId, UserId, RoleInfo, Issuer) {
   const Data = await GetJsonBin();
   Data.RankChanges = Data.RankChanges || [];
-  Data.RankChanges.push({ GroupId, UserId, NewRank: RoleInfo, IssuedBy: Issuer || "API", Timestamp: new Date().toISOString() });
+  const dateOnly = new Date().toISOString().split("T")[0]; // YYYY-MM-DD only
+  Data.RankChanges.push({ GroupId, UserId, NewRank: RoleInfo, IssuedBy: Issuer || "API", Timestamp: dateOnly });
   await SaveJsonBin(Data);
 }
 
@@ -178,6 +179,8 @@ ClientBot.on("interactionCreate", async (Interaction) => {
           Action = `Demoted to **${NewRank}**`;
         }
 
+        const dateOnly = new Date().toISOString().split("T")[0];
+
         const Embed = new EmbedBuilder()
           .setColor(0x2ecc71)
           .setTitle("Updated!")
@@ -185,17 +188,19 @@ ClientBot.on("interactionCreate", async (Interaction) => {
             { name: "User ID", value: String(UserId), inline: true },
             { name: "Group ID", value: String(GroupId), inline: true },
             { name: "Action", value: Action, inline: false },
-            { name: "Issued By", value: Interaction.user.tag, inline: true }
-          )
-          .setTimestamp();
+            { name: "Issued By", value: Interaction.user.tag, inline: true },
+            { name: "Date", value: dateOnly, inline: true }
+          );
 
         await Interaction.reply({ embeds: [Embed] });
       } catch (Err) {
+        const dateOnly = new Date().toISOString().split("T")[0];
+
         const ErrorEmbed = new EmbedBuilder()
           .setColor(0xe74c3c)
           .setTitle("Failed!")
           .setDescription(Err.message || "An unknown error occurred")
-          .setTimestamp();
+          .addFields({ name: "Date", value: dateOnly, inline: true });
 
         await Interaction.reply({ embeds: [ErrorEmbed], ephemeral: true });
       }
@@ -228,15 +233,13 @@ ClientBot.on("messageCreate", async (message) => {
 
   if (!GroupId || !PendingApprovals[GroupId]) return message.reply("Invalid or unknown group ID.");
   const { requesterId, guildId } = PendingApprovals[GroupId];
-  const guild = await ClientBot.guilds.fetch(guildId);
-  const member = await guild.members.fetch(requesterId);
 
   if (cmd === "!accept") {
-    await member.send(`Your group config (ID: ${GroupId}) has been accepted! Please rank DavidRankBot in your Roblox group.`);
+    await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been accepted! Please rank DavidRankBot in your Roblox group.`);
     delete PendingApprovals[GroupId];
     message.channel.send(`Accepted group ${GroupId} and notified <@${requesterId}>`);
   } else if (cmd === "!decline") {
-    await member.send(`Your group config (ID: ${GroupId}) has been declined by the RoSystem Administration Team! Please contact dizrobloxfan1 for more information.`);
+    await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been declined by the RoSystem Administration Team! Please contact dizrobloxfan1 for more information.`);
     delete PendingApprovals[GroupId];
     message.channel.send(`Declined group ${GroupId} and notified <@${requesterId}>`);
   }
