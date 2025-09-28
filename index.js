@@ -1,7 +1,6 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const axios = require("axios");
 const crypto = require("crypto");
-const { userInfo } = require("os");
 
 const ClientBot = new Client({ intents: [GatewayIntentBits.Guilds] });
 
