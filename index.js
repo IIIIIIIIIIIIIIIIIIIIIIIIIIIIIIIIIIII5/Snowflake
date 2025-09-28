@@ -10,7 +10,7 @@ const JsonBinSecret = process.env.JSONBIN_SECRET;
 const ADMIN_ID = process.env.ADMIN_ID;
 
 const Verifications = {};
-const PendingApprovals = {}; // { groupId: { requesterId, guildId } }
+const PendingApprovals = {};
 
 async function FetchRoles(GroupId) {
   const Res = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/roles`);
