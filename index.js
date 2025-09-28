@@ -21,10 +21,14 @@ async function FetchRoles(GroupId) {
 }
 
 async function GetXsrfToken() {
-  const res = await axios.post("https://auth.roblox.com/v2/logout", {}, {
-    headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}` }
-  });
-  return res.headers["x-csrf-token"];
+  try {
+    const res = await axios.post("https://auth.roblox.com/v2/logout", {}, {
+      headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}` }
+    });
+    return res.headers["x-csrf-token"];
+  } catch (err) {
+    return err.response?.headers["x-csrf-token"] || "";
+  }
 }
 
 async function SetRank(GroupId, UserId, RankNumber, Issuer) {
@@ -32,18 +36,34 @@ async function SetRank(GroupId, UserId, RankNumber, Issuer) {
   const RoleInfo = Roles[RankNumber];
   if (!RoleInfo) throw new Error("Invalid rank number: " + RankNumber);
 
-  const XsrfToken = await GetXsrfToken();
   const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
+  let XsrfToken = await GetXsrfToken();
 
-  await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
-    headers: {
-      Cookie: `.ROBLOSECURITY=${RobloxCookie}`,
-      "Content-Type": "application/json",
-      "X-CSRF-TOKEN": XsrfToken
+  try {
+    await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
+      headers: {
+        Cookie: `.ROBLOSECURITY=${RobloxCookie}`,
+        "Content-Type": "application/json",
+        "X-CSRF-TOKEN": XsrfToken
+      }
+    });
+  } catch (Err) {
+    if (Err.response?.status === 403 && Err.response?.headers["x-csrf-token"]) {
+      XsrfToken = Err.response.headers["x-csrf-token"];
+      await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
+        headers: {
+          Cookie: `.ROBLOSECURITY=${RobloxCookie}`,
+          "Content-Type": "application/json",
+          "X-CSRF-TOKEN": XsrfToken
+        }
+      });
+    } else {
+      console.error("SetRank failed:", Err.response?.data || Err.message);
+      throw new Error("Request failed: " + (Err.response?.data?.errors?.[0]?.message || Err.message));
     }
-  });
+  }
 
-  await LogRankChange(GroupId, UserId, RoleInfo, Issuer)
+  await LogRankChange(GroupId, UserId, RoleInfo, Issuer);
 }
 
 async function LogRankChange(GroupId, UserId, RoleInfo, Issuer) {
@@ -60,20 +80,21 @@ async function LogRankChange(GroupId, UserId, RoleInfo, Issuer) {
 }
 
 async function JoinDavidRankBot(GroupId) {
-  let XsrfToken = "";
+  let XsrfToken = await GetXsrfToken();
   const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users`;
+
   try {
     await axios.post(Url, {}, {
       headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
     });
   } catch (Err) {
-    if (Err.response?.status === 403 && Err.response.headers['x-csrf-token']) {
-      XsrfToken = Err.response.headers['x-csrf-token'];
+    if (Err.response?.status === 403 && Err.response.headers["x-csrf-token"]) {
+      XsrfToken = Err.response.headers["x-csrf-token"];
       await axios.post(Url, {}, {
         headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
       });
     } else {
-      console.error("Failed to add DavidRankBot to group:", Err.message);
+      console.error("Failed to add DavidRankBot to group:", Err.response?.data || Err.message);
     }
   }
 }
@@ -106,7 +127,7 @@ async function GetRobloxDescription(UserId) {
   return Res.data.description || "";
 }
 
-ClientBot.once("clientReady", async () => {
+ClientBot.once("ready", async () => {
   console.log("Bot is ready!");
 
   const Commands = [
@@ -161,9 +182,9 @@ ClientBot.on("interactionCreate", async (Interaction) => {
 
         try {
           const user = await ClientBot.users.fetch(Interaction.user.id);
-          await user.send(`DavidRankBot has successfully joined your Roblox group (ID: ${GroupId}). Please rank the account to a rank with rank permissions`);
+          await user.send(`DavidRankBot has successfully joined your Roblox group (ID: ${GroupId}). Please rank the account to a role with rank permissions.`);
         } catch (err) {
-          console.error("Failed to DM user: ", err.message)
+          console.error("Failed to DM user: ", err.message);
         }
       }, Delay);
 
