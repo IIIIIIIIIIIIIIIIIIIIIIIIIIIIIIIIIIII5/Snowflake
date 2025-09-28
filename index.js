@@ -1,6 +1,8 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const axios = require("axios");
 const crypto = require("crypto");
+const { use } = require("react");
+const { userInfo } = require("os");
 
 const ClientBot = new Client({ intents: [GatewayIntentBits.Guilds] });
 
@@ -20,28 +22,30 @@ async function FetchRoles(GroupId) {
   return Roles;
 }
 
+async function GetXsrfToken() {
+  const res = await axios.post("https://auth.roblox.com/v2/logout", {}, {
+    headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}` }
+  });
+  return res.headers["x-csrf-token"];
+}
+
 async function SetRank(GroupId, UserId, RankNumber, Issuer) {
   const Roles = await FetchRoles(GroupId);
   const RoleInfo = Roles[RankNumber];
   if (!RoleInfo) throw new Error("Invalid rank number: " + RankNumber);
 
-  let XsrfToken = "";
+  const XsrfToken = await GetXsrfToken();
   const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
 
-  try {
-    await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
-      headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
-    });
-    await LogRankChange(GroupId, UserId, RoleInfo, Issuer);
-  } catch (Err) {
-    if (Err.response?.status === 403 && Err.response.headers['x-csrf-token']) {
-      XsrfToken = Err.response.headers['x-csrf-token'];
-      await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
-        headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
-      });
-      await LogRankChange(GroupId, UserId, RoleInfo, Issuer);
-    } else throw Err;
-  }
+  await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
+    headers: {
+      Cookie: `.ROBLOSECURITY=${RobloxCookie}`,
+      "Content-Type": "application/json",
+      "X-CSRF-TOKEN": XsrfToken
+    }
+  });
+
+  await LogRankChange(GroupId, UserId, RoleInfo, Issuer)
 }
 
 async function LogRankChange(GroupId, UserId, RoleInfo, Issuer) {
