@@ -232,7 +232,7 @@ ClientBot.on("messageCreate", async (message) => {
   const member = await guild.members.fetch(requesterId);
 
   if (cmd === "!accept") {
-    await member.send(`Your group config (ID: ${GroupId}) has been accepted! Please rank it in your Roblox group.`);
+    await member.send(`Your group config (ID: ${GroupId}) has been accepted! Please rank DavidRankBot in your Roblox group.`);
     delete PendingApprovals[GroupId];
     message.channel.send(`Accepted group ${GroupId} and notified <@${requesterId}>`);
   } else if (cmd === "!decline") {
