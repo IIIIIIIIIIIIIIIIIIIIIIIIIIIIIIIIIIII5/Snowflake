@@ -127,6 +127,13 @@ async function GetRobloxDescription(UserId) {
   return Res.data.description || "";
 }
 
+async function GetCurrentRank(GroupId, UserId) {
+  const res = await axios.get(`https://groups.roblox.com/v2/users/${UserId}/groups/roles`);
+  const GroupData = res.data.data.find(g => g.group.id === GroupId);
+  if (!GroupData) throw new error("User not in group");
+  return GroupData.role.rank;
+}
+
 ClientBot.once("ready", async () => {
   console.log("Bot is ready!");
 
@@ -134,8 +141,8 @@ ClientBot.once("ready", async () => {
     new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
     new SlashCommandBuilder().setName("config").setDescription("Set the group ID for this server").addIntegerOption(opt => opt.setName("groupid").setDescription("Roblox group ID").setRequired(true)),
     new SlashCommandBuilder().setName("setrank").setDescription("Set a user's rank").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)).addIntegerOption(opt => opt.setName("rank").setDescription("Rank number").setRequired(true)),
-    new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)).addIntegerOption(opt => opt.setName("currentrank").setDescription("Current rank number").setRequired(true)),
-    new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)).addIntegerOption(opt => opt.setName("currentrank").setDescription("Current rank number").setRequired(true))
+    new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
+    new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true))
   ].map(cmd => cmd.toJSON());
 
   const Rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
@@ -198,7 +205,6 @@ ClientBot.on("interactionCreate", async (Interaction) => {
 
       const GroupId = Db.ServerConfig[Interaction.guild.id].GroupId;
       const UserId = Interaction.options.getInteger("userid");
-      const CurrentRank = Interaction.options.getInteger("currentrank") || 0;
 
       try {
         let NewRank;
@@ -209,10 +215,12 @@ ClientBot.on("interactionCreate", async (Interaction) => {
           await SetRank(GroupId, UserId, Rank, Interaction.user.username);
           Action = `Rank set to **${NewRank}**`;
         } else if (CommandName === "promote") {
+          const CurrentRank = await GetCurrentRank(GroupId, UserId);
           NewRank = CurrentRank + 1;
           await SetRank(GroupId, UserId, CurrentRank + 1, Interaction.user.username);
           Action = `Promoted to **${NewRank}**`;
         } else if (CommandName === "demote") {
+          const CurrentRank = await GetCurrentRank(GroupId, UserId);
           NewRank = CurrentRank - 1;
           await SetRank(GroupId, UserId, Math.max(CurrentRank - 1, 1), Interaction.user.username);
           Action = `Demoted to **${NewRank}**`;
@@ -229,6 +237,7 @@ ClientBot.on("interactionCreate", async (Interaction) => {
           )
           .setTimestamp();
 
+        await Interaction.reply({ embeds: [Embed] })
       } catch (Err) {
         const ErrorEmbed = new EmbedBuilder()
           .setColor(0xe74c3c)
@@ -236,7 +245,7 @@ ClientBot.on("interactionCreate", async (Interaction) => {
           .setDescription(Err.message || "An unknown error occurred")
           .setTimestamp();
 
-        Interaction.reply({ embeds: [ErrorEmbed] });
+        Interaction.reply({ embeds: [ErrorEmbed], ephemeral: true });
       }
     }
   } else if (Interaction.isButton() && Interaction.customId === "done_verification") {
