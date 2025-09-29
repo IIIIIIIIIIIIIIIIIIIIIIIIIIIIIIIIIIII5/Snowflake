@@ -103,7 +103,8 @@ ClientBot.once("ready", async () => {
     new SlashCommandBuilder().setName("config").setDescription("Set the group ID for this server").addIntegerOption(opt => opt.setName("groupid").setDescription("Roblox group ID").setRequired(true)),
     new SlashCommandBuilder().setName("setrank").setDescription("Set a user's rank").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)).addIntegerOption(opt => opt.setName("rank").setDescription("Rank number").setRequired(true)),
     new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
-    new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true))
+    new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
+    new SlashCommandBuilder().setName("whois").setDescription("Lookup a Roblox user from a Discord user").addUserOption(opt => opt.setName("user").setDescription("The Discord user to look up (leave blank to look up yourself)").setRequired(false))
   ].map(cmd => cmd.toJSON());
 
   const Rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
@@ -203,6 +204,39 @@ ClientBot.on("interactionCreate", async (Interaction) => {
           .addFields({ name: "Date", value: dateOnly, inline: true });
 
         await Interaction.reply({ embeds: [ErrorEmbed], ephemeral: true });
+      }
+    }
+
+    if (CommandName === "whois") {
+      const TargetUser = Interaction.options.getUser("user") || Interaction.user;
+
+      const Db = await GetJsonBin();
+      const VerifiedUsers = Db.VerifiedUsers || {};
+      const RobloxUserId = VerifiedUsers[TargetUser.id];
+
+      if (!RobloxUserId) {
+        return Interaction.reply({ content: `${TargetUser.tag} has not verified a Roblox account.`, ephemeral: true })
+      }
+
+      try {
+        const res = await axios.get(`https://users.roblox.com/v1/users/${RobloxUserId}`);
+        const RobloxInfo = res.data;
+
+        const Embed = new EmbedBuilder()
+          .setColor(0x3498db)
+          .setTitle("User Lookup")
+          .addFields(
+            { name: "Discord User", value: `${TargetUser.tag} (${TargetUser.id})`, inline: false },
+            { name: "Roblox Username", value: `[${RobloxInfo.name}](https://www.roblox.com/users/${RobloxInfo.id}/profile)`, inline: true },
+            { name: "Roblox User ID", value: String(RobloxInfo.id), inline: true },
+            { name: "Description", value: RobloxInfo.description?.slice(0, 200) || "None", inline: false }
+          )
+          .setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxInfo.id}&width=150&height=150&format=png`);
+
+        await Interaction.reply({ embeds: [Embed] });
+
+      } catch (err) {
+        await Interaction.reply({ content: `Failed to get info for UserId: ${RobloxUserId}: ${err.message}`, ephemeral: true});
       }
     }
   } else if (Interaction.isButton() && Interaction.customId === "done_verification") {
