@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ActivityType } = require("discord.js");
 const axios = require("axios");
 const crypto = require("crypto");
 
@@ -97,6 +97,7 @@ async function GetCurrentRank(GroupId, UserId) {
 
 ClientBot.once("ready", async () => {
   console.log("Bot is ready!");
+  ClientBot.user.setActivity("Snowflake Prison Roleplay", { type: ActivityType.Watching });
 
   const Commands = [
     new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
@@ -133,17 +134,15 @@ ClientBot.on("interactionCreate", async (Interaction) => {
 
     if (CommandName === "config") {
       const AllowedRoleId = "1386369108408406096";
-
-      if (!Interaction.member.roles.cache.has(AllowedRoleId)) {
-        return interaction.reply({ content: "You do not have permission to use this command.", ephemeral: true }); 
-      }
+      if (!Interaction.member.roles.cache.has(AllowedRoleId)) return Interaction.reply({ content: "You do not have permission to use this command.", ephemeral: true });
       
       const GroupId = Interaction.options.getInteger("groupid");
       const Db = await GetJsonBin();
       if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id]) return Interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
 
       Db.ServerConfig = Db.ServerConfig || {};
-      Db.ServerConfig[Interaction.guild.id] = { GroupId };
+      Db.ServerConfig[Interaction.guild.id] = Db.ServerConfig[Interaction.guild.id] || {};
+      Db.ServerConfig[Interaction.guild.id].GroupId = GroupId;
       await SaveJsonBin(Db);
 
       PendingApprovals[GroupId] = { requesterId: Interaction.user.id, guildId: Interaction.guild.id };
@@ -277,10 +276,25 @@ ClientBot.on("messageCreate", async (message) => {
 
   const args = message.content.split(" ");
   const cmd = args[0].toLowerCase();
-  const GroupId = args[1];
 
-  if (!GroupId || !PendingApprovals[GroupId]) return message.reply("Invalid or unknown group ID.");
-  const { requesterId, guildId } = PendingApprovals[GroupId];
+  if (cmd === "!setbottoken") {
+    const serverId = args[1];
+    const token = args[2];
+    if (!serverId || !token) {
+      return message.reply("Failed to work, command args are: `!setbottoken <serverId> <botToken>`");
+    }
+    const Db = await GetJsonBin();
+    Db.ServerConfig = Db.ServerConfig || {};
+    Db.ServerConfig[serverId] = Db.ServerConfig[serverId] || {};
+    Db.ServerConfig[serverId].BotToken = token;
+    await SaveJsonBin(Db);
+    return message.reply(`Custom bot token saved for server **${serverId}**`);
+  }
+
+  const GroupId = args[1];
+  if (!GroupId || !PendingApprovals[GroupId]) return;
+
+  const { requesterId } = PendingApprovals[GroupId];
 
   if (cmd === "!accept") {
     await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been accepted! Please rank DavidRankBot in your Roblox group.`);
