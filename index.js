@@ -59,7 +59,7 @@ async function SetRank(GroupId, UserId, RankNumber, Issuer) {
 async function LogRankChange(GroupId, UserId, RoleInfo, Issuer) {
   const Data = await GetJsonBin();
   Data.RankChanges = Data.RankChanges || [];
-  const dateOnly = new Date().toISOString().split("T")[0]; // YYYY-MM-DD only
+  const dateOnly = new Date().toISOString().split("T")[0];
   Data.RankChanges.push({ GroupId, UserId, NewRank: RoleInfo, IssuedBy: Issuer || "API", Timestamp: dateOnly });
   await SaveJsonBin(Data);
 }
@@ -153,6 +153,14 @@ ClientBot.on("interactionCreate", async (Interaction) => {
     }
 
     if (["setrank", "promote", "demote"].includes(CommandName)) {
+      const allowedRoleId = "1423332095001890908";
+      if (!Interaction.member.roles.cache.has(allowedRoleId)) {
+        return Interaction.reply({
+          content: "You do not have permission to use this command.",
+          ephemeral: true
+        });
+      }
+
       const Db = await GetJsonBin();
       if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id]) return Interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
       if (!Db.ServerConfig || !Db.ServerConfig[Interaction.guild.id]) return Interaction.reply({ content: "Group ID not set. Run /config <groupId> first.", ephemeral: true });
