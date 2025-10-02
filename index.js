@@ -132,6 +132,12 @@ ClientBot.on("interactionCreate", async (Interaction) => {
     }
 
     if (CommandName === "config") {
+      const AllowedRoleId = "1423332095001890908";
+
+      if (!Interaction.member.roles.cache.has(AllowedRoleId)) {
+        return interaction.reply({ content: "You do not have permission to use this command.", ephemeral: true }); 
+      }
+      
       const GroupId = Interaction.options.getInteger("groupid");
       const Db = await GetJsonBin();
       if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id]) return Interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
