@@ -132,7 +132,7 @@ ClientBot.on("interactionCreate", async (Interaction) => {
     }
 
     if (CommandName === "config") {
-      const AllowedRoleId = "1423332095001890908";
+      const AllowedRoleId = "1386369108408406096";
 
       if (!Interaction.member.roles.cache.has(AllowedRoleId)) {
         return interaction.reply({ content: "You do not have permission to use this command.", ephemeral: true }); 
