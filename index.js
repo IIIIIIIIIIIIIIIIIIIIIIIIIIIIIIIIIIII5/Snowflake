@@ -4,13 +4,31 @@ const crypto = require("crypto");
 
 const ClientBot = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
-const RobloxCookie = process.env.ROBLOSECURITY;
 const JsonBinId = process.env.JSONBIN_ID;
 const JsonBinSecret = process.env.JSONBIN_SECRET;
 const ADMIN_ID = process.env.ADMIN_ID;
 
 const Verifications = {};
 const PendingApprovals = {};
+
+async function GetJsonBin() {
+    try {
+        const Res = await axios.get(`https://api.jsonbin.io/v3/b/${JsonBinId}/latest`, { headers: { "X-Master-Key": JsonBinSecret } });
+        return Res.data.record || {};
+    } catch {
+        return {};
+    }
+}
+
+async function SaveJsonBin(Data) {
+    await axios.put(`https://api.jsonbin.io/v3/b/${JsonBinId}`, Data, { headers: { "X-Master-Key": JsonBinSecret, "Content-Type": "application/json" } });
+}
+
+async function GetRobloxCookie(guildId) {
+    const db = await GetJsonBin();
+    if (db.CustomTokens && db.CustomTokens[guildId]) return db.CustomTokens[guildId];
+    return process.env.ROBLOSECURITY;
+}
 
 async function FetchRoles(GroupId) {
     const Res = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/roles`);
@@ -19,7 +37,8 @@ async function FetchRoles(GroupId) {
     return Roles;
 }
 
-async function GetXsrfToken() {
+async function GetXsrfToken(guildId) {
+    const RobloxCookie = await GetRobloxCookie(guildId);
     try {
         const res = await axios.post("https://auth.roblox.com/v2/logout", {}, { headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}` } });
         return res.headers["x-csrf-token"];
@@ -28,13 +47,13 @@ async function GetXsrfToken() {
     }
 }
 
-async function SetRank(GroupId, UserId, RankNumber, Issuer) {
+async function SetRank(GroupId, UserId, RankNumber, Issuer, guildId) {
+    const RobloxCookie = await GetRobloxCookie(guildId);
     const Roles = await FetchRoles(GroupId);
     const RoleInfo = Roles[RankNumber];
     if (!RoleInfo) throw new Error("Invalid rank number: " + RankNumber);
-
     const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
-    let XsrfToken = await GetXsrfToken();
+    let XsrfToken = await GetXsrfToken(guildId);
 
     try {
         await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
@@ -51,28 +70,15 @@ async function SetRank(GroupId, UserId, RankNumber, Issuer) {
         }
     }
 
-    await LogRankChange(GroupId, UserId, RoleInfo, Issuer);
+    await LogRankChange(GroupId, UserId, RoleInfo, Issuer, guildId);
 }
 
-async function LogRankChange(GroupId, UserId, RoleInfo, Issuer) {
+async function LogRankChange(GroupId, UserId, RoleInfo, Issuer, guildId) {
     const Data = await GetJsonBin();
     Data.RankChanges = Data.RankChanges || [];
     const dateOnly = new Date().toISOString().split("T")[0];
-    Data.RankChanges.push({ GroupId, UserId, NewRank: RoleInfo, IssuedBy: Issuer || "API", Timestamp: dateOnly });
+    Data.RankChanges.push({ GroupId, UserId, NewRank: RoleInfo, IssuedBy: Issuer || "API", Timestamp: dateOnly, GuildId: guildId });
     await SaveJsonBin(Data);
-}
-
-async function GetJsonBin() {
-    try {
-        const Res = await axios.get(`https://api.jsonbin.io/v3/b/${JsonBinId}/latest`, { headers: { "X-Master-Key": JsonBinSecret } });
-        return Res.data.record || {};
-    } catch {
-        return {};
-    }
-}
-
-async function SaveJsonBin(Data) {
-    await axios.put(`https://api.jsonbin.io/v3/b/${JsonBinId}`, Data, { headers: { "X-Master-Key": JsonBinSecret, "Content-Type": "application/json" } });
 }
 
 async function GetRobloxUserId(Username) {
@@ -93,23 +99,15 @@ async function GetCurrentRank(GroupId, UserId) {
     return GroupData.role.rank;
 }
 
-async function GetActiveToken(guildId) {
-    const db = await GetJsonBin();
-    if (db.CustomTokens && db.CustomTokens[guildId]) return db.CustomTokens[guildId];
-    return process.env.BOT_TOKEN;
-}
-
 ClientBot.once("ready", async () => {
     ClientBot.user.setActivity("Snowflake Prison Roleplay", { type: ActivityType.Watching });
-
     const Commands = [
         new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("config").setDescription("Set the group ID for this server").addIntegerOption(opt => opt.setName("groupid").setDescription("Roblox group ID").setRequired(true)),
         new SlashCommandBuilder().setName("setrank").setDescription("Set a user's rank").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)).addIntegerOption(opt => opt.setName("rank").setDescription("Rank number").setRequired(true)),
         new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
         new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
-        new SlashCommandBuilder().setName("whois").setDescription("Lookup a Roblox user from a Discord user").addUserOption(opt => opt.setName("user").setDescription("The Discord user to look up (leave blank for yourself)").setRequired(false)),
-        new SlashCommandBuilder().setName("setbottoken").setDescription("Set a custom bot token for a server").addStringOption(opt => opt.setName("serverid").setDescription("Server ID").setRequired(true)).addStringOption(opt => opt.setName("token").setDescription("Bot token").setRequired(true))
+        new SlashCommandBuilder().setName("whois").setDescription("Lookup a Roblox user from a Discord user").addUserOption(opt => opt.setName("user").setDescription("The Discord user to look up (leave blank for yourself)").setRequired(false))
     ].map(cmd => cmd.toJSON());
 
     const Rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
@@ -117,81 +115,83 @@ ClientBot.once("ready", async () => {
 });
 
 ClientBot.on("interactionCreate", async interaction => {
-    if (interaction.isChatInputCommand()) {
-        const CommandName = interaction.commandName;
-        const guildId = interaction.guild?.id;
+    if (!interaction.isChatInputCommand()) return;
+    const CommandName = interaction.commandName;
+    const guildId = interaction.guild?.id;
 
-        if (CommandName === "setbottoken") {
-            if (interaction.user.id !== ADMIN_ID) return interaction.reply({ content: "You are not authorized.", ephemeral: true });
-            const targetServerId = interaction.options.getString("serverid");
-            const customToken = interaction.options.getString("token");
-            const db = await GetJsonBin();
-            db.CustomTokens = db.CustomTokens || {};
-            db.CustomTokens[targetServerId] = customToken;
-            await SaveJsonBin(db);
-            return interaction.reply({ content: `Custom bot token set for server ID ${targetServerId}.`, ephemeral: true });
-        }
+    if (CommandName === "verify") {
+        const Username = interaction.options.getString("username");
+        const UserId = await GetRobloxUserId(Username);
+        const Code = "VERIFY-" + crypto.randomBytes(3).toString("hex").toUpperCase();
+        Verifications[interaction.user.id] = { RobloxUserId: UserId, Code };
+        const Button = new ButtonBuilder().setCustomId("done_verification").setLabel("Done").setStyle(ButtonStyle.Primary);
+        const Row = new ActionRowBuilder().addComponents(Button);
+        await interaction.reply({ content: `Put this code in your Roblox profile description:\n${Code}\nThen click the Done button when finished.`, components: [Row], ephemeral: true });
+    }
 
-        const activeToken = await GetActiveToken(guildId);
+    if (CommandName === "config") {
+        const GroupId = interaction.options.getInteger("groupid");
+        const Db = await GetJsonBin();
+        Db.ServerConfig = Db.ServerConfig || {};
+        Db.ServerConfig[interaction.guild.id] = Db.ServerConfig[interaction.guild.id] || {};
+        Db.ServerConfig[interaction.guild.id].GroupId = GroupId;
+        await SaveJsonBin(Db);
+        PendingApprovals[GroupId] = { requesterId: interaction.user.id, guildId: interaction.guild.id };
+        try { await ClientBot.users.fetch(ADMIN_ID).then(u => u.send(`New pending config:\nGroup ID: ${GroupId}\nRequested by: <@${interaction.user.id}>`)); } catch {}
+        await interaction.reply({ content: `Group ID **${GroupId}** set! Waiting for admin approval.`, ephemeral: true });
+    }
 
-        if (CommandName === "verify") {
-            const Username = interaction.options.getString("username");
-            const UserId = await GetRobloxUserId(Username);
-            const Code = "VERIFY-" + crypto.randomBytes(3).toString("hex").toUpperCase();
-            Verifications[interaction.user.id] = { RobloxUserId: UserId, Code };
-            const Button = new ButtonBuilder().setCustomId("done_verification").setLabel("Done").setStyle(ButtonStyle.Primary);
-            const Row = new ActionRowBuilder().addComponents(Button);
-            await interaction.reply({ content: `Put this code in your Roblox profile description:\n\`${Code}\`\nThen click the Done button when finished.`, components: [Row], ephemeral: true });
-        }
-
-        if (CommandName === "config") {
-            const GroupId = interaction.options.getInteger("groupid");
-            const Db = await GetJsonBin();
-            Db.ServerConfig = Db.ServerConfig || {};
-            Db.ServerConfig[interaction.guild.id] = Db.ServerConfig[interaction.guild.id] || {};
-            Db.ServerConfig[interaction.guild.id].GroupId = GroupId;
-            await SaveJsonBin(Db);
-            PendingApprovals[GroupId] = { requesterId: interaction.user.id, guildId: interaction.guild.id };
-            try { await ClientBot.users.fetch(ADMIN_ID).then(u => u.send(`New pending config:\nGroup ID: ${GroupId}\nRequested by: <@${interaction.user.id}>`)); } catch {}
-            await interaction.reply({ content: `Group ID **${GroupId}** set! Waiting for admin approval.`, ephemeral: true });
-        }
-
-        if (["setrank", "promote", "demote"].includes(CommandName)) {
-            const Db = await GetJsonBin();
-            if (!Db.ServerConfig || !Db.ServerConfig[guildId]) return interaction.reply({ content: "Group ID not set. Run /config first.", ephemeral: true });
-            const GroupId = Db.ServerConfig[guildId].GroupId;
-            const UserId = interaction.options.getInteger("userid");
-            try {
-                let NewRank, Action;
-                if (CommandName === "setrank") { NewRank = interaction.options.getInteger("rank"); await SetRank(GroupId, UserId, NewRank, interaction.user.username); Action = `Rank set to **${NewRank}**`; }
-                if (CommandName === "promote") { NewRank = await GetCurrentRank(GroupId, UserId) + 1; await SetRank(GroupId, UserId, NewRank, interaction.user.username); Action = `Promoted to **${NewRank}**`; }
-                if (CommandName === "demote") { NewRank = Math.max(await GetCurrentRank(GroupId, UserId) - 1, 1); await SetRank(GroupId, UserId, NewRank, interaction.user.username); Action = `Demoted to **${NewRank}**`; }
-                const dateOnly = new Date().toISOString().split("T")[0];
-                const Embed = new EmbedBuilder().setColor(0x2ecc71).setTitle("Updated").addFields(
-                    { name: "User ID", value: String(UserId), inline: true },
-                    { name: "Group ID", value: String(GroupId), inline: true },
-                    { name: "Action", value: Action, inline: false },
-                    { name: "Issued By", value: interaction.user.tag, inline: true },
-                    { name: "Date", value: dateOnly, inline: true }
-                );
-                await interaction.reply({ embeds: [Embed] });
-            } catch (Err) { const dateOnly = new Date().toISOString().split("T")[0]; const ErrorEmbed = new EmbedBuilder().setColor(0xe74c3c).setTitle("Failed").setDescription(Err.message || "Unknown error").addFields({ name: "Date", value: dateOnly, inline: true }); await interaction.reply({ embeds: [ErrorEmbed], ephemeral: true }); }
-        }
-
-        if (CommandName === "whois") {
-            const TargetUser = interaction.options.getUser("user") || interaction.user;
-            const Db = await GetJsonBin();
-            const RobloxUserId = (Db.VerifiedUsers || {})[TargetUser.id];
-            if (!RobloxUserId) return interaction.reply({ content: `${TargetUser.tag} has not verified a Roblox account.`, ephemeral: true });
-            const RobloxInfo = (await axios.get(`https://users.roblox.com/v1/users/${RobloxUserId}`)).data;
-            const Embed = new EmbedBuilder().setColor(0x3498db).setTitle("User Lookup").addFields(
-                { name: "Discord User", value: `${TargetUser.tag} (${TargetUser.id})`, inline: false },
-                { name: "Roblox Username", value: `[${RobloxInfo.name}](https://www.roblox.com/users/${RobloxInfo.id}/profile)`, inline: true },
-                { name: "Roblox User ID", value: String(RobloxInfo.id), inline: true },
-                { name: "Description", value: RobloxInfo.description?.slice(0, 200) || "None", inline: false }
-            ).setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxInfo.id}&width=150&height=150&format=png`);
+    if (["setrank", "promote", "demote"].includes(CommandName)) {
+        const Db = await GetJsonBin();
+        if (!Db.ServerConfig || !Db.ServerConfig[guildId]) return interaction.reply({ content: "Group ID not set. Run /config first.", ephemeral: true });
+        const GroupId = Db.ServerConfig[guildId].GroupId;
+        const UserId = interaction.options.getInteger("userid");
+        try {
+            let NewRank, Action;
+            if (CommandName === "setrank") {
+                NewRank = interaction.options.getInteger("rank");
+                await SetRank(GroupId, UserId, NewRank, interaction.user.username, guildId);
+                Action = `Rank set to **${NewRank}**`;
+            }
+            if (CommandName === "promote") {
+                NewRank = await GetCurrentRank(GroupId, UserId) + 1;
+                await SetRank(GroupId, UserId, NewRank, interaction.user.username, guildId);
+                Action = `Promoted to **${NewRank}**`;
+            }
+            if (CommandName === "demote") {
+                NewRank = Math.max(await GetCurrentRank(GroupId, UserId) - 1, 1);
+                await SetRank(GroupId, UserId, NewRank, interaction.user.username, guildId);
+                Action = `Demoted to **${NewRank}**`;
+            }
+            const dateOnly = new Date().toISOString().split("T")[0];
+            const Embed = new EmbedBuilder().setColor(0x2ecc71).setTitle("Updated").addFields(
+                { name: "User ID", value: String(UserId), inline: true },
+                { name: "Group ID", value: String(GroupId), inline: true },
+                { name: "Action", value: Action, inline: false },
+                { name: "Issued By", value: interaction.user.tag, inline: true },
+                { name: "Date", value: dateOnly, inline: true }
+            );
             await interaction.reply({ embeds: [Embed] });
+        } catch (Err) {
+            const dateOnly = new Date().toISOString().split("T")[0];
+            const ErrorEmbed = new EmbedBuilder().setColor(0xe74c3c).setTitle("Failed").setDescription(Err.message || "Unknown error").addFields({ name: "Date", value: dateOnly, inline: true });
+            await interaction.reply({ embeds: [ErrorEmbed], ephemeral: true });
         }
+    }
+
+    if (CommandName === "whois") {
+        const TargetUser = interaction.options.getUser("user") || interaction.user;
+        const Db = await GetJsonBin();
+        const RobloxUserId = (Db.VerifiedUsers || {})[TargetUser.id];
+        if (!RobloxUserId) return interaction.reply({ content: `${TargetUser.tag} has not verified a Roblox account.`, ephemeral: true });
+        const RobloxInfo = (await axios.get(`https://users.roblox.com/v1/users/${RobloxUserId}`)).data;
+        const Embed = new EmbedBuilder().setColor(0x3498db).setTitle("User Lookup").addFields(
+            { name: "Discord User", value: `${TargetUser.tag} (${TargetUser.id})`, inline: false },
+            { name: "Roblox Username", value: `[${RobloxInfo.name}](https://www.roblox.com/users/${RobloxInfo.id}/profile)`, inline: true },
+            { name: "Roblox User ID", value: String(RobloxInfo.id), inline: true },
+            { name: "Description", value: RobloxInfo.description?.slice(0, 200) || "None", inline: false }
+        ).setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxInfo.id}&width=150&height=150&format=png`);
+        await interaction.reply({ embeds: [Embed] });
     }
 
     if (interaction.isButton() && interaction.customId === "done_verification") {
@@ -221,8 +221,16 @@ ClientBot.on("messageCreate", async message => {
         const GroupId = args[1];
         if (!GroupId || !PendingApprovals[GroupId]) return message.reply("Invalid or unknown group ID.");
         const { requesterId } = PendingApprovals[GroupId];
-        if (cmd === "!accept") { await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been accepted.`); delete PendingApprovals[GroupId]; return message.channel.send(`Accepted group ${GroupId} and notified <@${requesterId}>`); }
-        if (cmd === "!decline") { await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been declined.`); delete PendingApprovals[GroupId]; return message.channel.send(`Declined group ${GroupId} and notified <@${requesterId}>`); }
+        if (cmd === "!accept") {
+            await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been accepted.`);
+            delete PendingApprovals[GroupId];
+            return message.channel.send(`Accepted group ${GroupId} and notified <@${requesterId}>`);
+        }
+        if (cmd === "!decline") {
+            await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been declined.`);
+            delete PendingApprovals[GroupId];
+            return message.channel.send(`Declined group ${GroupId} and notified <@${requesterId}>`);
+        }
     }
 
     if (cmd === "!setbottoken") {
@@ -233,7 +241,7 @@ ClientBot.on("messageCreate", async message => {
         db.CustomTokens = db.CustomTokens || {};
         db.CustomTokens[targetServerId] = customToken;
         await SaveJsonBin(db);
-        message.channel.send(`Custom bot token set for server ID ${targetServerId}.`);
+        message.channel.send(`Custom Roblox token set for server ID ${targetServerId}.`);
     }
 });
 
