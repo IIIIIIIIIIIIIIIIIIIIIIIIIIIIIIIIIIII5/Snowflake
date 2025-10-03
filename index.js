@@ -82,7 +82,8 @@ async function LogRankChange(GroupId, UserId, RoleInfo, Issuer, guildId) {
 }
 
 async function GetRobloxUserId(Username) {
-    const Res = await axios.get(`https://users.roblox.com/v1/usernames/users`, {
+    const Res = await axios({
+        url: "https://users.roblox.com/v1/usernames/users",
         method: "POST",
         headers: { "Content-Type": "application/json" },
         data: { usernames: [Username] }
