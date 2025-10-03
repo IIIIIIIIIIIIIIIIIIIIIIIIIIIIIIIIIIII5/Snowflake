@@ -33,7 +33,7 @@ async function GetRobloxCookie(guildId) {
 async function FetchRoles(GroupId) {
     const Res = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/roles`);
     const Roles = {};
-    Res.data.roles.forEach(Role => Roles[Role.rank] = { Id: Role.name, RoleId: Role.id });
+    Res.data.roles.forEach(Role => Roles[Role.name.toLowerCase()] = { Name: Role.name, Rank: Role.rank, RoleId: Role.id });
     return Roles;
 }
 
@@ -47,11 +47,11 @@ async function GetXsrfToken(guildId) {
     }
 }
 
-async function SetRank(GroupId, UserId, RankNumber, Issuer, guildId) {
+async function SetRank(GroupId, UserId, RankName, Issuer, guildId) {
     const RobloxCookie = await GetRobloxCookie(guildId);
     const Roles = await FetchRoles(GroupId);
-    const RoleInfo = Roles[RankNumber];
-    if (!RoleInfo) throw new Error("Invalid rank number: " + RankNumber);
+    const RoleInfo = Roles[RankName.toLowerCase()];
+    if (!RoleInfo) throw new Error("Invalid rank name: " + RankName);
     const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
     let XsrfToken = await GetXsrfToken(guildId);
 
@@ -77,14 +77,23 @@ async function LogRankChange(GroupId, UserId, RoleInfo, Issuer, guildId) {
     const Data = await GetJsonBin();
     Data.RankChanges = Data.RankChanges || [];
     const dateOnly = new Date().toISOString().split("T")[0];
-    Data.RankChanges.push({ GroupId, UserId, NewRank: RoleInfo, IssuedBy: Issuer || "API", Timestamp: dateOnly, GuildId: guildId });
+    Data.RankChanges.push({ GroupId, UserId, NewRank: RoleInfo.Name, IssuedBy: Issuer || "API", Timestamp: dateOnly, GuildId: guildId });
     await SaveJsonBin(Data);
 }
 
 async function GetRobloxUserId(Username) {
-    const Res = await axios.get(`https://users.roblox.com/v1/users/search?keyword=${Username}`);
+    const Res = await axios.get(`https://users.roblox.com/v1/usernames/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        data: { usernames: [Username] }
+    });
     if (!Res.data.data || !Res.data.data[0]) throw new Error("Invalid username");
     return Res.data.data[0].id;
+}
+
+async function GetRobloxUserInfo(UserId) {
+    const Res = await axios.get(`https://users.roblox.com/v1/users/${UserId}`);
+    return Res.data;
 }
 
 async function GetRobloxDescription(UserId) {
@@ -96,7 +105,7 @@ async function GetCurrentRank(GroupId, UserId) {
     const res = await axios.get(`https://groups.roblox.com/v2/users/${UserId}/groups/roles`);
     const GroupData = res.data.data.find(g => g.group.id === GroupId);
     if (!GroupData) throw new Error("User not in group");
-    return GroupData.role.rank;
+    return { Rank: GroupData.role.rank, Name: GroupData.role.name };
 }
 
 ClientBot.once("ready", async () => {
@@ -104,9 +113,9 @@ ClientBot.once("ready", async () => {
     const Commands = [
         new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("config").setDescription("Set the group ID for this server").addIntegerOption(opt => opt.setName("groupid").setDescription("Roblox group ID").setRequired(true)),
-        new SlashCommandBuilder().setName("setrank").setDescription("Set a user's rank").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)).addIntegerOption(opt => opt.setName("rank").setDescription("Rank number").setRequired(true)),
-        new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
-        new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
+        new SlashCommandBuilder().setName("setrank").setDescription("Set a user's rank").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)).addStringOption(opt => opt.setName("rankname").setDescription("Rank name").setRequired(true)),
+        new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)),
+        new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("whois").setDescription("Lookup a Roblox user from a Discord user").addUserOption(opt => opt.setName("user").setDescription("The Discord user to look up (leave blank for yourself)").setRequired(false))
     ].map(cmd => cmd.toJSON());
 
@@ -145,27 +154,40 @@ ClientBot.on("interactionCreate", async interaction => {
         const Db = await GetJsonBin();
         if (!Db.ServerConfig || !Db.ServerConfig[guildId]) return interaction.reply({ content: "Group ID not set. Run /config first.", ephemeral: true });
         const GroupId = Db.ServerConfig[guildId].GroupId;
-        const UserId = interaction.options.getInteger("userid");
+        const Username = interaction.options.getString("username");
         try {
-            let NewRank, Action;
+            const UserId = await GetRobloxUserId(Username);
+            let Action, RoleName;
             if (CommandName === "setrank") {
-                NewRank = interaction.options.getInteger("rank");
-                await SetRank(GroupId, UserId, NewRank, interaction.user.username, guildId);
-                Action = `Rank set to **${NewRank}**`;
+                RoleName = interaction.options.getString("rankname");
+                await SetRank(GroupId, UserId, RoleName, interaction.user.username, guildId);
+                Action = `Rank set to **${RoleName}**`;
             }
             if (CommandName === "promote") {
-                NewRank = await GetCurrentRank(GroupId, UserId) + 1;
-                await SetRank(GroupId, UserId, NewRank, interaction.user.username, guildId);
-                Action = `Promoted to **${NewRank}**`;
+                const Current = await GetCurrentRank(GroupId, UserId);
+                const Roles = await FetchRoles(GroupId);
+                const Sorted = Object.values(Roles).sort((a, b) => a.Rank - b.Rank);
+                const CurrentIndex = Sorted.findIndex(r => r.Rank === Current.Rank);
+                if (CurrentIndex === -1 || CurrentIndex === Sorted.length - 1) throw new Error("Cannot promote further");
+                const NewRole = Sorted[CurrentIndex + 1];
+                await SetRank(GroupId, UserId, NewRole.Name, interaction.user.username, guildId);
+                RoleName = NewRole.Name;
+                Action = `Promoted to **${NewRole.Name}**`;
             }
             if (CommandName === "demote") {
-                NewRank = Math.max(await GetCurrentRank(GroupId, UserId) - 1, 1);
-                await SetRank(GroupId, UserId, NewRank, interaction.user.username, guildId);
-                Action = `Demoted to **${NewRank}**`;
+                const Current = await GetCurrentRank(GroupId, UserId);
+                const Roles = await FetchRoles(GroupId);
+                const Sorted = Object.values(Roles).sort((a, b) => a.Rank - b.Rank);
+                const CurrentIndex = Sorted.findIndex(r => r.Rank === Current.Rank);
+                if (CurrentIndex <= 0) throw new Error("Cannot demote further");
+                const NewRole = Sorted[CurrentIndex - 1];
+                await SetRank(GroupId, UserId, NewRole.Name, interaction.user.username, guildId);
+                RoleName = NewRole.Name;
+                Action = `Demoted to **${NewRole.Name}**`;
             }
             const dateOnly = new Date().toISOString().split("T")[0];
-            const Embed = new EmbedBuilder().setColor(0x2ecc71).setTitle("Updated").addFields(
-                { name: "User ID", value: String(UserId), inline: true },
+            const Embed = new EmbedBuilder().setColor(0x2ecc71).setTitle("Rank Updated").addFields(
+                { name: "Username", value: Username, inline: true },
                 { name: "Group ID", value: String(GroupId), inline: true },
                 { name: "Action", value: Action, inline: false },
                 { name: "Issued By", value: interaction.user.tag, inline: true },
@@ -184,7 +206,7 @@ ClientBot.on("interactionCreate", async interaction => {
         const Db = await GetJsonBin();
         const RobloxUserId = (Db.VerifiedUsers || {})[TargetUser.id];
         if (!RobloxUserId) return interaction.reply({ content: `${TargetUser.tag} has not verified a Roblox account.`, ephemeral: true });
-        const RobloxInfo = (await axios.get(`https://users.roblox.com/v1/users/${RobloxUserId}`)).data;
+        const RobloxInfo = await GetRobloxUserInfo(RobloxUserId);
         const Embed = new EmbedBuilder().setColor(0x3498db).setTitle("User Lookup").addFields(
             { name: "Discord User", value: `${TargetUser.tag} (${TargetUser.id})`, inline: false },
             { name: "Roblox Username", value: `[${RobloxInfo.name}](https://www.roblox.com/users/${RobloxInfo.id}/profile)`, inline: true },
