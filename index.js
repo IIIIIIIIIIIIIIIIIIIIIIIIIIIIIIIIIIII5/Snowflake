@@ -10,7 +10,7 @@ const JsonBinSecret = process.env.JSONBIN_SECRET;
 const ADMIN_ID = process.env.ADMIN_ID;
 
 const Verifications = {};
-const PendingApprovals = {};
+const PendingConfigs = {};
 
 async function FetchRoles(GroupId) {
   const Res = await axios.get(`https://groups.roblox.com/v1/groups/${GroupId}/roles`);
@@ -102,9 +102,7 @@ ClientBot.once("ready", async () => {
   const Commands = [
     new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
     new SlashCommandBuilder().setName("config").setDescription("Set the group ID for this server").addIntegerOption(opt => opt.setName("groupid").setDescription("Roblox group ID").setRequired(true)),
-    new SlashCommandBuilder().setName("setrank").setDescription("Set a user's rank")
-      .addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true))
-      .addStringOption(opt => opt.setName("rank").setDescription("Rank number or role name").setRequired(true)),
+    new SlashCommandBuilder().setName("setrank").setDescription("Set a user's rank").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)).addStringOption(opt => opt.setName("rank").setDescription("Rank number or role name").setRequired(true)),
     new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
     new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addIntegerOption(opt => opt.setName("userid").setDescription("Roblox user ID").setRequired(true)),
     new SlashCommandBuilder().setName("whois").setDescription("Lookup a Roblox user from a Discord user").addUserOption(opt => opt.setName("user").setDescription("The Discord user to look up (leave blank to look up yourself)").setRequired(false))
@@ -117,142 +115,30 @@ ClientBot.once("ready", async () => {
 ClientBot.on("interactionCreate", async (Interaction) => {
   if (Interaction.isChatInputCommand()) {
     const CommandName = Interaction.commandName;
-
-    if (["setrank", "promote", "demote"].includes(CommandName)) {
-      const allowedRoleId = "1423332095001890908";
-      if (!Interaction.member.roles.cache.has(allowedRoleId)) {
-        return Interaction.reply({
-          content: "You do not have permission to use this command.",
-          ephemeral: true
-        });
-      }
-
-      const Db = await GetJsonBin();
-      if (!Db.VerifiedUsers || !Db.VerifiedUsers[Interaction.user.id]) return Interaction.reply({ content: "You must verify first with /verify.", ephemeral: true });
-      if (!Db.ServerConfig || !Db.ServerConfig[Interaction.guild.id]) return Interaction.reply({ content: "Group ID not set. Run /config <groupId> first.", ephemeral: true });
-
-      const GroupId = Db.ServerConfig[Interaction.guild.id].GroupId;
-      const UserId = Interaction.options.getInteger("userid");
-
-      try {
-        let NewRank;
-        let Action;
-
-        const Roles = await FetchRoles(GroupId);
-        const RoleList = Object.values(Roles).sort((a, b) => a.Rank - b.Rank);
-
-        if (CommandName === "setrank") {
-          const Input = Interaction.options.getString("rank");
-          let RoleInfo = null;
-
-          if (!isNaN(Input)) {
-            const RankNumber = parseInt(Input);
-            RoleInfo = Roles[RankNumber];
-          }
-
-          if (!RoleInfo) {
-            RoleInfo = RoleList.find(r => r.Name.toLowerCase() === Input.toLowerCase());
-          }
-
-          if (!RoleInfo) throw new Error("Rank not found (use rank number or exact role name)");
-
-          NewRank = RoleInfo.Rank;
-          await SetRank(GroupId, UserId, NewRank, Interaction.user.username);
-          Action = `Rank set to ${RoleInfo.Name} (Rank ${NewRank})`;
-
-        } else {
-          const CurrentRank = await GetCurrentRank(GroupId, UserId);
-          const CurrentIndex = RoleList.findIndex(r => r.Rank === CurrentRank);
-          if (CurrentIndex === -1) throw new Error("User's current role not found in group");
-
-          if (CommandName === "promote") {
-            const NextRole = RoleList[CurrentIndex + 1];
-            if (!NextRole) throw new Error("User is already at the highest rank");
-            NewRank = NextRole.Rank;
-            await SetRank(GroupId, UserId, NewRank, Interaction.user.username);
-            Action = `Promoted to ${NextRole.Name} (Rank ${NewRank})`;
-          } else if (CommandName === "demote") {
-            const PrevRole = RoleList[CurrentIndex - 1];
-            if (!PrevRole) throw new Error("User is already at the lowest rank");
-            NewRank = PrevRole.Rank;
-            await SetRank(GroupId, UserId, NewRank, Interaction.user.username);
-            Action = `Demoted to ${PrevRole.Name} (Rank ${NewRank})`;
-          }
-        }
-
-        const dateOnly = new Date().toISOString().split("T")[0];
-
-        const Embed = new EmbedBuilder()
-          .setColor(0x2ecc71)
-          .setTitle("Updated")
-          .addFields(
-            { name: "User ID", value: String(UserId), inline: true },
-            { name: "Group ID", value: String(GroupId), inline: true },
-            { name: "Action", value: Action, inline: false },
-            { name: "Issued By", value: Interaction.user.tag, inline: true },
-            { name: "Date", value: dateOnly, inline: true }
-          );
-
-        await Interaction.reply({ embeds: [Embed] });
-      } catch (Err) {
-        const dateOnly = new Date().toISOString().split("T")[0];
-
-        const ErrorEmbed = new EmbedBuilder()
-          .setColor(0xe74c3c)
-          .setTitle("Failed")
-          .setDescription(Err.message || "An unknown error occurred")
-          .addFields({ name: "Date", value: dateOnly, inline: true });
-
-        await Interaction.reply({ embeds: [ErrorEmbed], ephemeral: true });
-      }
+    if (CommandName === "config") {
+      const GroupId = Interaction.options.getInteger("groupid");
+      PendingConfigs[Interaction.guild.id] = { GroupId, RequestedBy: Interaction.user.id };
+      const Embed = new EmbedBuilder().setColor(0xf1c40f).setTitle("Config Request").setDescription(`Set group ID to **${GroupId}** for this server?`).addFields({ name: "Requested By", value: Interaction.user.tag, inline: true }, { name: "Server", value: Interaction.guild.name, inline: true });
+      const Buttons = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`config_approve_${Interaction.guild.id}`).setLabel("Approve").setStyle(ButtonStyle.Success), new ButtonBuilder().setCustomId(`config_deny_${Interaction.guild.id}`).setLabel("Deny").setStyle(ButtonStyle.Danger));
+      await Interaction.reply({ embeds: [Embed], components: [Buttons] });
     }
-
     if (CommandName === "verify") {
       const Username = Interaction.options.getString("username");
       try {
         const UserId = await GetRobloxUserId(Username);
         const Code = crypto.randomBytes(3).toString("hex").toUpperCase();
         Verifications[Interaction.user.id] = { UserId, Code };
-        await Interaction.reply({
-          content: `Please put this code in your Roblox profile description: ${Code}. Then click the button below to confirm.`,
-          components: [
-            new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId("verify_confirm").setLabel("Confirm Verification").setStyle(ButtonStyle.Primary)
-            )
-          ],
-          ephemeral: true
-        });
+        await Interaction.reply({ content: `Please put this code in your Roblox profile description: ${Code}. Then click the button below to confirm.`, components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId("verify_confirm").setLabel("Confirm Verification").setStyle(ButtonStyle.Primary))], ephemeral: true });
       } catch (Err) {
         await Interaction.reply({ content: Err.message, ephemeral: true });
       }
     }
-
-    if (CommandName === "config") {
-      if (Interaction.user.id !== ADMIN_ID) {
-        return Interaction.reply({ content: "Only the bot admin can use this command.", ephemeral: true });
-      }
-      const GroupId = Interaction.options.getInteger("groupid");
-      const Db = await GetJsonBin();
-      Db.ServerConfig = Db.ServerConfig || {};
-      Db.ServerConfig[Interaction.guild.id] = { GroupId };
-      await SaveJsonBin(Db);
-      await Interaction.reply({ content: `Group ID for this server has been set to ${GroupId}`, ephemeral: true });
-    }
-
     if (CommandName === "whois") {
       const TargetUser = Interaction.options.getUser("user") || Interaction.user;
       const Db = await GetJsonBin();
-      if (!Db.VerifiedUsers || !Db.VerifiedUsers[TargetUser.id]) {
-        return Interaction.reply({ content: "That user is not verified.", ephemeral: true });
-      }
+      if (!Db.VerifiedUsers || !Db.VerifiedUsers[TargetUser.id]) return Interaction.reply({ content: "That user is not verified.", ephemeral: true });
       const RobloxId = Db.VerifiedUsers[TargetUser.id];
-      const Embed = new EmbedBuilder()
-        .setColor(0x3498db)
-        .setTitle("Whois Lookup")
-        .addFields(
-          { name: "Discord User", value: TargetUser.tag, inline: true },
-          { name: "Roblox UserId", value: String(RobloxId), inline: true }
-        );
+      const Embed = new EmbedBuilder().setColor(0x3498db).setTitle("Whois Lookup").addFields({ name: "Discord User", value: TargetUser.tag, inline: true }, { name: "Roblox UserId", value: String(RobloxId), inline: true });
       await Interaction.reply({ embeds: [Embed] });
     }
   }
@@ -261,12 +147,9 @@ ClientBot.on("interactionCreate", async (Interaction) => {
     if (Interaction.customId === "verify_confirm") {
       const Data = Verifications[Interaction.user.id];
       if (!Data) return Interaction.reply({ content: "No verification session found. Please use /verify first.", ephemeral: true });
-
       try {
         const Description = await GetRobloxDescription(Data.UserId);
-        if (!Description.includes(Data.Code)) {
-          return Interaction.reply({ content: "Verification code not found in your description. Please try again.", ephemeral: true });
-        }
+        if (!Description.includes(Data.Code)) return Interaction.reply({ content: "Verification code not found in your description. Please try again.", ephemeral: true });
         const Db = await GetJsonBin();
         Db.VerifiedUsers = Db.VerifiedUsers || {};
         Db.VerifiedUsers[Interaction.user.id] = Data.UserId;
@@ -277,6 +160,49 @@ ClientBot.on("interactionCreate", async (Interaction) => {
         await Interaction.reply({ content: Err.message, ephemeral: true });
       }
     }
+    if (Interaction.customId.startsWith("config_approve_")) {
+      if (Interaction.user.id !== ADMIN_ID) return Interaction.reply({ content: "You are not allowed to approve.", ephemeral: true });
+      const GuildId = Interaction.customId.split("_")[2];
+      const Pending = PendingConfigs[GuildId];
+      if (!Pending) return Interaction.reply({ content: "No pending config for this server.", ephemeral: true });
+      const Db = await GetJsonBin();
+      Db.ServerConfig = Db.ServerConfig || {};
+      Db.ServerConfig[GuildId] = { GroupId: Pending.GroupId };
+      await SaveJsonBin(Db);
+      delete PendingConfigs[GuildId];
+      await Interaction.reply({ content: `Config approved. Group ID set to ${Pending.GroupId}.` });
+    }
+    if (Interaction.customId.startsWith("config_deny_")) {
+      if (Interaction.user.id !== ADMIN_ID) return Interaction.reply({ content: "You are not allowed to deny.", ephemeral: true });
+      const GuildId = Interaction.customId.split("_")[2];
+      if (PendingConfigs[GuildId]) delete PendingConfigs[GuildId];
+      await Interaction.reply({ content: "Config request denied." });
+    }
+  }
+});
+
+ClientBot.on("messageCreate", async (message) => {
+  if (!message.content.startsWith("!")) return;
+  if (message.author.id !== ADMIN_ID) return;
+
+  const args = message.content.split(" ");
+  const cmd = args[0].toLowerCase();
+  const GroupId = args[1];
+  if (!GroupId || !PendingConfigs[message.guild.id]) return;
+
+  if (cmd === "!accept") {
+    const Pending = PendingConfigs[message.guild.id];
+    const Db = await GetJsonBin();
+    Db.ServerConfig = Db.ServerConfig || {};
+    Db.ServerConfig[message.guild.id] = { GroupId: Pending.GroupId };
+    await SaveJsonBin(Db);
+    delete PendingConfigs[message.guild.id];
+    return message.reply(`Group ${Pending.GroupId} accepted and saved.`);
+  }
+
+  if (cmd === "!decline") {
+    delete PendingConfigs[message.guild.id];
+    return message.reply(`Group ${GroupId} declined.`);
   }
 });
 
