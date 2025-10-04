@@ -187,18 +187,16 @@ ClientBot.on("interactionCreate", async interaction => {
                 RoleName = NewRole.Name;
                 Action = `Demoted to **${NewRole.Name}**`;
             }
-            const dateOnly = new Date().toISOString().split("T")[0];
             const Embed = new EmbedBuilder().setColor(0x2ecc71).setTitle("Rank Updated").addFields(
                 { name: "Username", value: Username, inline: true },
                 { name: "Group ID", value: String(GroupId), inline: true },
                 { name: "Action", value: Action, inline: false },
                 { name: "Issued By", value: interaction.user.tag, inline: true },
-                { name: "Date", value: dateOnly, inline: true }
-            );
+                { name: "Date", value: new Date().toISOString().split("T")[0], inline: true }
+            ).setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
             await interaction.reply({ embeds: [Embed] });
         } catch (Err) {
-            const dateOnly = new Date().toISOString().split("T")[0];
-            const ErrorEmbed = new EmbedBuilder().setColor(0xe74c3c).setTitle("Failed").setDescription(Err.message || "Unknown error").addFields({ name: "Date", value: dateOnly, inline: true });
+            const ErrorEmbed = new EmbedBuilder().setColor(0xe74c3c).setTitle("Failed").setDescription(Err.message || "Unknown error").addFields({ name: "Date", value: new Date().toISOString().split("T")[0], inline: true }).setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
             await interaction.reply({ embeds: [ErrorEmbed], ephemeral: true });
         }
     }
@@ -214,7 +212,7 @@ ClientBot.on("interactionCreate", async interaction => {
             { name: "Roblox Username", value: `[${RobloxInfo.name}](https://www.roblox.com/users/${RobloxInfo.id}/profile)`, inline: true },
             { name: "Roblox User ID", value: String(RobloxInfo.id), inline: true },
             { name: "Description", value: RobloxInfo.description?.slice(0, 200) || "None", inline: false }
-        ).setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxInfo.id}&width=150&height=150&format=png`);
+        ).setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxInfo.id}&width=150&height=150&format=png`).setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
         await interaction.reply({ embeds: [Embed] });
     }
 
@@ -223,14 +221,11 @@ ClientBot.on("interactionCreate", async interaction => {
         if (!member.roles.cache.has("1411698495735337182")) {
             return interaction.reply({ content: "You do not have permission to use this command!", ephemeral: true });
         }
-
         const host = interaction.user;
         const cohost = interaction.options.getUser("cohost");
         const supervisor = interaction.options.getUser("supervisor");
-
         const channel = interaction.guild.channels.cache.get("1411697149435183115");
         if (!channel) return interaction.reply({ content: "Channel not found", ephemeral: true });
-
         const embed = new EmbedBuilder()
             .setColor(0x3498db)
             .setTitle("A TRAINING IS BEING HOSTED")
@@ -239,11 +234,10 @@ Host: <@${host.id}>
 Co-Host: ${cohost ? `<@${cohost.id}>` : "None"}
 Supervisor: ${supervisor ? `<@${supervisor.id}>` : "None"}
 Link: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)
-Ping: <@&1404500986633916479>
             `)
-            .setThumbnail("https://media.discordapp.net/attachments/1411697149435183115/1424015100452540556/snowflake.png?ex=68e268e8&is=68e11768&hm=a1aada229c8506fab9075d65645134a86da5e30ba4ce4b53e602f76baa59f51f&=&format=webp&quality=lossless");
-
-        await channel.send({ embeds: [embed] });
+            .setThumbnail("https://media.discordapp.net/attachments/1411697149435183115/1424015100452540556/snowflake.png?ex=68e268e8&is=68e11768&hm=a1aada229c8506fab9075d65645134a86da5e30ba4ce4b53e602f76baa59f51f&=&format=webp&quality=lossless")
+            .setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
+        await channel.send({ content: "<@&1404500986633916479>", embeds: [embed] });
         await interaction.reply({ content: `Announcement sent to ${channel}.`, ephemeral: true });
     }
 
