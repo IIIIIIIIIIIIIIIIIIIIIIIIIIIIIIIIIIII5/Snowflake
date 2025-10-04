@@ -121,14 +121,12 @@ ClientBot.once("ready", async () => {
     ].map(cmd => cmd.toJSON());
 
     const Rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
-    const GuildId = "1411697148973547591";
 
-    const existing = await Rest.get(Routes.applicationGuildCommands(process.env.CLIENT_ID, GuildId));
-    const existingNames = existing.map(c => c.name);
-
-    for (const cmd of Commands) {
-        if (!existingNames.includes(cmd.name)) {
-            await Rest.post(Routes.applicationGuildCommands(process.env.CLIENT_ID, GuildId), { body: cmd });
+    for (const [guildId] of ClientBot.guilds.cache) {
+        try {
+            await Rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId), { body: Commands });
+        } catch (err) {
+            console.error(`Failed to register commands for guild ${guildId}`, err);
         }
     }
 });
@@ -230,7 +228,7 @@ ClientBot.on("interactionCreate", async interaction => {
         const host = interaction.user;
         const cohost = interaction.options.getUser("cohost");
         const supervisor = interaction.options.getUser("supervisor");
-        const channel = interaction.guild.channels.cache.get("1398706795840536696");
+        const channel = await interaction.guild.channels.fetch("1398706795840536696");
         if (!channel) return interaction.reply({ content: "Channel not found", ephemeral: true });
         const embed = new EmbedBuilder()
             .setColor(0x3498db)
@@ -239,7 +237,7 @@ ClientBot.on("interactionCreate", async interaction => {
             .setThumbnail("https://media.discordapp.net/attachments/1411697149435183115/1424015100452540556/snowflake.png")
             .setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
         await channel.send({ content: "<@&1404500986633916479>", embeds: [embed] });
-        await interaction.reply({ content: `Announcement sent to ${channel}.`, ephemeral: true });
+        await interaction.reply({ content: `Announcement sent to ${channel.name}.`, ephemeral: true });
     }
 
     if (interaction.isButton() && interaction.customId === "done_verification") {
