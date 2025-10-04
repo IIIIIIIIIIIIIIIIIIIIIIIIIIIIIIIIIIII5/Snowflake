@@ -54,7 +54,6 @@ async function SetRank(GroupId, UserId, RankName, Issuer, guildId) {
     if (!RoleInfo) throw new Error("Invalid rank name: " + RankName);
     const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
     let XsrfToken = await GetXsrfToken(guildId);
-
     try {
         await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
             headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
@@ -69,7 +68,6 @@ async function SetRank(GroupId, UserId, RankName, Issuer, guildId) {
             throw new Error("Request failed: " + (Err.response?.data?.errors?.[0]?.message || Err.message));
         }
     }
-
     await LogRankChange(GroupId, UserId, RoleInfo, Issuer, guildId);
 }
 
@@ -111,7 +109,6 @@ async function GetCurrentRank(GroupId, UserId) {
 
 ClientBot.once("ready", async () => {
     ClientBot.user.setActivity("Snowflake Prison Roleplay", { type: ActivityType.Watching });
-
     const Commands = [
         new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("config").setDescription("Set the group ID for this server").addIntegerOption(opt => opt.setName("groupid").setDescription("Roblox group ID").setRequired(true)),
@@ -121,9 +118,13 @@ ClientBot.once("ready", async () => {
         new SlashCommandBuilder().setName("whois").setDescription("Lookup a Roblox user from a Discord user").addUserOption(opt => opt.setName("user").setDescription("The Discord user to look up (leave blank for yourself)").setRequired(false)),
         new SlashCommandBuilder().setName("host").setDescription("Host a training!").addUserOption(opt => opt.setName("cohost").setDescription("Co-host of the session (Leave blank for no co-host)").setRequired(false)).addUserOption(opt => opt.setName("supervisor").setDescription("Supervisor of the session (Leave blank for no supervisor)").setRequired(false)),
     ].map(cmd => cmd.toJSON());
-
     const Rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
-    await Rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, "1411697148973547591"), { body: Commands });
+    const GuildId = "1411697148973547591";
+    const existing = await Rest.get(Routes.applicationGuildCommands(process.env.CLIENT_ID, GuildId));
+    for (const cmd of existing) {
+        await Rest.delete(Routes.applicationGuildCommand(process.env.CLIENT_ID, GuildId, cmd.id));
+    }
+    await Rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, GuildId), { body: Commands });
 });
 
 ClientBot.on("interactionCreate", async interaction => {
