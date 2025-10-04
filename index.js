@@ -117,7 +117,8 @@ ClientBot.once("ready", async () => {
         new SlashCommandBuilder().setName("setrank").setDescription("Set a user's rank").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)).addStringOption(opt => opt.setName("rankname").setDescription("Rank name").setRequired(true)),
         new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)),
-        new SlashCommandBuilder().setName("whois").setDescription("Lookup a Roblox user from a Discord user").addUserOption(opt => opt.setName("user").setDescription("The Discord user to look up (leave blank for yourself)").setRequired(false))
+        new SlashCommandBuilder().setName("whois").setDescription("Lookup a Roblox user from a Discord user").addUserOption(opt => opt.setName("user").setDescription("The Discord user to look up (leave blank for yourself)").setRequired(false)),
+        new SlashCommandBuilder().setName("host").setDescription("Host a training!").addUserOption(opt => opt.setName("cohost").setDescription("Co-host of the session (Leave blank for no co-host)").setRequired(false)).addUserOption(opt => opt.setName("supervisor").setDescription("Supervisor of the session (Leave blank for no supervisor)").setRequired(false)),
     ].map(cmd => cmd.toJSON());
 
     const Rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
@@ -215,6 +216,34 @@ ClientBot.on("interactionCreate", async interaction => {
             { name: "Description", value: RobloxInfo.description?.slice(0, 200) || "None", inline: false }
         ).setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxInfo.id}&width=150&height=150&format=png`);
         await interaction.reply({ embeds: [Embed] });
+    }
+
+    if (CommandName == "host") {
+        const member = interaction.member;
+        if (!member.roles.cache.has("1411698495735337182")) {
+            return interaction.reply({ content: "You do not have permission to use this command!"});
+        }
+
+        const host = interaction.user;
+        const cohost = interaction.options.getUser("cohost");
+        const supervisor = interaction.options.getUser("supervisor");
+
+        const channel = interaction.guilds.channel.cache.get("1411697149435183115")
+        if (!channel) return interaction.reply({ content: "Channel not found"});
+
+        const embed = new EmbedBuilder()
+        .setColor(0x3498db)
+        .setTitle("A TRAINING IS BEING HOSTED")
+        .setDescription(`
+Host: <@${host.id}>
+Co-Host: ${cohost ? `<@${cohost.id}>` : "None"}
+Supervisor: ${supervisor ? `<@${supervisor.id}>` : "None"}
+Link: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)
+Ping: <@&1404500986633916479>
+        `);
+
+        await channel.send({ embeds: [embed] });
+        await interaction.reply({ content: `Announcement sent to ${channel}.` })
     }
 
     if (interaction.isButton() && interaction.customId === "done_verification") {
