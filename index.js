@@ -218,13 +218,13 @@ ClientBot.on("interactionCreate", async interaction => {
 
     if (CommandName === "host") {
         const member = interaction.member;
-        if (!member.roles.cache.has("1411698495735337182")) {
+        if (!member.roles.cache.has("1424007337210937445")) {
             return interaction.reply({ content: "You do not have permission to use this command!", ephemeral: true });
         }
         const host = interaction.user;
         const cohost = interaction.options.getUser("cohost");
         const supervisor = interaction.options.getUser("supervisor");
-        const channel = interaction.guild.channels.cache.get("1411697149435183115");
+        const channel = interaction.guild.channels.cache.get("1398706795840536696");
         if (!channel) return interaction.reply({ content: "Channel not found", ephemeral: true });
         const embed = new EmbedBuilder()
             .setColor(0x3498db)
