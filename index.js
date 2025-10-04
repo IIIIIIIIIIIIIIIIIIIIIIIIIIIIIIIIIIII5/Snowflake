@@ -117,7 +117,7 @@ ClientBot.once("ready", async () => {
         new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("whois").setDescription("Lookup a Roblox user from a Discord user").addUserOption(opt => opt.setName("user").setDescription("The Discord user to look up (leave blank for yourself)").setRequired(false)),
-        new SlashCommandBuilder().setName("host").setDescription("Host a training!").addUserOption(opt => opt.setName("cohost").setDescription("Co-host of the session (Leave blank for no co-host)").setRequired(false)).addUserOption(opt => opt.setName("supervisor").setDescription("Supervisor of the session (Leave blank for no supervisor)").setRequired(false)),
+        new SlashCommandBuilder().setName("host").setDescription("Host a training!").addUserOption(opt => opt.setName("cohost").setDescription("Co-host of the session (Leave blank for no co-host)").setRequired(false)).addUserOption(opt => opt.setName("supervisor").setDescription("Supervisor of the session (Leave blank for no supervisor)").setRequired(false))
     ].map(cmd => cmd.toJSON());
 
     const Rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
@@ -126,10 +126,9 @@ ClientBot.once("ready", async () => {
     const existing = await Rest.get(Routes.applicationGuildCommands(process.env.CLIENT_ID, GuildId));
     const existingNames = existing.map(c => c.name);
 
-    for (const cmd of Commands) {
-        if (!existingNames.includes(cmd.name)) {
-            await Rest.post(Routes.applicationGuildCommands(process.env.CLIENT_ID, GuildId), { body: cmd });
-        }
+    const commandsToAdd = Commands.filter(c => !existingNames.includes(c.name));
+    if (commandsToAdd.length > 0) {
+        await Rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, GuildId), { body: [...existing, ...commandsToAdd] });
     }
 });
 
