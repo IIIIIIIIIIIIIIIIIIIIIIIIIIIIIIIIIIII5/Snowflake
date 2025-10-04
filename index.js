@@ -122,7 +122,7 @@ ClientBot.once("ready", async () => {
     ].map(cmd => cmd.toJSON());
 
     const Rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
-    await Rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: Commands });
+    await Rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, "1411697148973547591"), { body: Commands });
 });
 
 ClientBot.on("interactionCreate", async interaction => {
@@ -218,32 +218,32 @@ ClientBot.on("interactionCreate", async interaction => {
         await interaction.reply({ embeds: [Embed] });
     }
 
-    if (CommandName == "host") {
+    if (CommandName === "host") {
         const member = interaction.member;
-        if (!member.roles.cache.has("1411698495735337182")) {
-            return interaction.reply({ content: "You do not have permission to use this command!"});
+        if (!member.roles.cache.has("1424007337210937445")) {
+            return interaction.reply({ content: "You do not have permission to use this command!", ephemeral: true });
         }
 
         const host = interaction.user;
         const cohost = interaction.options.getUser("cohost");
         const supervisor = interaction.options.getUser("supervisor");
 
-        const channel = interaction.guilds.channel.cache.get("1411697149435183115")
-        if (!channel) return interaction.reply({ content: "Channel not found"});
+        const channel = interaction.guild.channels.cache.get("1398706795840536696");
+        if (!channel) return interaction.reply({ content: "Channel not found", ephemeral: true });
 
         const embed = new EmbedBuilder()
-        .setColor(0x3498db)
-        .setTitle("A TRAINING IS BEING HOSTED")
-        .setDescription(`
+            .setColor(0x3498db)
+            .setTitle("A TRAINING IS BEING HOSTED")
+            .setDescription(`
 Host: <@${host.id}>
 Co-Host: ${cohost ? `<@${cohost.id}>` : "None"}
 Supervisor: ${supervisor ? `<@${supervisor.id}>` : "None"}
 Link: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)
 Ping: <@&1404500986633916479>
-        `);
+            `);
 
         await channel.send({ embeds: [embed] });
-        await interaction.reply({ content: `Announcement sent to ${channel}.` })
+        await interaction.reply({ content: `Announcement sent to ${channel}.`, ephemeral: true });
     }
 
     if (interaction.isButton() && interaction.customId === "done_verification") {
