@@ -123,14 +123,7 @@ ClientBot.once("ready", async () => {
     ].map(cmd => cmd.toJSON());
 
     const Rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
-
-    const GuildId = "1411697148973547591";
-    const existing = await Rest.get(Routes.applicationGuildCommands(process.env.CLIENT_ID, GuildId));
-    for (const cmd of existing) {
-        await Rest.delete(Routes.applicationGuildCommand(process.env.CLIENT_ID, GuildId, cmd.id));
-    }
-
-    await Rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, GuildId), { body: Commands });
+    await Rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, "1411697148973547591"), { body: Commands });
 });
 
 ClientBot.on("interactionCreate", async interaction => {
