@@ -240,7 +240,8 @@ Co-Host: ${cohost ? `<@${cohost.id}>` : "None"}
 Supervisor: ${supervisor ? `<@${supervisor.id}>` : "None"}
 Link: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)
 Ping: <@&1404500986633916479>
-            `);
+            `)
+            .setThumbnail("https://media.discordapp.net/attachments/1411697149435183115/1424015100452540556/snowflake.png?ex=68e268e8&is=68e11768&hm=a1aada229c8506fab9075d65645134a86da5e30ba4ce4b53e602f76baa59f51f&=&format=webp&quality=lossless");
 
         await channel.send({ embeds: [embed] });
         await interaction.reply({ content: `Announcement sent to ${channel}.`, ephemeral: true });
