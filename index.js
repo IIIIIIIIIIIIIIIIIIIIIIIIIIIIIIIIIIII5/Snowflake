@@ -54,6 +54,7 @@ async function SetRank(GroupId, UserId, RankName, Issuer, guildId) {
     if (!RoleInfo) throw new Error("Invalid rank name: " + RankName);
     const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
     let XsrfToken = await GetXsrfToken(guildId);
+
     try {
         await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
             headers: { Cookie: `.ROBLOSECURITY=${RobloxCookie}`, "Content-Type": "application/json", "X-CSRF-TOKEN": XsrfToken }
@@ -68,6 +69,7 @@ async function SetRank(GroupId, UserId, RankName, Issuer, guildId) {
             throw new Error("Request failed: " + (Err.response?.data?.errors?.[0]?.message || Err.message));
         }
     }
+
     await LogRankChange(GroupId, UserId, RoleInfo, Issuer, guildId);
 }
 
@@ -109,7 +111,6 @@ async function GetCurrentRank(GroupId, UserId) {
 
 ClientBot.once("ready", async () => {
     ClientBot.user.setActivity("Snowflake Prison Roleplay", { type: ActivityType.Watching });
-
     const Commands = [
         new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("config").setDescription("Set the group ID for this server").addIntegerOption(opt => opt.setName("groupid").setDescription("Roblox group ID").setRequired(true)),
@@ -117,19 +118,11 @@ ClientBot.once("ready", async () => {
         new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("whois").setDescription("Lookup a Roblox user from a Discord user").addUserOption(opt => opt.setName("user").setDescription("The Discord user to look up (leave blank for yourself)").setRequired(false)),
-        new SlashCommandBuilder().setName("host").setDescription("Host a training!").addUserOption(opt => opt.setName("cohost").setDescription("Co-host of the session (Leave blank for no co-host)").setRequired(false)).addUserOption(opt => opt.setName("supervisor").setDescription("Supervisor of the session (Leave blank for no supervisor)").setRequired(false))
+        new SlashCommandBuilder().setName("host").setDescription("Host a training!").addUserOption(opt => opt.setName("cohost").setDescription("Co-host of the session (Leave blank for no co-host)").setRequired(false)).addUserOption(opt => opt.setName("supervisor").setDescription("Supervisor of the session (Leave blank for no supervisor)").setRequired(false)),
     ].map(cmd => cmd.toJSON());
 
     const Rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
-    const GuildId = "1411697148973547591";
-
-    const existing = await Rest.get(Routes.applicationGuildCommands(process.env.CLIENT_ID, GuildId));
-    const existingNames = existing.map(c => c.name);
-
-    const commandsToAdd = Commands.filter(c => !existingNames.includes(c.name));
-    if (commandsToAdd.length > 0) {
-        await Rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, GuildId), { body: [...existing, ...commandsToAdd] });
-    }
+    await Rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, "1411697148973547591"), { body: Commands });
 });
 
 ClientBot.on("interactionCreate", async interaction => {
@@ -151,10 +144,10 @@ ClientBot.on("interactionCreate", async interaction => {
         const GroupId = interaction.options.getInteger("groupid");
         const Db = await GetJsonBin();
         Db.ServerConfig = Db.ServerConfig || {};
-        Db.ServerConfig[guildId] = Db.ServerConfig[guildId] || {};
-        Db.ServerConfig[guildId].GroupId = GroupId;
+        Db.ServerConfig[interaction.guild.id] = Db.ServerConfig[interaction.guild.id] || {};
+        Db.ServerConfig[interaction.guild.id].GroupId = GroupId;
         await SaveJsonBin(Db);
-        PendingApprovals[GroupId] = { requesterId: interaction.user.id, guildId };
+        PendingApprovals[GroupId] = { requesterId: interaction.user.id, guildId: interaction.guild.id };
         try { await ClientBot.users.fetch(ADMIN_ID).then(u => u.send(`New pending config:\nGroup ID: ${GroupId}\nRequested by: <@${interaction.user.id}>`)); } catch {}
         await interaction.reply({ content: `Group ID **${GroupId}** set! Waiting for admin approval.`, ephemeral: true });
     }
@@ -225,7 +218,9 @@ ClientBot.on("interactionCreate", async interaction => {
 
     if (CommandName === "host") {
         const member = interaction.member;
-        if (!member.roles.cache.has("1424007337210937445")) return interaction.reply({ content: "You do not have permission to use this command!", ephemeral: true });
+        if (!member.roles.cache.has("1424007337210937445")) {
+            return interaction.reply({ content: "You do not have permission to use this command!", ephemeral: true });
+        }
         const host = interaction.user;
         const cohost = interaction.options.getUser("cohost");
         const supervisor = interaction.options.getUser("supervisor");
@@ -234,8 +229,13 @@ ClientBot.on("interactionCreate", async interaction => {
         const embed = new EmbedBuilder()
             .setColor(0x3498db)
             .setTitle("A TRAINING IS BEING HOSTED")
-            .setDescription(`Host: <@${host.id}>\nCo-Host: ${cohost ? `<@${cohost.id}>` : "None"}\nSupervisor: ${supervisor ? `<@${supervisor.id}>` : "None"}\nLink: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)`)
-            .setThumbnail("https://media.discordapp.net/attachments/1411697149435183115/1424015100452540556/snowflake.png")
+            .setDescription(`
+Host: <@${host.id}>
+Co-Host: ${cohost ? `<@${cohost.id}>` : "None"}
+Supervisor: ${supervisor ? `<@${supervisor.id}>` : "None"}
+Link: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)
+            `)
+            .setThumbnail("https://media.discordapp.net/attachments/1411697149435183115/1424015100452540556/snowflake.png?ex=68e268e8&is=68e11768&hm=a1aada229c8506fab9075d65645134a86da5e30ba4ce4b53e602f76baa59f51f&=&format=webp&quality=lossless")
             .setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
         await channel.send({ content: "<@&1404500986633916479>", embeds: [embed] });
         await interaction.reply({ content: `Announcement sent to ${channel}.`, ephemeral: true });
