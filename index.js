@@ -170,11 +170,11 @@ ClientBot.on("interactionCreate", async interaction => {
         const Username = interaction.options.getString("username");
         try {
             const UserId = await GetRobloxUserId(Username);
-            let Action, RoleName;
+            let ActionType, NewRankName;
             if (CommandName === "setrank") {
-                RoleName = interaction.options.getString("rankname");
-                await SetRank(GroupId, UserId, RoleName, interaction.user.id, GuildId);
-                Action = `Rank set to **${RoleName}**`;
+                NewRankName = interaction.options.getString("rankname");
+                await SetRank(GroupId, UserId, NewRankName, interaction.user.id, GuildId);
+                ActionType = "Set Rank";
             }
             if (CommandName === "promote") {
                 const Current = await GetCurrentRank(GroupId, UserId);
@@ -184,8 +184,8 @@ ClientBot.on("interactionCreate", async interaction => {
                 if (CurrentIndex === -1 || CurrentIndex === Sorted.length-1) throw new Error("Cannot promote further");
                 const NewRole = Sorted[CurrentIndex+1];
                 await SetRank(GroupId, UserId, NewRole.Name, interaction.user.id, GuildId);
-                RoleName = NewRole.Name;
-                Action = `Promoted to **${NewRole.Name}**`;
+                NewRankName = NewRole.Name;
+                ActionType = "Promoted";
             }
             if (CommandName === "demote") {
                 const Current = await GetCurrentRank(GroupId, UserId);
@@ -195,20 +195,31 @@ ClientBot.on("interactionCreate", async interaction => {
                 if (CurrentIndex<=0) throw new Error("Cannot demote further");
                 const NewRole = Sorted[CurrentIndex-1];
                 await SetRank(GroupId, UserId, NewRole.Name, interaction.user.id, GuildId);
-                RoleName = NewRole.Name;
-                Action = `Demoted to **${NewRole.Name}**`;
+                NewRankName = NewRole.Name;
+                ActionType = "Demoted";
             }
-            const Embed = new EmbedBuilder().setColor(0x2ecc71).setTitle("Rank Updated").addFields(
-                { name: "Username", value: Username, inline: true },
-                { name: "Group ID", value: String(GroupId), inline: true },
-                { name: "Action", value: Action, inline: false },
-                { name: "Issued By", value: interaction.user.tag, inline: true },
-                { name: "Date", value: new Date().toISOString().split("T")[0], inline: true }
-            ).setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
-            return interaction.editReply({ embeds: [Embed] });
+
+            const IssuerRobloxId = (Db.VerifiedUsers || {})[interaction.user.id];
+            const TargetRobloxInfo = await GetRobloxUserInfo(UserId);
+            const IssuerRobloxInfo = await GetRobloxUserInfo(IssuerRobloxId);
+
+            const LogChannel = await interaction.guild.channels.fetch("1424381038393556992");
+            if (LogChannel) {
+                const LogEmbed = new EmbedBuilder()
+                    .setColor(0x2ecc71)
+                    .setTitle("**Rank Updated**")
+                    .addFields(
+                        { name: "Action By:", value: IssuerRobloxInfo.name, inline: true },
+                        { name: "Action On:", value: TargetRobloxInfo.name, inline: true },
+                        { name: "Action:", value: ActionType, inline: true },
+                        { name: "New Rank:", value: NewRankName, inline: true }
+                    );
+                LogChannel.send({ embeds: [LogEmbed] });
+            }
+
+            return interaction.editReply({ content: `${ActionType} ${TargetRobloxInfo.name} to ${NewRankName}` });
         } catch (Err) {
-            const ErrorEmbed = new EmbedBuilder().setColor(0xe74c3c).setTitle("Failed").setDescription(Err.message || "Unknown error").addFields({ name: "Date", value: new Date().toISOString().split("T")[0], inline: true }).setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
-            return interaction.editReply({ embeds: [ErrorEmbed] });
+            return interaction.editReply({ content: `Error: ${Err.message}` });
         }
     }
 
@@ -217,13 +228,7 @@ ClientBot.on("interactionCreate", async interaction => {
         const RobloxUserId = (Db.VerifiedUsers||{})[TargetUser.id];
         if (!RobloxUserId) return interaction.editReply({ content: `${TargetUser.tag} has not verified a Roblox account.` });
         const RobloxInfo = await GetRobloxUserInfo(RobloxUserId);
-        const Embed = new EmbedBuilder().setColor(0x3498db).setTitle("User Lookup").addFields(
-            { name: "Discord User", value: `${TargetUser.tag} (${TargetUser.id})`, inline: false },
-            { name: "Roblox Username", value: `[${RobloxInfo.name}](https://www.roblox.com/users/${RobloxInfo.id}/profile)`, inline: true },
-            { name: "Roblox User ID", value: String(RobloxInfo.id), inline: true },
-            { name: "Description", value: RobloxInfo.description?.slice(0,200) || "None", inline: false }
-        ).setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxInfo.id}&width=150&height=150&format=png`).setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
-        return interaction.editReply({ embeds: [Embed] });
+        return interaction.editReply({ content: `[${RobloxInfo.name}](https://www.roblox.com/users/${RobloxInfo.id}/profile)` });
     }
 
     if (CommandName === "host") {
@@ -234,7 +239,7 @@ ClientBot.on("interactionCreate", async interaction => {
         const Supervisor = interaction.options.getUser("supervisor");
         const Channel = await interaction.guild.channels.fetch("1398706795840536696").catch(() => null);
         if (!Channel) return interaction.editReply({ content: "Channel not found." });
-        const Embed = new EmbedBuilder().setColor(0x3498db).setTitle("A TRAINING IS BEING HOSTED").setDescription(`Host: <@${Host.id}>\nCo-Host: ${CoHost ? `<@${CoHost.id}>` : "None"}\nSupervisor: ${Supervisor ? `<@${Supervisor.id}>` : "None"}\nLink: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)`).setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
+        const Embed = new EmbedBuilder().setColor(0x3498db).setTitle("A TRAINING IS BEING HOSTED").setDescription(`Host: <@${Host.id}>\nCo-Host: ${CoHost ? `<@${CoHost.id}>` : "None"}\nSupervisor: ${Supervisor ? `<@${Supervisor.id}>` : "None"}\nLink: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)`);
         await Channel.send({ content: "<@&1404500986633916479>", embeds: [Embed] });
         return interaction.editReply({ content: `Announcement sent to ${Channel.name}.` });
     }
