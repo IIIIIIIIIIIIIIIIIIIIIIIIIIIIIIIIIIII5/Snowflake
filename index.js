@@ -241,7 +241,10 @@ ClientBot.on("interactionCreate", async interaction => {
         const Channel = await interaction.guild.channels.fetch("1398706795840536696").catch(() => null);
         if (!Channel) return interaction.editReply({ content: "Channel not found." });
 
-        const Embed = new EmbedBuilder().setColor(0x3498db).setTitle("A TRAINING IS BEING HOSTED").setDescription(`Host: <@${Host.id}>\nCo-Host: ${CoHost ? `<@${CoHost.id}>` : "None"}\nSupervisor: ${Supervisor ? `<@${Supervisor.id}>` : "None"}\nLink: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)`);
+        const Embed = new EmbedBuilder()
+            .setColor(0x3498db)
+            .setTitle("A TRAINING IS BEING HOSTED")
+            .setDescription(`Host: <@${Host.id}>\nCo-Host: ${CoHost ? `<@${CoHost.id}>` : "None"}\nSupervisor: ${Supervisor ? `<@${Supervisor.id}>` : "None"}\nLink: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)`);
         await Channel.send({ content: "<@&1404500986633916479>", embeds: [Embed] });
 
         const Db = await GetJsonBin();
@@ -250,8 +253,10 @@ ClientBot.on("interactionCreate", async interaction => {
 
         function addTraining(userId, type) {
             Db.Trainings[userId] = Db.Trainings[userId] || { hosted: {}, cohosted: {}, supervised: {} };
-            Db.Trainings[userId][type][monthKey] = (Db.Trainings[userId][type][monthKey] || 0) + 1;
-            Db.Trainings[userId][type].total = (Db.Trainings[userId][type].total || 0) + 1;
+            const userData = Db.Trainings[userId][type];
+            if (userData.lastMonth !== monthKey) { userData[monthKey] = 0; userData.lastMonth = monthKey; }
+            userData[monthKey] = (userData[monthKey] || 0) + 1;
+            userData.total = (userData.total || 0) + 1;
         }
 
         addTraining(Host.id, "hosted");
@@ -259,7 +264,6 @@ ClientBot.on("interactionCreate", async interaction => {
         if (Supervisor) addTraining(Supervisor.id, "supervised");
 
         await SaveJsonBin(Db);
-
         return interaction.editReply({ content: `Announcement sent to ${Channel.name}.` });
     }
 
@@ -270,9 +274,10 @@ ClientBot.on("interactionCreate", async interaction => {
         const monthKey = new Date().toISOString().slice(0,7);
 
         function getStats(type) {
-            const monthly = Trainings[type][monthKey] || 0;
-            const total = Trainings[type].total || 0;
-            return { monthly, total };
+            const userData = Trainings[type];
+            if (!userData) return { monthly: 0, total: 0 };
+            if (userData.lastMonth !== monthKey) { userData[monthKey] = 0; userData.lastMonth = monthKey; }
+            return { monthly: userData[monthKey] || 0, total: userData.total || 0 };
         }
 
         const Hosted = getStats("hosted");
@@ -282,18 +287,18 @@ ClientBot.on("interactionCreate", async interaction => {
         const RobloxUserId = (Db.VerifiedUsers || {})[TargetUser.id];
         let robloxUsername = "Not Verified";
         let profileUrl;
-
+        let thumbnailUrl;
         if (RobloxUserId) {
             const RobloxInfo = await GetRobloxUserInfo(RobloxUserId);
             robloxUsername = RobloxInfo.name;
             profileUrl = `https://www.roblox.com/users/${RobloxUserId}/profile`;
+            thumbnailUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxUserId}&width=150&height=150&format=png`;
         }
 
         const ProfileEmbed = new EmbedBuilder()
             .setColor(0x1abc9c)
-            .setTitle(`[${robloxUsername}]`) 
+            .setTitle(robloxUsername)
             .setURL(profileUrl || undefined)
-            .setThumbnail(RobloxUserId ? `https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxUserId}&width=150&height=150&format=png` : null)
             .addFields(
                 { name: "Trainings Hosted This Month", value: `${Hosted.monthly}`, inline: true },
                 { name: "Trainings Co-Hosted This Month", value: `${CoHosted.monthly}`, inline: true },
@@ -302,7 +307,7 @@ ClientBot.on("interactionCreate", async interaction => {
                 { name: "Trainings Co-Hosted Total", value: `${CoHosted.total}`, inline: true },
                 { name: "Trainings Supervised Total", value: `${Supervised.total}`, inline: true }
             );
-
+        if (thumbnailUrl) ProfileEmbed.setThumbnail(thumbnailUrl);
         return interaction.editReply({ embeds: [ProfileEmbed] });
     }
 });
