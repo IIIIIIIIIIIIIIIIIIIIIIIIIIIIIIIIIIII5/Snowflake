@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ActivityType } = require("discord.js");
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActivityType } = require("discord.js");
 const axios = require("axios");
 const crypto = require("crypto");
 
@@ -101,7 +101,7 @@ async function GetRobloxDescription(UserId) {
     return Res.data.description || "";
 }
 
-ClientBot.once("clientReady", async () => {
+ClientBot.once("ready", async () => {
     ClientBot.user.setActivity("Snowflake Prison Roleplay", { type: ActivityType.Watching });
     const Commands = [
         new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
@@ -110,7 +110,6 @@ ClientBot.once("clientReady", async () => {
         new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("whois").setDescription("Lookup a Roblox user from a Discord user").addUserOption(opt => opt.setName("user").setDescription("The Discord user to look up (leave blank for yourself)").setRequired(false)),
-        new SlashCommandBuilder().setName("host").setDescription("Host a training!").addUserOption(opt => opt.setName("cohost").setDescription("Co-host (optional)").setRequired(false)).addUserOption(opt => opt.setName("supervisor").setDescription("Supervisor (optional)").setRequired(false)),
         new SlashCommandBuilder().setName("profile").setDescription("View your training stats").addUserOption(opt => opt.setName("user").setDescription("The Discord user to view (optional)").setRequired(false))
     ].map(cmd => cmd.toJSON());
 
@@ -199,140 +198,26 @@ ClientBot.on("interactionCreate", async interaction => {
                 NewRankName = NewRole.Name;
                 ActionType = "Demoted";
             }
-
-            const IssuerRobloxId = (Db.VerifiedUsers || {})[interaction.user.id];
-            const TargetRobloxInfo = await GetRobloxUserInfo(UserId);
-            const IssuerRobloxInfo = await GetRobloxUserInfo(IssuerRobloxId);
-
-            const LogChannel = await interaction.guild.channels.fetch("1424381038393556992");
-            if (LogChannel) {
-                const LogEmbed = new EmbedBuilder()
-                    .setColor(0x2ecc71)
-                    .setTitle("**Rank Updated**")
-                    .addFields(
-                        { name: "Action By:", value: IssuerRobloxInfo.name, inline: true },
-                        { name: "Action On:", value: TargetRobloxInfo.name, inline: true },
-                        { name: "Action:", value: ActionType, inline: true },
-                        { name: "New Rank:", value: NewRankName, inline: true }
-                    );
-                LogChannel.send({ embeds: [LogEmbed] });
-            }
-
-            return interaction.editReply({ content: `${ActionType} ${TargetRobloxInfo.name} to ${NewRankName}` });
+            return interaction.editReply({ content: `${ActionType} ${Username} to **${NewRankName}**.` });
         } catch (Err) {
             return interaction.editReply({ content: `Error: ${Err.message}` });
         }
     }
 
     if (CommandName === "whois") {
-        const TargetUser = interaction.options.getUser("user") || interaction.user;
-        const RobloxUserId = (Db.VerifiedUsers||{})[TargetUser.id];
-        if (!RobloxUserId) return interaction.editReply({ content: `${TargetUser.tag} has not verified a Roblox account.` });
-        const RobloxInfo = await GetRobloxUserInfo(RobloxUserId);
-        return interaction.editReply({ content: `[${RobloxInfo.name}](https://www.roblox.com/users/${RobloxUserId}/profile)` });
-    }
-
-    if (CommandName === "host") {
-        const Member = interaction.member;
-        if (!Member.roles.cache.has("1424007337210937445")) return interaction.editReply({ content: "You do not have permission to use this command!" });
-        const Host = interaction.user;
-        const CoHost = interaction.options.getUser("cohost");
-        const Supervisor = interaction.options.getUser("supervisor");
-        const Channel = await interaction.guild.channels.fetch("1398706795840536696").catch(() => null);
-        if (!Channel) return interaction.editReply({ content: "Channel not found." });
-
-        const Embed = new EmbedBuilder()
-            .setColor(0x3498db)
-            .setTitle("A TRAINING IS BEING HOSTED")
-            .setDescription(`Host: <@${Host.id}>\nCo-Host: ${CoHost ? `<@${CoHost.id}>` : "None"}\nSupervisor: ${Supervisor ? `<@${Supervisor.id}>` : "None"}\nLink: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)`);
-        await Channel.send({ content: "<@&1404500986633916479>", embeds: [Embed] });
-
-        const Db = await GetJsonBin();
-        Db.Trainings = Db.Trainings || {};
-        const monthKey = new Date().toISOString().slice(0,7);
-
-        function addTraining(userId, type) {
-            Db.Trainings[userId] = Db.Trainings[userId] || { hosted: {}, cohosted: {}, supervised: {} };
-            const userData = Db.Trainings[userId][type];
-            if (userData.lastMonth !== monthKey) { userData[monthKey] = 0; userData.lastMonth = monthKey; }
-            userData[monthKey] = (userData[monthKey] || 0) + 1;
-            userData.total = (userData.total || 0) + 1;
-        }
-
-        addTraining(Host.id, "hosted");
-        if (CoHost) addTraining(CoHost.id, "cohosted");
-        if (Supervisor) addTraining(Supervisor.id, "supervised");
-
-        await SaveJsonBin(Db);
-        return interaction.editReply({ content: `Announcement sent to ${Channel.name}.` });
+        let TargetUser = interaction.options.getUser("user") || interaction.user;
+        const RobloxId = Db.VerifiedUsers?.[TargetUser.id];
+        if (!RobloxId) return interaction.editReply({ content: "User not verified." });
+        const Info = await GetRobloxUserInfo(RobloxId);
+        return interaction.editReply({ content: `Roblox username: ${Info.name}\nDisplay name: ${Info.displayName}\nID: ${Info.id}` });
     }
 
     if (CommandName === "profile") {
-        const TargetUser = interaction.options.getUser("user") || interaction.user;
-        const Db = await GetJsonBin();
-        const Trainings = (Db.Trainings || {})[TargetUser.id] || { hosted: {}, cohosted: {}, supervised: {} };
-        const monthKey = new Date().toISOString().slice(0,7);
-
-        function getStats(type) {
-            const userData = Trainings[type];
-            if (!userData) return { monthly: 0, total: 0 };
-            if (userData.lastMonth !== monthKey) { userData[monthKey] = 0; userData.lastMonth = monthKey; }
-            return { monthly: userData[monthKey] || 0, total: userData.total || 0 };
-        }
-
-        const Hosted = getStats("hosted");
-        const CoHosted = getStats("cohosted");
-        const Supervised = getStats("supervised");
-
-        const RobloxUserId = (Db.VerifiedUsers || {})[TargetUser.id];
-        let robloxUsername = "Not Verified";
-        let profileUrl;
-        let thumbnailUrl;
-        if (RobloxUserId) {
-            const RobloxInfo = await GetRobloxUserInfo(RobloxUserId);
-            robloxUsername = RobloxInfo.name;
-            profileUrl = `https://www.roblox.com/users/${RobloxUserId}/profile`;
-            thumbnailUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxUserId}&width=150&height=150&format=png`;
-        }
-
-        const ProfileEmbed = new EmbedBuilder()
-            .setColor(0x1abc9c)
-            .setTitle(robloxUsername)
-            .setURL(profileUrl || undefined)
-            .addFields(
-                { name: "Trainings Hosted This Month", value: `${Hosted.monthly}`, inline: true },
-                { name: "Trainings Co-Hosted This Month", value: `${CoHosted.monthly}`, inline: true },
-                { name: "Trainings Supervised This Month", value: `${Supervised.monthly}`, inline: true },
-                { name: "Trainings Hosted Total", value: `${Hosted.total}`, inline: true },
-                { name: "Trainings Co-Hosted Total", value: `${CoHosted.total}`, inline: true },
-                { name: "Trainings Supervised Total", value: `${Supervised.total}`, inline: true }
-            );
-        if (thumbnailUrl) ProfileEmbed.setThumbnail(thumbnailUrl);
-        return interaction.editReply({ embeds: [ProfileEmbed] });
-    }
-});
-
-ClientBot.on("messageCreate", async message => {
-    if (!message.content.startsWith("!")) return;
-    if (message.author.id !== AdminId) return;
-    const Args = message.content.split(" ");
-    const Cmd = Args[0].toLowerCase();
-    const Db = await GetJsonBin();
-    if (Cmd === "!accept" || Cmd === "!decline") {
-        const GroupId = Args[1];
-        if (!GroupId || !PendingApprovals[GroupId]) return message.reply("Invalid or unknown group ID.");
-        const { requesterId } = PendingApprovals[GroupId];
-        if (Cmd === "!accept") { await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been accepted.`); delete PendingApprovals[GroupId]; return message.channel.send(`Accepted group ${GroupId} and notified <@${requesterId}>`); }
-        if (Cmd === "!decline") { await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been declined.`); delete PendingApprovals[GroupId]; return message.channel.send(`Declined group ${GroupId} and notified <@${requesterId}>`); }
-    }
-    if (Cmd === "!setbottoken") {
-        const TargetServerId = Args[1];
-        const CustomToken = Args[2];
-        if (!TargetServerId || !CustomToken) return message.reply("Usage: !setbottoken <serverid> <token>");
-        Db.CustomTokens = Db.CustomTokens || {};
-        Db.CustomTokens[TargetServerId] = CustomToken;
-        await SaveJsonBin(Db);
-        message.channel.send(`Custom Roblox token set for server ID ${TargetServerId}.`);
+        let TargetUser = interaction.options.getUser("user") || interaction.user;
+        const RobloxId = Db.VerifiedUsers?.[TargetUser.id];
+        if (!RobloxId) return interaction.editReply({ content: "User not verified." });
+        const Info = await GetRobloxUserInfo(RobloxId);
+        return interaction.editReply({ content: `Profile for ${TargetUser.tag}:\nRoblox username: ${Info.name}\nDisplay name: ${Info.displayName}\nID: ${Info.id}` });
     }
 });
 
