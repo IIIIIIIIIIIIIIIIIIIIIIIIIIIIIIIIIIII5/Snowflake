@@ -110,7 +110,8 @@ ClientBot.once("clientReady", async () => {
         new SlashCommandBuilder().setName("promote").setDescription("Promote a user").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("demote").setDescription("Demote a user").addStringOption(opt => opt.setName("username").setDescription("Roblox username").setRequired(true)),
         new SlashCommandBuilder().setName("whois").setDescription("Lookup a Roblox user from a Discord user").addUserOption(opt => opt.setName("user").setDescription("The Discord user to look up (leave blank for yourself)").setRequired(false)),
-        new SlashCommandBuilder().setName("host").setDescription("Host a training!").addUserOption(opt => opt.setName("cohost").setDescription("Co-host (optional)").setRequired(false)).addUserOption(opt => opt.setName("supervisor").setDescription("Supervisor (optional)").setRequired(false))
+        new SlashCommandBuilder().setName("host").setDescription("Host a training!").addUserOption(opt => opt.setName("cohost").setDescription("Co-host (optional)").setRequired(false)).addUserOption(opt => opt.setName("supervisor").setDescription("Supervisor (optional)").setRequired(false)),
+        new SlashCommandBuilder().setName("profile").setDescription("View your training stats").addUserOption(opt => opt.setName("user").setDescription("The Discord user to view (optional)").setRequired(false))
     ].map(cmd => cmd.toJSON());
 
     const Rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
@@ -228,7 +229,7 @@ ClientBot.on("interactionCreate", async interaction => {
         const RobloxUserId = (Db.VerifiedUsers||{})[TargetUser.id];
         if (!RobloxUserId) return interaction.editReply({ content: `${TargetUser.tag} has not verified a Roblox account.` });
         const RobloxInfo = await GetRobloxUserInfo(RobloxUserId);
-        return interaction.editReply({ content: `[${RobloxInfo.name}](https://www.roblox.com/users/${RobloxInfo.id}/profile)` });
+        return interaction.editReply({ content: `[${RobloxInfo.name}](https://www.roblox.com/users/${RobloxUserId}/profile)` });
     }
 
     if (CommandName === "host") {
@@ -239,9 +240,70 @@ ClientBot.on("interactionCreate", async interaction => {
         const Supervisor = interaction.options.getUser("supervisor");
         const Channel = await interaction.guild.channels.fetch("1398706795840536696").catch(() => null);
         if (!Channel) return interaction.editReply({ content: "Channel not found." });
+
         const Embed = new EmbedBuilder().setColor(0x3498db).setTitle("A TRAINING IS BEING HOSTED").setDescription(`Host: <@${Host.id}>\nCo-Host: ${CoHost ? `<@${CoHost.id}>` : "None"}\nSupervisor: ${Supervisor ? `<@${Supervisor.id}>` : "None"}\nLink: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)`);
         await Channel.send({ content: "<@&1404500986633916479>", embeds: [Embed] });
+
+        const Db = await GetJsonBin();
+        Db.Trainings = Db.Trainings || {};
+        const monthKey = new Date().toISOString().slice(0,7);
+
+        function addTraining(userId, type) {
+            Db.Trainings[userId] = Db.Trainings[userId] || { hosted: {}, cohosted: {}, supervised: {} };
+            Db.Trainings[userId][type][monthKey] = (Db.Trainings[userId][type][monthKey] || 0) + 1;
+            Db.Trainings[userId][type].total = (Db.Trainings[userId][type].total || 0) + 1;
+        }
+
+        addTraining(Host.id, "hosted");
+        if (CoHost) addTraining(CoHost.id, "cohosted");
+        if (Supervisor) addTraining(Supervisor.id, "supervised");
+
+        await SaveJsonBin(Db);
+
         return interaction.editReply({ content: `Announcement sent to ${Channel.name}.` });
+    }
+
+    if (CommandName === "profile") {
+        const TargetUser = interaction.options.getUser("user") || interaction.user;
+        const Db = await GetJsonBin();
+        const Trainings = (Db.Trainings || {})[TargetUser.id] || { hosted: {}, cohosted: {}, supervised: {} };
+        const monthKey = new Date().toISOString().slice(0,7);
+
+        function getStats(type) {
+            const monthly = Trainings[type][monthKey] || 0;
+            const total = Trainings[type].total || 0;
+            return { monthly, total };
+        }
+
+        const Hosted = getStats("hosted");
+        const CoHosted = getStats("cohosted");
+        const Supervised = getStats("supervised");
+
+        const RobloxUserId = (Db.VerifiedUsers || {})[TargetUser.id];
+        let robloxUsername = "Not Verified";
+        let profileUrl;
+
+        if (RobloxUserId) {
+            const RobloxInfo = await GetRobloxUserInfo(RobloxUserId);
+            robloxUsername = RobloxInfo.name;
+            profileUrl = `https://www.roblox.com/users/${RobloxUserId}/profile`;
+        }
+
+        const ProfileEmbed = new EmbedBuilder()
+            .setColor(0x1abc9c)
+            .setTitle(`[${robloxUsername}]`) 
+            .setURL(profileUrl || undefined)
+            .setThumbnail(RobloxUserId ? `https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxUserId}&width=150&height=150&format=png` : null)
+            .addFields(
+                { name: "Trainings Hosted This Month", value: `${Hosted.monthly}`, inline: true },
+                { name: "Trainings Co-Hosted This Month", value: `${CoHosted.monthly}`, inline: true },
+                { name: "Trainings Supervised This Month", value: `${Supervised.monthly}`, inline: true },
+                { name: "Trainings Hosted Total", value: `${Hosted.total}`, inline: true },
+                { name: "Trainings Co-Hosted Total", value: `${CoHosted.total}`, inline: true },
+                { name: "Trainings Supervised Total", value: `${Supervised.total}`, inline: true }
+            );
+
+        return interaction.editReply({ embeds: [ProfileEmbed] });
     }
 });
 
