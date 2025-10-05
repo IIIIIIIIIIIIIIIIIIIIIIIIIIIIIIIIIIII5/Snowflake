@@ -157,6 +157,9 @@ ClientBot.on("interactionCreate", async interaction => {
         if (!Db.ServerConfig || !Db.ServerConfig[GuildId]) return interaction.reply({ content: "Group ID not set. Run /config first.", ephemeral: true });
         const GroupId = Db.ServerConfig[GuildId].GroupId;
         const Username = interaction.options.getString("username");
+
+        await interaction.deferReply();
+        
         try {
             const UserId = await GetRobloxUserId(Username);
             let Action, RoleName;
