@@ -118,7 +118,6 @@ ClientBot.once("ready", async () => {
     }
 });
 
-// --- FIXED safeReply ---
 async function safeReply(interaction, options) {
     try {
         if (!interaction.replied && !interaction.deferred) {
@@ -136,9 +135,9 @@ async function safeReply(interaction, options) {
 ClientBot.on("interactionCreate", async interaction => {
     if (interaction.isButton() && interaction.customId === "done_verification") {
         try {
-            if (!interaction.deferred) await interaction.deferReply({ flags: 64 });
+            if (!interaction.deferred) await interaction.deferReply({ ephemeral: true });
             const Data = Verifications[interaction.user.id];
-            if (!Data) return safeReply(interaction, { content: "You haven't started verification yet.", flags: 64 });
+            if (!Data) return safeReply(interaction, { content: "You haven't started verification yet.", ephemeral: true });
             const Description = await GetRobloxDescription(Data.RobloxUserId);
             if (Description.includes(Data.Code)) {
                 const Database = await GetJsonBin();
@@ -146,14 +145,13 @@ ClientBot.on("interactionCreate", async interaction => {
                 Database.VerifiedUsers[interaction.user.id] = Data.RobloxUserId;
                 await SaveJsonBin(Database);
                 delete Verifications[interaction.user.id];
-                await safeReply(interaction, { content: `Verified! Linked to Roblox ID ${Data.RobloxUserId}`, flags: 64 });
+                return safeReply(interaction, { content: `Verified! Linked to Roblox ID ${Data.RobloxUserId}`, ephemeral: true });
             } else {
-                await safeReply(interaction, { content: "Code not found in your profile. Make sure you added it and try again.", flags: 64 });
+                return safeReply(interaction, { content: "Code not found in your profile. Make sure you added it and try again.", ephemeral: true });
             }
         } catch {
-            await safeReply(interaction, { content: "Verification failed. Try again later.", flags: 64 });
+            return safeReply(interaction, { content: "Verification failed. Try again later.", ephemeral: true });
         }
-        return;
     }
 
     if (!interaction.isChatInputCommand()) return;
@@ -168,7 +166,7 @@ ClientBot.on("interactionCreate", async interaction => {
         Verifications[interaction.user.id] = { RobloxUserId: UserId, Code };
         const Button = new ButtonBuilder().setCustomId("done_verification").setLabel("Done").setStyle(ButtonStyle.Primary);
         const Row = new ActionRowBuilder().addComponents(Button);
-        await safeReply(interaction, { content: `Put this code in your Roblox profile description:\n${Code}\nThen click the Done button when finished.`, components: [Row], flags: 64 });
+        await safeReply(interaction, { content: `Put this code in your Roblox profile description:\n${Code}\nThen click the Done button when finished.`, components: [Row], ephemeral: true });
     }
 
     if (CommandName === "config") {
@@ -179,11 +177,11 @@ ClientBot.on("interactionCreate", async interaction => {
         await SaveJsonBin(Db);
         PendingApprovals[GroupId] = { requesterId: interaction.user.id, guildId: GuildId };
         try { await ClientBot.users.fetch(AdminId).then(u => u.send(`New pending config:\nGroup ID: ${GroupId}\nRequested by: <@${interaction.user.id}>`)); } catch {}
-        await safeReply(interaction, { content: `Group ID **${GroupId}** set! Waiting for admin approval.`, flags: 64 });
+        await safeReply(interaction, { content: `Group ID **${GroupId}** set! Waiting for admin approval.`, ephemeral: true });
     }
 
     if (["setrank","promote","demote"].includes(CommandName)) {
-        if (!Db.ServerConfig || !Db.ServerConfig[GuildId]) return await safeReply(interaction, { content: "Group ID not set. Run /config first.", flags: 64 });
+        if (!Db.ServerConfig || !Db.ServerConfig[GuildId]) return await safeReply(interaction, { content: "Group ID not set. Run /config first.", ephemeral: true });
         const GroupId = Db.ServerConfig[GuildId].GroupId;
         const Username = interaction.options.getString("username");
         try {
@@ -226,14 +224,14 @@ ClientBot.on("interactionCreate", async interaction => {
             await safeReply(interaction, { embeds: [Embed] });
         } catch (Err) {
             const ErrorEmbed = new EmbedBuilder().setColor(0xe74c3c).setTitle("Failed").setDescription(Err.message || "Unknown error").addFields({ name: "Date", value: new Date().toISOString().split("T")[0], inline: true }).setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
-            await safeReply(interaction, { embeds: [ErrorEmbed], flags: 64 });
+            await safeReply(interaction, { embeds: [ErrorEmbed], ephemeral: true });
         }
     }
 
     if (CommandName === "whois") {
         const TargetUser = interaction.options.getUser("user") || interaction.user;
         const RobloxUserId = (Db.VerifiedUsers||{})[TargetUser.id];
-        if (!RobloxUserId) return await safeReply(interaction, { content: `${TargetUser.tag} has not verified a Roblox account.`, flags: 64 });
+        if (!RobloxUserId) return await safeReply(interaction, { content: `${TargetUser.tag} has not verified a Roblox account.`, ephemeral: true });
         const RobloxInfo = await GetRobloxUserInfo(RobloxUserId);
         const Embed = new EmbedBuilder().setColor(0x3498db).setTitle("User Lookup").addFields(
             { name: "Discord User", value: `${TargetUser.tag} (${TargetUser.id})`, inline: false },
@@ -246,15 +244,15 @@ ClientBot.on("interactionCreate", async interaction => {
 
     if (CommandName === "host") {
         const Member = interaction.member;
-        if (!Member.roles.cache.has("1424007337210937445")) return await safeReply(interaction, { content: "You do not have permission to use this command!", flags: 64 });
+        if (!Member.roles.cache.has("1424007337210937445")) return await safeReply(interaction, { content: "You do not have permission to use this command!", ephemeral: true });
         const Host = interaction.user;
         const CoHost = interaction.options.getUser("cohost");
         const Supervisor = interaction.options.getUser("supervisor");
         const Channel = await interaction.guild.channels.fetch("1398706795840536696").catch(() => null);
-        if (!Channel) return await safeReply(interaction, { content: "Channel not found.", flags: 64 });
+        if (!Channel) return await safeReply(interaction, { content: "Channel not found.", ephemeral: true });
         const Embed = new EmbedBuilder().setColor(0x3498db).setTitle("A TRAINING IS BEING HOSTED").setDescription(`Host: <@${Host.id}>\nCo-Host: ${CoHost ? `<@${CoHost.id}>` : "None"}\nSupervisor: ${Supervisor ? `<@${Supervisor.id}>` : "None"}\nLink: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)`).setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
         await Channel.send({ content: "<@&1404500986633916479>", embeds: [Embed] });
-        await safeReply(interaction, { content: `Announcement sent to ${Channel.name}.`, flags: 64 });
+        await safeReply(interaction, { content: `Announcement sent to ${Channel.name}.`, ephemeral: true });
     }
 });
 
