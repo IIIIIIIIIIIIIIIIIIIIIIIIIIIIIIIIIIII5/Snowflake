@@ -118,14 +118,19 @@ ClientBot.once("ready", async () => {
     }
 });
 
+// --- FIXED safeReply ---
 async function safeReply(interaction, options) {
     try {
         if (!interaction.replied && !interaction.deferred) {
             await interaction.reply(options);
+        } else if (interaction.deferred && !interaction.replied) {
+            await interaction.editReply(options);
         } else {
             await interaction.followUp(options);
         }
-    } catch {}
+    } catch (err) {
+        console.error("safeReply error:", err);
+    }
 }
 
 ClientBot.on("interactionCreate", async interaction => {
@@ -258,6 +263,7 @@ ClientBot.on("messageCreate", async message => {
     if (message.author.id !== AdminId) return;
     const Args = message.content.split(" ");
     const Cmd = Args[0].toLowerCase();
+    const Db = await GetJsonBin();
     if (Cmd === "!accept" || Cmd === "!decline") {
         const GroupId = Args[1];
         if (!GroupId || !PendingApprovals[GroupId]) return message.reply("Invalid or unknown group ID.");
