@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActivityType } = require("discord.js");
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActivityType, EmbedBuilder } = require("discord.js");
 const axios = require("axios");
 const crypto = require("crypto");
 
@@ -123,7 +123,7 @@ ClientBot.on("interactionCreate", async interaction => {
     if (interaction.isButton() && interaction.customId === "done_verification") {
         await interaction.deferReply({ ephemeral: true });
         const Data = Verifications[interaction.user.id];
-        if (!Data) return interaction.editReply({ content: "You haven't started verification yet." });
+        if (!Data) return interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Error").setDescription("You haven't started verification yet.").setColor("Red")] });
         const Description = await GetRobloxDescription(Data.RobloxUserId);
         if (Description.includes(Data.Code)) {
             const Database = await GetJsonBin();
@@ -131,9 +131,9 @@ ClientBot.on("interactionCreate", async interaction => {
             Database.VerifiedUsers[interaction.user.id] = Data.RobloxUserId;
             await SaveJsonBin(Database);
             delete Verifications[interaction.user.id];
-            return interaction.editReply({ content: `Verified! Linked to Roblox ID ${Data.RobloxUserId}` });
+            return interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Verified").setDescription(`Linked to Roblox ID ${Data.RobloxUserId}`).setColor("Green")] });
         } else {
-            return interaction.editReply({ content: "Code not found in your profile. Make sure you added it and try again." });
+            return interaction.editReply({ embeds: [new EmbedBuilder().setTitle("Verification Failed").setDescription("Code not found in your profile. Make sure you added it and try again.").setColor("Red")] });
         }
     }
 
@@ -150,7 +150,8 @@ ClientBot.on("interactionCreate", async interaction => {
         Verifications[interaction.user.id] = { RobloxUserId: UserId, Code };
         const Button = new ButtonBuilder().setCustomId("done_verification").setLabel("Done").setStyle(ButtonStyle.Primary);
         const Row = new ActionRowBuilder().addComponents(Button);
-        return interaction.editReply({ content: `Put this code in your Roblox profile description:\n${Code}\nThen click the Done button when finished.`, components: [Row] });
+        const Embed = new EmbedBuilder().setTitle("Verification").setDescription(`Put this code in your Roblox profile description:\n**${Code}**\nThen click the Done button when finished.`).setColor("Blue");
+        return interaction.editReply({ embeds: [Embed], components: [Row] });
     }
 
     if (CommandName === "config") {
@@ -161,11 +162,15 @@ ClientBot.on("interactionCreate", async interaction => {
         await SaveJsonBin(Db);
         PendingApprovals[GroupId] = { requesterId: interaction.user.id, guildId: GuildId };
         try { await ClientBot.users.fetch(AdminId).then(u => u.send(`New pending config:\nGroup ID: ${GroupId}\nRequested by: <@${interaction.user.id}>`)); } catch {}
-        return interaction.editReply({ content: `Group ID **${GroupId}** set! Waiting for admin approval.` });
+        const Embed = new EmbedBuilder().setTitle("Config Set").setDescription(`Group ID **${GroupId}** set! Waiting for admin approval.`).setColor("Blue");
+        return interaction.editReply({ embeds: [Embed] });
     }
 
     if (["setrank","promote","demote"].includes(CommandName)) {
-        if (!Db.ServerConfig || !Db.ServerConfig[GuildId]) return interaction.editReply({ content: "Group ID not set. Run /config first." });
+        if (!Db.ServerConfig || !Db.ServerConfig[GuildId]) {
+            const Embed = new EmbedBuilder().setTitle("Error").setDescription("Group ID not set. Run /config first.").setColor("Red");
+            return interaction.editReply({ embeds: [Embed] });
+        }
         const GroupId = Db.ServerConfig[GuildId].GroupId;
         const Username = interaction.options.getString("username");
         try {
@@ -198,26 +203,42 @@ ClientBot.on("interactionCreate", async interaction => {
                 NewRankName = NewRole.Name;
                 ActionType = "Demoted";
             }
-            return interaction.editReply({ content: `${ActionType} ${Username} to **${NewRankName}**.` });
+            const Embed = new EmbedBuilder().setTitle(ActionType).setDescription(`${ActionType} ${Username} to **${NewRankName}**.`).setColor("Green");
+            return interaction.editReply({ embeds: [Embed] });
         } catch (Err) {
-            return interaction.editReply({ content: `Error: ${Err.message}` });
+            const Embed = new EmbedBuilder().setTitle("Error").setDescription(Err.message).setColor("Red");
+            return interaction.editReply({ embeds: [Embed] });
         }
     }
 
     if (CommandName === "whois") {
         let TargetUser = interaction.options.getUser("user") || interaction.user;
         const RobloxId = Db.VerifiedUsers?.[TargetUser.id];
-        if (!RobloxId) return interaction.editReply({ content: "User not verified." });
+        if (!RobloxId) {
+            const Embed = new EmbedBuilder().setTitle("Error").setDescription("User not verified.").setColor("Red");
+            return interaction.editReply({ embeds: [Embed] });
+        }
         const Info = await GetRobloxUserInfo(RobloxId);
-        return interaction.editReply({ content: `Roblox username: ${Info.name}\nDisplay name: ${Info.displayName}\nID: ${Info.id}` });
+        const Embed = new EmbedBuilder()
+            .setTitle(`Whois: ${TargetUser.tag}`)
+            .setDescription(`Roblox username: ${Info.name}\nDisplay name: ${Info.displayName}\nID: ${Info.id}`)
+            .setColor("Blue");
+        return interaction.editReply({ embeds: [Embed] });
     }
 
     if (CommandName === "profile") {
         let TargetUser = interaction.options.getUser("user") || interaction.user;
         const RobloxId = Db.VerifiedUsers?.[TargetUser.id];
-        if (!RobloxId) return interaction.editReply({ content: "User not verified." });
+        if (!RobloxId) {
+            const Embed = new EmbedBuilder().setTitle("Error").setDescription("User not verified.").setColor("Red");
+            return interaction.editReply({ embeds: [Embed] });
+        }
         const Info = await GetRobloxUserInfo(RobloxId);
-        return interaction.editReply({ content: `Profile for ${TargetUser.tag}:\nRoblox username: ${Info.name}\nDisplay name: ${Info.displayName}\nID: ${Info.id}` });
+        const Embed = new EmbedBuilder()
+            .setTitle(`Profile for ${TargetUser.tag}`)
+            .setDescription(`Roblox username: ${Info.name}\nDisplay name: ${Info.displayName}\nID: ${Info.id}`)
+            .setColor("Blue");
+        return interaction.editReply({ embeds: [Embed] });
     }
 });
 
