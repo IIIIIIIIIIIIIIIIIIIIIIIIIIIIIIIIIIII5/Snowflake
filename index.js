@@ -101,7 +101,7 @@ async function GetRobloxDescription(UserId) {
     return Res.data.description || "";
 }
 
-ClientBot.once("ready", async () => {
+ClientBot.once("clientReady", async () => {
     ClientBot.user.setActivity("Snowflake Prison Roleplay", { type: ActivityType.Watching });
     const Commands = [
         new SlashCommandBuilder().setName("verify").setDescription("Verify your Roblox account").addStringOption(opt => opt.setName("username").setDescription("Your Roblox username").setRequired(true)),
@@ -118,20 +118,22 @@ ClientBot.once("ready", async () => {
     }
 });
 
-ClientBot.on("interactionCreate", async interaction => {
-    const safeReply = async (content) => {
+async function safeReply(interaction, options) {
+    try {
         if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply(content);
+            await interaction.reply(options);
         } else {
-            await interaction.followUp(content);
+            await interaction.followUp(options);
         }
-    };
+    } catch {}
+}
 
+ClientBot.on("interactionCreate", async interaction => {
     if (interaction.isButton() && interaction.customId === "done_verification") {
         try {
-            if (!interaction.deferred) await interaction.deferReply({ ephemeral: true });
+            if (!interaction.deferred) await interaction.deferReply({ flags: 64 });
             const Data = Verifications[interaction.user.id];
-            if (!Data) return await safeReply({ content: "You haven't started verification yet." });
+            if (!Data) return safeReply(interaction, { content: "You haven't started verification yet.", flags: 64 });
             const Description = await GetRobloxDescription(Data.RobloxUserId);
             if (Description.includes(Data.Code)) {
                 const Database = await GetJsonBin();
@@ -139,12 +141,12 @@ ClientBot.on("interactionCreate", async interaction => {
                 Database.VerifiedUsers[interaction.user.id] = Data.RobloxUserId;
                 await SaveJsonBin(Database);
                 delete Verifications[interaction.user.id];
-                await safeReply({ content: `Verified! Linked to Roblox ID ${Data.RobloxUserId}` });
+                await safeReply(interaction, { content: `Verified! Linked to Roblox ID ${Data.RobloxUserId}`, flags: 64 });
             } else {
-                await safeReply({ content: "Code not found in your profile. Make sure you added it and try again." });
+                await safeReply(interaction, { content: "Code not found in your profile. Make sure you added it and try again.", flags: 64 });
             }
         } catch {
-            await safeReply({ content: "Verification failed. Try again later." });
+            await safeReply(interaction, { content: "Verification failed. Try again later.", flags: 64 });
         }
         return;
     }
@@ -152,7 +154,6 @@ ClientBot.on("interactionCreate", async interaction => {
     if (!interaction.isChatInputCommand()) return;
     const CommandName = interaction.commandName;
     const GuildId = interaction.guild?.id;
-
     const Db = await GetJsonBin();
 
     if (CommandName === "verify") {
@@ -162,7 +163,7 @@ ClientBot.on("interactionCreate", async interaction => {
         Verifications[interaction.user.id] = { RobloxUserId: UserId, Code };
         const Button = new ButtonBuilder().setCustomId("done_verification").setLabel("Done").setStyle(ButtonStyle.Primary);
         const Row = new ActionRowBuilder().addComponents(Button);
-        await safeReply({ content: `Put this code in your Roblox profile description:\n${Code}\nThen click the Done button when finished.`, components: [Row], ephemeral: true });
+        await safeReply(interaction, { content: `Put this code in your Roblox profile description:\n${Code}\nThen click the Done button when finished.`, components: [Row], flags: 64 });
     }
 
     if (CommandName === "config") {
@@ -173,11 +174,11 @@ ClientBot.on("interactionCreate", async interaction => {
         await SaveJsonBin(Db);
         PendingApprovals[GroupId] = { requesterId: interaction.user.id, guildId: GuildId };
         try { await ClientBot.users.fetch(AdminId).then(u => u.send(`New pending config:\nGroup ID: ${GroupId}\nRequested by: <@${interaction.user.id}>`)); } catch {}
-        await safeReply({ content: `Group ID **${GroupId}** set! Waiting for admin approval.`, ephemeral: true });
+        await safeReply(interaction, { content: `Group ID **${GroupId}** set! Waiting for admin approval.`, flags: 64 });
     }
 
     if (["setrank","promote","demote"].includes(CommandName)) {
-        if (!Db.ServerConfig || !Db.ServerConfig[GuildId]) return await safeReply({ content: "Group ID not set. Run /config first.", ephemeral: true });
+        if (!Db.ServerConfig || !Db.ServerConfig[GuildId]) return await safeReply(interaction, { content: "Group ID not set. Run /config first.", flags: 64 });
         const GroupId = Db.ServerConfig[GuildId].GroupId;
         const Username = interaction.options.getString("username");
         try {
@@ -217,17 +218,17 @@ ClientBot.on("interactionCreate", async interaction => {
                 { name: "Issued By", value: interaction.user.tag, inline: true },
                 { name: "Date", value: new Date().toISOString().split("T")[0], inline: true }
             ).setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
-            await safeReply({ embeds: [Embed] });
+            await safeReply(interaction, { embeds: [Embed] });
         } catch (Err) {
             const ErrorEmbed = new EmbedBuilder().setColor(0xe74c3c).setTitle("Failed").setDescription(Err.message || "Unknown error").addFields({ name: "Date", value: new Date().toISOString().split("T")[0], inline: true }).setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
-            await safeReply({ embeds: [ErrorEmbed], ephemeral: true });
+            await safeReply(interaction, { embeds: [ErrorEmbed], flags: 64 });
         }
     }
 
     if (CommandName === "whois") {
         const TargetUser = interaction.options.getUser("user") || interaction.user;
         const RobloxUserId = (Db.VerifiedUsers||{})[TargetUser.id];
-        if (!RobloxUserId) return await safeReply({ content: `${TargetUser.tag} has not verified a Roblox account.`, ephemeral: true });
+        if (!RobloxUserId) return await safeReply(interaction, { content: `${TargetUser.tag} has not verified a Roblox account.`, flags: 64 });
         const RobloxInfo = await GetRobloxUserInfo(RobloxUserId);
         const Embed = new EmbedBuilder().setColor(0x3498db).setTitle("User Lookup").addFields(
             { name: "Discord User", value: `${TargetUser.tag} (${TargetUser.id})`, inline: false },
@@ -235,20 +236,20 @@ ClientBot.on("interactionCreate", async interaction => {
             { name: "Roblox User ID", value: String(RobloxInfo.id), inline: true },
             { name: "Description", value: RobloxInfo.description?.slice(0,200) || "None", inline: false }
         ).setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxInfo.id}&width=150&height=150&format=png`).setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
-        await safeReply({ embeds: [Embed] });
+        await safeReply(interaction, { embeds: [Embed] });
     }
 
     if (CommandName === "host") {
         const Member = interaction.member;
-        if (!Member.roles.cache.has("1424007337210937445")) return await safeReply({ content: "You do not have permission to use this command!", ephemeral: true });
+        if (!Member.roles.cache.has("1424007337210937445")) return await safeReply(interaction, { content: "You do not have permission to use this command!", flags: 64 });
         const Host = interaction.user;
         const CoHost = interaction.options.getUser("cohost");
         const Supervisor = interaction.options.getUser("supervisor");
         const Channel = await interaction.guild.channels.fetch("1398706795840536696").catch(() => null);
-        if (!Channel) return await safeReply({ content: "Channel not found.", ephemeral: true });
+        if (!Channel) return await safeReply(interaction, { content: "Channel not found.", flags: 64 });
         const Embed = new EmbedBuilder().setColor(0x3498db).setTitle("A TRAINING IS BEING HOSTED").setDescription(`Host: <@${Host.id}>\nCo-Host: ${CoHost ? `<@${CoHost.id}>` : "None"}\nSupervisor: ${Supervisor ? `<@${Supervisor.id}>` : "None"}\nLink: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)`).setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` });
         await Channel.send({ content: "<@&1404500986633916479>", embeds: [Embed] });
-        await safeReply({ content: `Announcement sent to ${Channel.name}.`, ephemeral: true });
+        await safeReply(interaction, { content: `Announcement sent to ${Channel.name}.`, flags: 64 });
     }
 });
 
@@ -268,7 +269,6 @@ ClientBot.on("messageCreate", async message => {
         const TargetServerId = Args[1];
         const CustomToken = Args[2];
         if (!TargetServerId || !CustomToken) return message.reply("Usage: !setbottoken <serverid> <token>");
-        const Db = await GetJsonBin();
         Db.CustomTokens = Db.CustomTokens || {};
         Db.CustomTokens[TargetServerId] = CustomToken;
         await SaveJsonBin(Db);
