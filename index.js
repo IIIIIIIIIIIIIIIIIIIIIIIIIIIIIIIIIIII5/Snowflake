@@ -20,11 +20,12 @@ const PendingApprovals = {};
 function formatNumber(num) {
     if (num < 1000) return num.toLocaleString();
 
-    const suffixes = [
-        "", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No",
-        "De", "Ud", "Dd", "Td", "Qad", "Qid", "Sxd", "Spd", "Ocd", "Nod",
-        "Vg", "Uvg", "Dvg", "Tvg", "Qavg", "Qivg", "Sxvg", "Spvg", "Ocvg", "Novg",
-        "Tg"
+     const suffixes = [
+        "", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc",
+        "UDc", "DDc", "TDc", "QaDc", "QiDc", "SxDc", "SpDc", "OcDc", "NoDc",
+        "Vg", "UVg", "DVg", "TVg", "QaVg", "QiVg", "SxVg", "SpVg", "OcVg", "NoVg",
+        "Tg", "UTg", "DTg", "TTg", "QaTg", "QiTg", "SxTg", "SpTg", "OcTg", "NoTg",
+        "Qd", "UQd", "DQd", "TQd", "QaQd", "QiQd", "SxQd", "SpQd", "OcQd", "NoQd"
     ];
 
     const tier = Math.floor(Math.log10(num) / 3);
