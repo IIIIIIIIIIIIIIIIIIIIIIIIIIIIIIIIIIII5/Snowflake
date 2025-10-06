@@ -416,6 +416,17 @@ ClientBot.on("interactionCreate", async interaction => {
 
         if (!TrainingData) return interaction.reply({ content: `${TargetUser.username} has no training data.`, ephemeral: false });
 
+        const monthKey = new Date().toISOString().slice(0, 7);
+
+        function getCounts(type) {
+            const data = TrainingData[type] || {};
+
+            return {
+                total: formatNumber(data.total || 0),
+                monthly: formatNumber(data[monthKey] || 0)
+            }
+        }  
+
         const Hosted = formatNumber(TrainingData.hosted?.total || 0);
         const CoHosted = formatNumber(TrainingData.cohosted?.total || 0);
         const Supervised = formatNumber(TrainingData.supervised?.total || 0);
