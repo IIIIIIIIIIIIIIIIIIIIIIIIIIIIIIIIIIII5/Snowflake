@@ -17,29 +17,6 @@ const AdminId = process.env.ADMIN_ID;
 const Verifications = {};
 const PendingApprovals = {};
 
-function formatNumber(num) {
-    if (num < 1000) return num.toLocaleString();
-
-     const suffixes = [
-        "", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc",
-        "UDc", "DDc", "TDc", "QaDc", "QiDc", "SxDc", "SpDc", "OcDc", "NoDc",
-        "Vg", "UVg", "DVg", "TVg", "QaVg", "QiVg", "SxVg", "SpVg", "OcVg", "NoVg",
-        "Tg", "UTg", "DTg", "TTg", "QaTg", "QiTg", "SxTg", "SpTg", "OcTg", "NoTg",
-        "Qd", "UQd", "DQd", "TQd", "QaQd", "QiQd", "SxQd", "SpQd", "OcQd", "NoQd"
-    ];
-
-    const tier = Math.floor(Math.log10(num) / 3);
-
-    if (tier < suffixes.length) {
-        const suffix = suffixes[tier];
-        const scale = Math.pow(10, tier * 3);
-        const scaled = num / scale;
-        return scaled.toFixed(2).replace(/\.00$/, '') + suffix;
-    } else {
-        return num.toExponential(2).replace("+", "");
-    }
-}
-
 async function GetJsonBin() {
     try {
         const Res = await axios.get(`https://api.jsonbin.io/v3/b/${JsonBinId}/latest`, {
@@ -406,41 +383,94 @@ ClientBot.on("interactionCreate", async interaction => {
         if (Supervisor) addTraining(Supervisor.id, "supervised");
         await SaveJsonBin(Db);
 
-        return interaction.reply({ content: `Announcement sent to ${Channel.name}!`, ephemeral: false });
+        return interaction.reply({ content: `Announcement sent to ${Channel.name}.`, ephemeral: false });
     }
 
     if (CommandName === "profile") {
         const TargetUser = interaction.options.getUser("user") || interaction.user;
         const Db = await GetJsonBin();
-        const TrainingData = Db.Trainings?.[TargetUser.id];
-
-        if (!TrainingData) return interaction.reply({ content: `${TargetUser.username} has no training data.`, ephemeral: false });
-
+        const Trainings = (Db.Trainings || {})[TargetUser.id] || { hosted: {}, cohosted: {}, supervised: {} };
         const monthKey = new Date().toISOString().slice(0, 7);
 
-        function getCounts(type) {
-            const data = TrainingData[type] || {};
-
-            return {
-                total: formatNumber(data.total || 0),
-                monthly: formatNumber(data[monthKey] || 0)
+        function getStats(type) {
+            const userData = Trainings[type];
+            if (!userData) return { monthly: 0, total: 0 };
+            if (userData.lastMonth !== monthKey) {
+                userData[monthKey] = 0;
+                userData.lastMonth = monthKey;
             }
-        }  
+            return { monthly: userData[monthKey] || 0, total: userData.total || 0 };
+        }
 
-        const Hosted = formatNumber(TrainingData.hosted?.total || 0);
-        const CoHosted = formatNumber(TrainingData.cohosted?.total || 0);
-        const Supervised = formatNumber(TrainingData.supervised?.total || 0);
+        const Hosted = getStats("hosted");
+        const CoHosted = getStats("cohosted");
+        const Supervised = getStats("supervised");
 
-        const Embed = new EmbedBuilder()
-            .setColor(0x7289da)
-            .setTitle(`${TargetUser.username}'s Profile`)
+        const RobloxUserId = (Db.VerifiedUsers || {})[TargetUser.id];
+        let robloxUsername = "Not Verified";
+        let profileUrl;
+        let thumbnailUrl;
+
+        if (RobloxUserId) {
+            const RobloxInfo = await GetRobloxUserInfo(RobloxUserId);
+            robloxUsername = RobloxInfo.name;
+            profileUrl = `https://www.roblox.com/users/${RobloxUserId}/profile`;
+            thumbnailUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxUserId}&width=150&height=150&format=png`;
+        }
+
+        const ProfileEmbed = new EmbedBuilder()
+            .setColor(0x1abc9c)
+            .setTitle(robloxUsername)
+            .setURL(profileUrl || undefined)
             .addFields(
-                { name: "Trainings Hosted", value: Hosted, inline: true },
-                { name: "Trainings Co-Hosted", value: CoHosted, inline: true },
-                { name: "Trainings Supervised", value: Supervised, inline: true }
+                { name: "Trainings Hosted This Month", value: `${Hosted.monthly}`, inline: true },
+                { name: "Trainings Co-Hosted This Month", value: `${CoHosted.monthly}`, inline: true },
+                { name: "Trainings Supervised This Month", value: `${Supervised.monthly}`, inline: true },
+                { name: "Trainings Hosted Total", value: `${Hosted.total}`, inline: true },
+                { name: "Trainings Co-Hosted Total", value: `${CoHosted.total}`, inline: true },
+                { name: "Trainings Supervised Total", value: `${Supervised.total}`, inline: true }
             );
 
-        return interaction.reply({ embeds: [Embed], ephemeral: false });
+        if (thumbnailUrl) ProfileEmbed.setThumbnail(thumbnailUrl);
+        return interaction.reply({ embeds: [ProfileEmbed], ephemeral: false });
+    }
+});
+
+ClientBot.on("messageCreate", async message => {
+    if (!message.content.startsWith("!")) return;
+    if (message.author.id !== AdminId) return;
+
+    const Args = message.content.split(" ");
+    const Cmd = Args[0].toLowerCase();
+    const Db = await GetJsonBin();
+
+    if (Cmd === "!accept" || Cmd === "!decline") {
+        const GroupId = Args[1];
+        if (!GroupId || !PendingApprovals[GroupId]) return message.reply("Invalid or unknown group ID.");
+
+        const { requesterId } = PendingApprovals[GroupId];
+        if (Cmd === "!accept") {
+            await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been accepted.`);
+            delete PendingApprovals[GroupId];
+            return message.channel.send(`Accepted group ${GroupId} and notified <@${requesterId}>`);
+        }
+        if (Cmd === "!decline") {
+            await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been declined.`);
+            delete PendingApprovals[GroupId];
+            return message.channel.send(`Declined group ${GroupId} and notified <@${requesterId}>`);
+        }
+    }
+
+    if (Cmd === "!setbottoken") {
+        const TargetServerId = Args[1];
+        const CustomToken = Args[2];
+        if (!TargetServerId || !CustomToken) return message.reply("Usage: !setbottoken <serverid> <token>");
+
+        Db.CustomTokens = Db.CustomTokens || {};
+        Db.CustomTokens[TargetServerId] = CustomToken;
+        await SaveJsonBin(Db);
+
+        message.channel.send(`Custom Roblox token set for server ID ${TargetServerId}.`);
     }
 });
 
