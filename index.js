@@ -29,20 +29,10 @@ function GetCommandFiles(Dir) {
 }
 
 const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
-console.log(`Loading ${CommandFiles.length} command files...`);
-
 for (const File of CommandFiles) {
-  try {
-    const Cmd = require(File);
-    if (Cmd && Cmd.data && Cmd.execute) {
-      ClientBot.Commands.set(Cmd.data.name, Cmd);
-      console.log(`Loaded command: ${Cmd.data.name}`);
-    } else {
-      console.log(`Skipped invalid command file: ${path.basename(File)}`);
-    }
-  } catch (Err) {
-    console.error(`Error loading ${File}:`, Err.message);
-  }
+  delete require.cache[require.resolve(File)];
+  const Cmd = require(File);
+  if (Cmd && Cmd.data && Cmd.execute) ClientBot.Commands.set(Cmd.data.name, Cmd);
 }
 
 ClientBot.once('ready', async () => {
@@ -52,11 +42,10 @@ ClientBot.once('ready', async () => {
   const Rest = new REST({ version: '10' }).setToken(BotToken);
   const CommandsPayload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
 
-  await ClientBot.guilds.fetch();
+  const Guilds = await ClientBot.guilds.fetch();
 
-  for (const [GuildId, Guild] of ClientBot.guilds.cache) {
+  for (const [GuildId, Guild] of Guilds) {
     try {
-      await Rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: [] });
       await Rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: CommandsPayload });
       console.log(`Registered ${CommandsPayload.length} commands for guild: ${Guild.name} (${GuildId})`);
     } catch (Err) {
@@ -64,7 +53,7 @@ ClientBot.once('ready', async () => {
     }
   }
 
-  console.log('All guild commands refreshed.');
+  console.log('All guild commands synced.');
 });
 
 ClientBot.on('interactionCreate', async Interaction => {
@@ -79,7 +68,7 @@ ClientBot.on('interactionCreate', async Interaction => {
   try {
     await Cmd.execute(Interaction, ClientBot);
   } catch (Err) {
-    console.error(`Error executing ${Interaction.commandName}:`, Err);
+    console.error('Command error:', Err);
     if (!Interaction.replied && !Interaction.deferred) {
       await Interaction.reply({ content: 'An error occurred.', ephemeral: true });
     } else {
