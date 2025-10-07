@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const crypto = require('crypto');
-const { GetRobloxUserId, startVerification } = require('./roblox');
+const { GetRobloxUserId, startVerification } = require('../roblox');
 
 module.exports = {
   data: new SlashCommandBuilder()
