@@ -56,7 +56,6 @@ ClientBot.once('clientReady', async () => {
 ClientBot.on('interactionCreate', async interaction => {
   if (interaction.isButton() && interaction.customId === 'done_verification') return Roblox.HandleVerificationButton(interaction);
   if (!interaction.isChatInputCommand()) return;
-
   const cmd = ClientBot.Commands.get(interaction.commandName);
   if (!cmd) return;
 
