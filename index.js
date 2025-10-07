@@ -1,12 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType } = require('discord.js');
-const roblox = require('./roblox');
+const Roblox = require('./roblox');
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID;
+const BotToken = process.env.BOT_TOKEN;
+const ClientId = process.env.CLIENT_ID;
+const AdminId = process.env.ADMIN_ID;
 
-const client = new Client({
+const ClientBot = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
@@ -14,88 +15,100 @@ const client = new Client({
   ]
 });
 
-client.commands = new Collection();
-client.PendingApprovals = roblox.PendingApprovals;
+ClientBot.Commands = new Collection();
+ClientBot.PendingApprovals = Roblox.PendingApprovals;
 
-const commandFiles = fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && !['index.js','roblox.js'].includes(f));
-for (const file of commandFiles) {
-  const cmd = require(path.join(__dirname, file));
-  if (cmd && cmd.data && cmd.execute) {
-    client.commands.set(cmd.data.name, cmd);
+function GetCommandFiles(Dir) {
+  let Files = [];
+  for (const F of fs.readdirSync(Dir)) {
+    const Full = path.join(Dir, F);
+    if (fs.statSync(Full).isDirectory()) Files = Files.concat(GetCommandFiles(Full));
+    else if (F.endsWith('.js')) Files.push(Full);
   }
+  return Files;
 }
 
-client.once('ready', async () => {
-  console.log(`Logged in as ${client.user.tag}`);
-  client.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
+const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
+for (const File of CommandFiles) {
+  const Cmd = require(File);
+  if (Cmd && Cmd.data && Cmd.execute) ClientBot.Commands.set(Cmd.data.name, Cmd);
+}
 
-  const rest = new REST({ version: '10' }).setToken(BOT_TOKEN);
-  const commandsPayload = Array.from(client.commands.values()).map(c => c.data.toJSON());
+ClientBot.once('ready', async () => {
+  console.log(`Logged in as ${ClientBot.user.tag}`);
+  ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
 
-  await client.guilds.fetch();
+  const Rest = new REST({ version: '10' }).setToken(BotToken);
+  const CommandsPayload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
 
-  for (const [guildId, guild] of client.guilds.cache) {
+  await ClientBot.guilds.fetch();
+
+  for (const [GuildId, Guild] of ClientBot.guilds.cache) {
     try {
-      await rest.put(Routes.applicationGuildCommands(CLIENT_ID, guildId), { body: commandsPayload });
-      console.log(`Commands registered for guild ${guildId}`);
-    } catch (err) {
-      console.error(`Failed to register commands for ${guildId}:`, err.message);
+      await Rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: CommandsPayload });
+      console.log(`Commands registered for guild ${GuildId}`);
+    } catch (Err) {
+      console.error(`Failed to register commands for ${GuildId}:`, Err.message);
     }
   }
 
   console.log('All guild commands synced.');
 });
 
-client.on('interactionCreate', async interaction => {
-  if (interaction.isButton() && interaction.customId === 'done_verification') {
-    return roblox.handleVerificationButton(interaction);
+ClientBot.on('interactionCreate', async Interaction => {
+  if (Interaction.isButton() && Interaction.customId === 'done_verification') {
+    return Roblox.HandleVerificationButton(Interaction);
   }
 
-  if (!interaction.isChatInputCommand()) return;
-  const cmd = client.commands.get(interaction.commandName);
-  if (!cmd) return;
+  if (!Interaction.isChatInputCommand()) return;
+  const Cmd = ClientBot.Commands.get(Interaction.commandName);
+  if (!Cmd) return;
 
   try {
-    await cmd.execute(interaction, client);
-  } catch (err) {
-    console.error('Command error:', err);
-    if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: 'An error occurred.', ephemeral: true });
-    else await interaction.editReply({ content: `Error: ${err.message}` });
+    await Cmd.execute(Interaction, ClientBot);
+  } catch (Err) {
+    console.error('Command error:', Err);
+    if (!Interaction.replied && !Interaction.deferred) {
+      await Interaction.reply({ content: 'An error occurred.', ephemeral: true });
+    } else {
+      await Interaction.editReply({ content: `Error: ${Err.message}` });
+    }
   }
 });
 
-client.on('messageCreate', async message => {
-  if (!message.content.startsWith('!')) return;
-  if (message.author.id !== process.env.ADMIN_ID) return;
+ClientBot.on('messageCreate', async Message => {
+  if (!Message.content.startsWith('!')) return;
+  if (Message.author.id !== AdminId) return;
 
-  const parts = message.content.split(/\s+/);
-  const cmd = parts[0].toLowerCase();
-  const db = await roblox.GetJsonBin();
+  const Parts = Message.content.split(/\s+/);
+  const Cmd = Parts[0].toLowerCase();
+  const Db = await Roblox.GetJsonBin();
 
-  if (cmd === '!accept' || cmd === '!decline') {
-    const groupId = parts[1];
-    if (!groupId || !roblox.PendingApprovals[groupId]) return message.reply('Invalid or unknown group ID.');
-    const { requesterId } = roblox.PendingApprovals[groupId];
-    if (cmd === '!accept') {
-      try { await client.users.send(requesterId, `Your group config (ID: ${groupId}) has been accepted.`); } catch {}
-      delete roblox.PendingApprovals[groupId];
-      return message.channel.send(`Accepted group ${groupId} and notified <@${requesterId}>`);
+  if (Cmd === '!accept' || Cmd === '!decline') {
+    const GroupId = Parts[1];
+    if (!GroupId || !Roblox.PendingApprovals[GroupId]) return Message.reply('Invalid or unknown group ID.');
+    const { requesterId } = Roblox.PendingApprovals[GroupId];
+
+    if (Cmd === '!accept') {
+      try { await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been accepted.`); } catch {}
+      delete Roblox.PendingApprovals[GroupId];
+      return Message.channel.send(`Accepted group ${GroupId} and notified <@${requesterId}>`);
     } else {
-      try { await client.users.send(requesterId, `Your group config (ID: ${groupId}) has been declined.`); } catch {}
-      delete roblox.PendingApprovals[groupId];
-      return message.channel.send(`Declined group ${groupId} and notified <@${requesterId}>`);
+      try { await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been declined.`); } catch {}
+      delete Roblox.PendingApprovals[GroupId];
+      return Message.channel.send(`Declined group ${GroupId} and notified <@${requesterId}>`);
     }
   }
 
-  if (cmd === '!setbottoken') {
-    const targetServerId = parts[1];
-    const customToken = parts[2];
-    if (!targetServerId || !customToken) return message.reply('Usage: !setbottoken <serverid> <token>');
-    db.CustomTokens = db.CustomTokens || {};
-    db.CustomTokens[targetServerId] = customToken;
-    await roblox.SaveJsonBin(db);
-    return message.channel.send(`Custom Roblox token set for server ID ${targetServerId}.`);
+  if (Cmd === '!setbottoken') {
+    const TargetServerId = Parts[1];
+    const CustomToken = Parts[2];
+    if (!TargetServerId || !CustomToken) return Message.reply('Usage: !setbottoken <serverid> <token>');
+    Db.CustomTokens = Db.CustomTokens || {};
+    Db.CustomTokens[TargetServerId] = CustomToken;
+    await Roblox.SaveJsonBin(Db);
+    return Message.channel.send(`Custom Roblox token set for server ID ${TargetServerId}.`);
   }
 });
 
-client.login(BOT_TOKEN);
+ClientBot.login(BotToken);
