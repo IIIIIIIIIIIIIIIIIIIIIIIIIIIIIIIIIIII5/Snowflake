@@ -25,7 +25,7 @@ function GetCommandFiles(Dir) {
     if (fs.statSync(Full).isDirectory()) Files = Files.concat(GetCommandFiles(Full));
     else if (F.endsWith('.js')) Files.push(Full);
   }
-  return Files;
+  return [...new Set(Files.map(f => path.resolve(f)))];
 }
 
 const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
@@ -46,6 +46,7 @@ ClientBot.once('ready', async () => {
 
   for (const [GuildId, Guild] of Guilds) {
     try {
+      await Rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: [] });
       await Rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: CommandsPayload });
       console.log(`Registered ${CommandsPayload.length} commands for guild: ${Guild.name} (${GuildId})`);
     } catch (Err) {
@@ -57,50 +58,26 @@ ClientBot.once('ready', async () => {
 });
 
 ClientBot.on('interactionCreate', async Interaction => {
-  if (Interaction.isButton() && Interaction.customId === 'done_verification') {
-    return Roblox.HandleVerificationButton(Interaction);
-  }
-
+  if (Interaction.isButton() && Interaction.customId === 'done_verification') return Roblox.HandleVerificationButton(Interaction);
   if (!Interaction.isChatInputCommand()) return;
   const Cmd = ClientBot.Commands.get(Interaction.commandName);
   if (!Cmd) return;
-
-  try {
-    await Cmd.execute(Interaction, ClientBot);
-  } catch (Err) {
-    console.error('Command error:', Err);
-    if (!Interaction.replied && !Interaction.deferred) {
-      await Interaction.reply({ content: 'An error occurred.', ephemeral: true });
-    } else {
-      await Interaction.editReply({ content: `Error: ${Err.message}` });
-    }
-  }
+  try { await Cmd.execute(Interaction, ClientBot); } catch (Err) { if (!Interaction.replied && !Interaction.deferred) await Interaction.reply({ content: 'An error occurred.', ephemeral: true }); else await Interaction.editReply({ content: `Error: ${Err.message}` }); }
 });
 
 ClientBot.on('messageCreate', async Message => {
   if (!Message.content.startsWith('!')) return;
   if (Message.author.id !== AdminId) return;
-
   const Parts = Message.content.split(/\s+/);
   const Cmd = Parts[0].toLowerCase();
   const Db = await Roblox.GetJsonBin();
-
   if (Cmd === '!accept' || Cmd === '!decline') {
     const GroupId = Parts[1];
     if (!GroupId || !Roblox.PendingApprovals[GroupId]) return Message.reply('Invalid or unknown group ID.');
     const { requesterId } = Roblox.PendingApprovals[GroupId];
-
-    if (Cmd === '!accept') {
-      try { await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been accepted.`); } catch {}
-      delete Roblox.PendingApprovals[GroupId];
-      return Message.channel.send(`Accepted group ${GroupId} and notified <@${requesterId}>`);
-    } else {
-      try { await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been declined.`); } catch {}
-      delete Roblox.PendingApprovals[GroupId];
-      return Message.channel.send(`Declined group ${GroupId} and notified <@${requesterId}>`);
-    }
+    if (Cmd === '!accept') { try { await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been accepted.`); } catch {} delete Roblox.PendingApprovals[GroupId]; return Message.channel.send(`Accepted group ${GroupId} and notified <@${requesterId}>`); }
+    else { try { await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been declined.`); } catch {} delete Roblox.PendingApprovals[GroupId]; return Message.channel.send(`Declined group ${GroupId} and notified <@${requesterId}>`); }
   }
-
   if (Cmd === '!setbottoken') {
     const TargetServerId = Parts[1];
     const CustomToken = Parts[2];
