@@ -8,7 +8,7 @@ module.exports = {
     .addUserOption(opt => opt.setName('user').setDescription('The Discord user to view').setRequired(false)),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ ephemeral: false });
     const db = await GetJsonBin();
     const target = interaction.options.getUser('user') || interaction.user;
     const trainings = db.Trainings?.[target.id] || { hosted: {}, cohosted: {}, supervised: {} };
