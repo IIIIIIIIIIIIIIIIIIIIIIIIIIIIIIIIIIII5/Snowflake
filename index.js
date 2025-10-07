@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ActivityType, InteractionResponseFlags } = require("discord.js");
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ActivityType } = require("discord.js");
 const axios = require("axios");
 const crypto = require("crypto");
 
@@ -130,6 +130,7 @@ async function GetRobloxDescription(UserId) {
 }
 
 ClientBot.once("ready", async () => {
+    console.log(`Logged in as ${ClientBot.user.tag}`);
     ClientBot.user.setActivity("Snowflake Prison Roleplay", { type: ActivityType.Watching });
 
     const Commands = [
@@ -144,9 +145,18 @@ ClientBot.once("ready", async () => {
     ].map(cmd => cmd.toJSON());
 
     const Rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
-    for (const [GuildId] of ClientBot.guilds.cache) {
-        try { await Rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, GuildId), { body: Commands }); } catch {}
+    await ClientBot.guilds.fetch();
+
+    for (const [guildId] of ClientBot.guilds.cache) {
+        try {
+            await Rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId), { body: [] });
+            await Rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId), { body: Commands });
+        } catch (err) {
+            console.error(`Failed to register commands for ${guildId}:`, err.message);
+        }
     }
+
+    console.log("All guild commands synced successfully.");
 });
 
 ClientBot.on("interactionCreate", async interaction => {
@@ -196,7 +206,7 @@ ClientBot.on("interactionCreate", async interaction => {
 
         PendingApprovals[GroupId] = { requesterId: interaction.user.id, guildId: GuildId };
         try { await ClientBot.users.fetch(AdminId).then(u => u.send(`New pending config:\nGroup ID: ${GroupId}\nRequested by: <@${interaction.user.id}>`)); } catch {}
-        return interaction.editReply({ content: `Group ID **${GroupId}** set! Waiting for admin approval.` });
+        return interaction.editReply({ content: `Group ID ${GroupId} set! Waiting for admin approval.` });
     }
 
     if (["setrank","promote","demote"].includes(CommandName)) {
@@ -245,7 +255,7 @@ ClientBot.on("interactionCreate", async interaction => {
             if(LogChannel){
                 const LogEmbed = new EmbedBuilder()
                     .setColor(0x2ecc71)
-                    .setTitle("**Rank Updated**")
+                    .setTitle("Rank Updated")
                     .addFields(
                         { name:"Action By:", value:IssuerRobloxInfo.name, inline:true },
                         { name:"Action On:", value:TargetRobloxInfo.name, inline:true },
@@ -293,11 +303,8 @@ ClientBot.on("interactionCreate", async interaction => {
         const monthKey = new Date().toISOString().slice(0,7);
 
         function addTraining(userId,type){
-            Db.Trainings[userId]=Db.Trainings[userId]||{hosted:{},cohosted:{},supervised:{}};
-            const userData=Db.Trainings[userId][type];
-            if(userData.lastMonth!==monthKey){userData[monthKey]=0;userData.lastMonth=monthKey;}
-            userData[monthKey]=(userData[monthKey]||0)+1;
-            userData.total=(userData.total||0)+1;
+            Db.Trainings[userId]=Db.Trainings[userId]||{hosted:{},cohosted:{},supervised:{}};  
+            Db.Trainings[userId][type][monthKey]=(Db.Trainings[userId][type][monthKey]||0)+1;
         }
 
         addTraining(Host.id,"hosted");
@@ -305,86 +312,32 @@ ClientBot.on("interactionCreate", async interaction => {
         if(Supervisor) addTraining(Supervisor.id,"supervised");
         await SaveJsonBin(Db);
 
-        return interaction.editReply({ content:`Announcement sent to ${Channel.name}.` });
+        return interaction.editReply({ content:"Training hosted successfully!" });
     }
 
     if (CommandName==="profile"){
         await interaction.deferReply({ ephemeral:true });
         const TargetUser = interaction.options.getUser("user")||interaction.user;
-        const Trainings=(Db.Trainings||{})[TargetUser.id]||{hosted:{},cohosted:{},supervised:{}};
-        const monthKey = new Date().toISOString().slice(0,7);
+        Db.Trainings=Db.Trainings||{};
+        const Stats=Db.Trainings[TargetUser.id];
+        if(!Stats) return interaction.editReply({ content:`${TargetUser.tag} has no recorded trainings.` });
 
-        function getStats(type){
-            const userData = Trainings[type];
-            if(!userData) return {monthly:0,total:0};
-            if(userData.lastMonth!==monthKey){userData[monthKey]=0;userData.lastMonth=monthKey;}
-            return {monthly:userData[monthKey]||0,total:userData.total||0};
-        }
+        const monthKey=new Date().toISOString().slice(0,7);
+        const hosted=Stats.hosted[monthKey]||0;
+        const cohosted=Stats.cohosted[monthKey]||0;
+        const supervised=Stats.supervised[monthKey]||0;
 
-        const Hosted=getStats("hosted");
-        const CoHosted=getStats("cohosted");
-        const Supervised=getStats("supervised");
-
-        const RobloxUserId=(Db.VerifiedUsers||{})[TargetUser.id];
-        let robloxUsername="Not Verified", profileUrl, thumbnailUrl;
-        if(RobloxUserId){
-            const RobloxInfo = await GetRobloxUserInfo(RobloxUserId);
-            robloxUsername = RobloxInfo.name;
-            profileUrl = `https://www.roblox.com/users/${RobloxUserId}/profile`;
-            thumbnailUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${RobloxUserId}&width=150&height=150&format=png`;
-        }
-
-        const ProfileEmbed = new EmbedBuilder()
+        const Embed=new EmbedBuilder()
             .setColor(0x1abc9c)
-            .setTitle(robloxUsername)
-            .setURL(profileUrl||undefined)
+            .setTitle(`${TargetUser.username}'s Training Profile`)
+            .setDescription(`Month: ${monthKey}`)
             .addFields(
-                { name:"Trainings Hosted This Month", value:`${Hosted.monthly}`, inline:true },
-                { name:"Trainings Co-Hosted This Month", value:`${CoHosted.monthly}`, inline:true },
-                { name:"Trainings Supervised This Month", value:`${Supervised.monthly}`, inline:true },
-                { name:"Trainings Hosted Total", value:`${Hosted.total}`, inline:true },
-                { name:"Trainings Co-Hosted Total", value:`${CoHosted.total}`, inline:true },
-                { name:"Trainings Supervised Total", value:`${Supervised.total}`, inline:true }
+                { name:"Hosted", value:String(hosted), inline:true },
+                { name:"Co-Hosted", value:String(cohosted), inline:true },
+                { name:"Supervised", value:String(supervised), inline:true }
             );
 
-        if(thumbnailUrl) ProfileEmbed.setThumbnail(thumbnailUrl);
-        return interaction.editReply({ embeds:[ProfileEmbed] });
-    }
-});
-
-ClientBot.on("messageCreate", async message=>{
-    if(!message.content.startsWith("!")) return;
-    if(message.author.id!==AdminId) return;
-    const Args=message.content.split(" ");
-    const Cmd=Args[0].toLowerCase();
-    const Db=await GetJsonBin();
-
-    if(Cmd==="!accept"||Cmd==="!decline"){
-        const GroupId=Args[1];
-        if(!GroupId||!PendingApprovals[GroupId]) return message.reply("Invalid or unknown group ID.");
-        const { requesterId } = PendingApprovals[GroupId];
-
-        if(Cmd==="!accept"){
-            await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been accepted.`);
-            delete PendingApprovals[GroupId];
-            return message.channel.send(`Accepted group ${GroupId} and notified <@${requesterId}>`);
-        }
-
-        if(Cmd==="!decline"){
-            await ClientBot.users.send(requesterId, `Your group config (ID: ${GroupId}) has been declined.`);
-            delete PendingApprovals[GroupId];
-            return message.channel.send(`Declined group ${GroupId} and notified <@${requesterId}>`);
-        }
-    }
-
-    if(Cmd==="!setbottoken"){
-        const TargetServerId=Args[1];
-        const CustomToken=Args[2];
-        if(!TargetServerId||!CustomToken) return message.reply("Usage: !setbottoken <serverid> <token>");
-        Db.CustomTokens=Db.CustomTokens||{};
-        Db.CustomTokens[TargetServerId]=CustomToken;
-        await SaveJsonBin(Db);
-        message.channel.send(`Custom Roblox token set for server ID ${TargetServerId}.`);
+        return interaction.editReply({ embeds:[Embed] });
     }
 });
 
