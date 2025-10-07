@@ -35,24 +35,25 @@ for (const file of CommandFiles) {
   if (cmd && cmd.data && cmd.execute) ClientBot.Commands.set(cmd.data.name, cmd);
 }
 
-ClientBot.once('clientReady', async () => {
-  console.log(`Logged in as ${ClientBot.user.tag}`);
-  ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
-
+async function RegisterGuildCommands() {
   const rest = new REST({ version: '10' }).setToken(BotToken);
-  const commandsPayload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
-
+  const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
   const guilds = await ClientBot.guilds.fetch();
 
   for (const [guildId, guild] of guilds) {
     try {
-      await rest.put(Routes.applicationGuildCommands(ClientId, guildId), { body: commandsPayload });
-      console.log(`Registered ${commandsPayload.length} commands for guild: ${guild.name} (${guildId})`);
+      await rest.put(Routes.applicationGuildCommands(ClientId, guildId), { body: payload });
+      console.log(`Registered ${payload.length} commands for guild: ${guild.name} (${guildId})`);
     } catch (err) {
       console.error(`Failed to register commands for ${guildId}:`, err.message);
     }
   }
+}
 
+ClientBot.once('clientReady', async () => {
+  console.log(`Logged in as ${ClientBot.user.tag}`);
+  ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
+  await RegisterGuildCommands();
   console.log('All guild commands synced.');
 });
 
