@@ -45,14 +45,15 @@ ClientBot.once('ready', async () => {
 
   for (const [GuildId, Guild] of ClientBot.guilds.cache) {
     try {
+      await Rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: [] });
       await Rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: CommandsPayload });
-      console.log(`Commands registered for guild ${GuildId}`);
+      console.log(`Commands refreshed for guild ${Guild.name} (${GuildId})`);
     } catch (Err) {
       console.error(`Failed to register commands for ${GuildId}:`, Err.message);
     }
   }
 
-  console.log('All guild commands synced.');
+  console.log('All guild commands refreshed.');
 });
 
 ClientBot.on('interactionCreate', async Interaction => {
