@@ -17,7 +17,6 @@ const ClientBot = new Client({
 
 ClientBot.Commands = new Collection();
 ClientBot.PendingApprovals = Roblox.PendingApprovals;
-ClientBot.botActive = true;
 
 function GetCommandFiles(dir) {
   const files = [];
@@ -55,20 +54,23 @@ ClientBot.once('clientReady', async () => {
 });
 
 ClientBot.on('interactionCreate', async interaction => {
-  if (!ClientBot.botActive) return;
   if (interaction.isButton() && interaction.customId === 'done_verification') return Roblox.HandleVerificationButton(interaction);
   if (!interaction.isChatInputCommand()) return;
+
   const cmd = ClientBot.Commands.get(interaction.commandName);
   if (!cmd) return;
-  try { await cmd.execute(interaction, ClientBot); } 
-  catch (err) { 
-    if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: 'An error occurred.', ephemeral: true }); 
-    else await interaction.editReply({ content: `Error: ${err.message}` }); 
+
+  try {
+    await cmd.execute(interaction, ClientBot);
+  } catch (err) {
+    if (!interaction.replied && !interaction.deferred)
+      await interaction.reply({ content: 'An error occurred.', ephemeral: true });
+    else
+      await interaction.editReply({ content: `Error: ${err.message}` });
   }
 });
 
 ClientBot.on('messageCreate', async message => {
-  if (!ClientBot.botActive) return;
   if (!message.content.startsWith('!')) return;
   if (message.author.id !== AdminId) return;
 
@@ -80,8 +82,16 @@ ClientBot.on('messageCreate', async message => {
     const groupId = parts[1];
     if (!groupId || !Roblox.PendingApprovals[groupId]) return message.reply('Invalid or unknown group ID.');
     const { requesterId } = Roblox.PendingApprovals[groupId];
-    if (cmd === '!accept') { try { await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been accepted.`); } catch {} delete Roblox.PendingApprovals[groupId]; return message.channel.send(`Accepted group ${groupId} and notified <@${requesterId}>`); }
-    else { try { await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been declined.`); } catch {} delete Roblox.PendingApprovals[groupId]; return message.channel.send(`Declined group ${groupId} and notified <@${requesterId}>`); }
+
+    if (cmd === '!accept') {
+      try { await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been accepted.`); } catch {}
+      delete Roblox.PendingApprovals[groupId];
+      return message.channel.send(`Accepted group ${groupId} and notified <@${requesterId}>`);
+    } else {
+      try { await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been declined.`); } catch {}
+      delete Roblox.PendingApprovals[groupId];
+      return message.channel.send(`Declined group ${groupId} and notified <@${requesterId}>`);
+    }
   }
 
   if (cmd === '!setbottoken') {
