@@ -35,7 +35,7 @@ for (const file of CommandFiles) {
   if (cmd && cmd.data && cmd.execute) ClientBot.Commands.set(cmd.data.name, cmd);
 }
 
-async function RegisterGuildCommands() {
+async function RefreshGuildCommands() {
   const rest = new REST({ version: '10' }).setToken(BotToken);
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
   const guilds = await ClientBot.guilds.fetch();
@@ -53,7 +53,7 @@ async function RegisterGuildCommands() {
 ClientBot.once('clientReady', async () => {
   console.log(`Logged in as ${ClientBot.user.tag}`);
   ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
-  await RegisterGuildCommands();
+  await RefreshGuildCommands();
   console.log('All guild commands synced.');
 });
 
