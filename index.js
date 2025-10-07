@@ -17,6 +17,7 @@ const ClientBot = new Client({
 
 ClientBot.Commands = new Collection();
 ClientBot.PendingApprovals = Roblox.PendingApprovals;
+ClientBot.botActive = true;
 
 function GetCommandFiles(dir) {
   const files = [];
@@ -35,40 +36,42 @@ for (const file of CommandFiles) {
   if (cmd && cmd.data && cmd.execute) ClientBot.Commands.set(cmd.data.name, cmd);
 }
 
-async function RefreshGuildCommands() {
+async function RefreshGlobalCommands() {
   const rest = new REST({ version: '10' }).setToken(BotToken);
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
-  const guilds = await ClientBot.guilds.fetch();
-
-  for (const [guildId, guild] of guilds) {
-    try {
-      await rest.put(Routes.applicationGuildCommands(ClientId, guildId), { body: payload });
-      console.log(`Registered ${payload.length} commands for guild: ${guild.name} (${guildId})`);
-    } catch (err) {
-      console.error(`Failed to register commands for ${guildId}:`, err.message);
-    }
+  try {
+    await rest.put(Routes.applicationCommands(ClientId), { body: payload });
+    console.log(`Registered ${payload.length} global commands.`);
+  } catch (err) {
+    console.error('Failed to register global commands:', err.message);
   }
 }
 
 ClientBot.once('clientReady', async () => {
   console.log(`Logged in as ${ClientBot.user.tag}`);
   ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
-  await RefreshGuildCommands();
-  console.log('All guild commands synced.');
+  await RefreshGlobalCommands();
+  console.log('All global commands synced.');
 });
 
 ClientBot.on('interactionCreate', async interaction => {
+  if (!ClientBot.botActive) return;
   if (interaction.isButton() && interaction.customId === 'done_verification') return Roblox.HandleVerificationButton(interaction);
   if (!interaction.isChatInputCommand()) return;
   const cmd = ClientBot.Commands.get(interaction.commandName);
   if (!cmd) return;
   try { await cmd.execute(interaction, ClientBot); } 
-  catch (err) { if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: 'An error occurred.', ephemeral: true }); else await interaction.editReply({ content: `Error: ${err.message}` }); }
+  catch (err) { 
+    if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: 'An error occurred.', ephemeral: true }); 
+    else await interaction.editReply({ content: `Error: ${err.message}` }); 
+  }
 });
 
 ClientBot.on('messageCreate', async message => {
+  if (!ClientBot.botActive) return;
   if (!message.content.startsWith('!')) return;
   if (message.author.id !== AdminId) return;
+
   const parts = message.content.split(/\s+/);
   const cmd = parts[0].toLowerCase();
   const db = await Roblox.GetJsonBin();
