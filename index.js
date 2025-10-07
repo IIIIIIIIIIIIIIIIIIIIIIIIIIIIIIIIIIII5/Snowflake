@@ -29,9 +29,20 @@ function GetCommandFiles(Dir) {
 }
 
 const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
+console.log(`Loading ${CommandFiles.length} command files...`);
+
 for (const File of CommandFiles) {
-  const Cmd = require(File);
-  if (Cmd && Cmd.data && Cmd.execute) ClientBot.Commands.set(Cmd.data.name, Cmd);
+  try {
+    const Cmd = require(File);
+    if (Cmd && Cmd.data && Cmd.execute) {
+      ClientBot.Commands.set(Cmd.data.name, Cmd);
+      console.log(`Loaded command: ${Cmd.data.name}`);
+    } else {
+      console.log(`Skipped invalid command file: ${path.basename(File)}`);
+    }
+  } catch (Err) {
+    console.error(`Error loading ${File}:`, Err.message);
+  }
 }
 
 ClientBot.once('ready', async () => {
@@ -47,7 +58,7 @@ ClientBot.once('ready', async () => {
     try {
       await Rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: [] });
       await Rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: CommandsPayload });
-      console.log(`Commands refreshed for guild ${Guild.name} (${GuildId})`);
+      console.log(`Registered ${CommandsPayload.length} commands for guild: ${Guild.name} (${GuildId})`);
     } catch (Err) {
       console.error(`Failed to register commands for ${GuildId}:`, Err.message);
     }
@@ -68,7 +79,7 @@ ClientBot.on('interactionCreate', async Interaction => {
   try {
     await Cmd.execute(Interaction, ClientBot);
   } catch (Err) {
-    console.error('Command error:', Err);
+    console.error(`Error executing ${Interaction.commandName}:`, Err);
     if (!Interaction.replied && !Interaction.deferred) {
       await Interaction.reply({ content: 'An error occurred.', ephemeral: true });
     } else {
