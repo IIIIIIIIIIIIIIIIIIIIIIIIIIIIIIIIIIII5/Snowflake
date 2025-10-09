@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType } = require('discord.js');
 const Roblox = require('./roblox');
+const { StartApi } = require('./api');
 
 const BotToken = process.env.BOT_TOKEN;
 const ClientId = process.env.CLIENT_ID;
@@ -46,11 +47,14 @@ async function RefreshGlobalCommands() {
   }
 }
 
-ClientBot.once('clientReady', async () => {
+global.ClientBot = ClientBot;
+
+ClientBot.once('ready', async () => {
   console.log(`Logged in as ${ClientBot.user.tag}`);
   ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
   await RefreshGlobalCommands();
   console.log('All global commands synced.');
+  StartApi();
 });
 
 ClientBot.on('interactionCreate', async interaction => {
