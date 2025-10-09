@@ -45,7 +45,7 @@ async function GetCurrentRank(groupId, userId) {
   return { Rank: group.role.rank, Name: group.role.name };
 }
 
-async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId) {
+async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, client) {
   const roles = await FetchRoles(groupId);
   const roleInfo = roles[rankName.toLowerCase()];
   if (!roleInfo) throw new Error('Invalid rank name: ' + rankName);
@@ -65,18 +65,55 @@ async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId) {
   let xsrf = await GetXsrfToken(guildId);
 
   try {
-    await axios.patch(url, { roleId: roleInfo.RoleId }, { headers: { Cookie: `.ROBLOSECURITY=${cookie}`, 'Content-Type': 'application/json', 'X-CSRF-TOKEN': xsrf } });
+    await axios.patch(url, { roleId: roleInfo.RoleId }, {
+      headers: {
+        Cookie: `.ROBLOSECURITY=${cookie}`,
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': xsrf
+      }
+    });
   } catch (err) {
     if (err.response?.status === 403 && err.response?.headers['x-csrf-token']) {
       xsrf = err.response.headers['x-csrf-token'];
-      await axios.patch(url, { roleId: roleInfo.RoleId }, { headers: { Cookie: `.ROBLOSECURITY=${cookie}`, 'Content-Type': 'application/json', 'X-CSRF-TOKEN': xsrf } });
+      await axios.patch(url, { roleId: roleInfo.RoleId }, {
+        headers: {
+          Cookie: `.ROBLOSECURITY=${cookie}`,
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': xsrf
+        }
+      });
     } else throw new Error('Request failed: ' + (err.response?.data?.errors?.[0]?.message || err.message));
   }
 
   const data = await GetJsonBin();
-  data.RankChanges = data.RankChanges || [];
-  data.RankChanges.push({ GroupId: groupId, UserId: userId, NewRank: roleInfo.Name, IssuedBy: issuerDiscordId, Timestamp: new Date().toISOString(), GuildId: guildId });
+  if (!data.RankChanges || !Array.isArray(data.RankChanges)) data.RankChanges = [];
+  data.RankChanges.push({
+    GroupId: groupId,
+    UserId: userId,
+    NewRank: roleInfo.Name,
+    IssuedBy: issuerDiscordId,
+    Timestamp: new Date().toISOString(),
+    GuildId: guildId
+  });
   await SaveJsonBin(data);
+
+  const guild = await client.guilds.fetch(guildId).catch(() => null);
+  const logChannel = guild ? await guild.channels.fetch('1424381038393556992').catch(() => null) : null;
+
+  if (logChannel) {
+    const embed = {
+      color: 0x2f3136,
+      title: 'Rank Updated',
+      fields: [
+        { name: 'Action By:', value: `<@${issuerDiscordId}>`, inline: true },
+        { name: 'Action On:', value: `${userId}`, inline: true },
+        { name: 'Action:', value: 'Promoted', inline: true },
+        { name: 'New Rank:', value: `${roleInfo.Name}`, inline: false }
+      ],
+      timestamp: new Date()
+    };
+    await logChannel.send({ embeds: [embed] });
+  }
 }
 
 async function GetRobloxUserId(username) {
