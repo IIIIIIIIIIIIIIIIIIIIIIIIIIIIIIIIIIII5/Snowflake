@@ -6,13 +6,17 @@ const PendingApprovals = {};
 
 async function GetJsonBin() {
   try {
-    const res = await axios.get(`https://api.jsonbin.io/v3/b/${JsonBinId}/latest`, { headers: { 'X-Master-Key': JsonBinSecret } });
+    const res = await axios.get(`https://api.jsonbin.io/v3/b/${JsonBinId}/latest`, { 
+      headers: { 'X-Master-Key': JsonBinSecret } 
+    });
     return res.data.record || {};
   } catch { return {}; }
 }
 
 async function SaveJsonBin(data) {
-  await axios.put(`https://api.jsonbin.io/v3/b/${JsonBinId}`, data, { headers: { 'X-Master-Key': JsonBinSecret, 'Content-Type': 'application/json' } });
+  await axios.put(`https://api.jsonbin.io/v3/b/${JsonBinId}`, data, { 
+    headers: { 'X-Master-Key': JsonBinSecret, 'Content-Type': 'application/json' } 
+  });
 }
 
 async function GetRobloxCookie(guildId) {
@@ -97,8 +101,8 @@ async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, clie
   });
   await SaveJsonBin(data);
 
-  const guild = await client.guilds.fetch(guildId).catch(() => null);
-  const logChannel = guild.channels.cache.get('1424381038393556992');
+  const guild = client?.guilds ? await client.guilds.fetch(guildId).catch(() => null) : null;
+  const logChannel = guild?.channels?.cache?.get('1424381038393556992');
 
   if (logChannel) {
     const embed = {
