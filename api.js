@@ -5,7 +5,6 @@ const app = express();
 app.use(express.json());
 
 const API_KEY = process.env.AUTHKEY;
-let botActive = true;
 
 function CheckAuth(req, res, next) {
   const key = req.headers.authorization;
@@ -45,11 +44,11 @@ app.post('/api/verify/force', CheckAuth, async (req, res) => {
 
 app.post('/api/setrank', CheckAuth, async (req, res) => {
   try {
-    if (!botActive) return res.status(403).json({ error: 'Bot is currently disabled' });
-
     const { groupId, userId, newRankName, issuerDiscordId, guildId } = req.body;
     if (!groupId || !userId || !newRankName || !issuerDiscordId || !guildId)
       return res.status(400).json({ error: 'Missing fields' });
+
+    if (!global.ClientBot) return res.status(500).json({ error: 'Discord client not ready' });
 
     await Roblox.SetRank(groupId, userId, newRankName, issuerDiscordId, guildId, global.ClientBot);
     return res.json({ success: true, message: `Rank updated to ${newRankName}` });
@@ -58,10 +57,9 @@ app.post('/api/setrank', CheckAuth, async (req, res) => {
   }
 });
 
-app.post('/api/bot/toggle', CheckAuth, (req, res) => {
-  botActive = !botActive;
-  res.json({ success: true, botActive });
-});
+function StartApi() {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log(`API running on port ${PORT}`));
+}
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`API running on port ${PORT}`));
+module.exports = { app, StartApi };
