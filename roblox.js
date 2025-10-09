@@ -99,7 +99,7 @@ function startVerification(discordId, robloxUserId, code) {
   Verifications[discordId] = { RobloxUserId: robloxUserId, Code: code };
 }
 
-async function handleVerificationButton(interaction) {
+async function HandleVerificationButton(interaction) {
   await interaction.deferReply({ ephemeral: true });
   const data = Verifications[interaction.user.id];
   if (!data) return interaction.editReply({ content: "You haven't started verification yet." });
@@ -131,5 +131,5 @@ module.exports = {
   Verifications,
   PendingApprovals,
   startVerification,
-  handleVerificationButton
+  HandleVerificationButton
 };
