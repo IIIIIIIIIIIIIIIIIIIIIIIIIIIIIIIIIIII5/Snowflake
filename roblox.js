@@ -98,7 +98,7 @@ async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, clie
   await SaveJsonBin(data);
 
   const guild = await client.guilds.fetch(guildId).catch(() => null);
-  const logChannel = guild ? await guild.channels.fetch('1424381038393556992').catch(() => null) : null;
+  const logChannel = guild.channels.cache.get('1424381038393556992');
 
   if (logChannel) {
     const embed = {
