@@ -49,7 +49,7 @@ async function GetCurrentRank(groupId, userId) {
   return { Rank: group.role.rank, Name: group.role.name };
 }
 
-async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, client) {
+async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, client = global.ClientBot) {
   const roles = await FetchRoles(groupId);
   const roleInfo = roles[rankName.toLowerCase()];
   if (!roleInfo) throw new Error('Invalid rank name: ' + rankName);
