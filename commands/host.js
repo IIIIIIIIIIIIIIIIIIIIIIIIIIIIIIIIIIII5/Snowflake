@@ -41,6 +41,10 @@ module.exports = {
       db.Trainings = db.Trainings || {};
       db.Trainings[id] = db.Trainings[id] || { hosted: {}, cohosted: {}, supervised: {} };
       const section = db.Trainings[id][type];
+      if (section.lastMonth !== monthKey) {
+        section[monthKey] = 0;
+        section.lastMonth = monthKey;
+      }
       section[monthKey] = (section[monthKey] || 0) + 1;
       section.total = (section.total || 0) + 1;
     };
