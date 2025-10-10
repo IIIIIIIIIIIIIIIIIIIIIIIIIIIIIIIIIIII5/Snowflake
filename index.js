@@ -7,6 +7,7 @@ const { StartApi } = require('./api');
 const BotToken = process.env.BOT_TOKEN;
 const ClientId = process.env.CLIENT_ID;
 const AdminId = process.env.ADMIN_ID;
+const GuildId = '1386275140815425557';
 
 const ClientBot = new Client({
   intents: [
@@ -52,13 +53,10 @@ async function RefreshCommands() {
   console.log('Commands to register:', payload.map(p => p.name));
 
   try {
-    await rest.put(Routes.applicationCommands(ClientId), { body: [] });
-    console.log('Cleared old global commands.');
-
-    await rest.put(Routes.applicationCommands(ClientId), { body: payload });
-    console.log(`Registered ${payload.length} global commands.`);
+    await rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: payload });
+    console.log(`Registered ${payload.length} guild commands for guild ${GuildId}.`);
   } catch (err) {
-    console.error('Failed to register commands:', err);
+    console.error('Failed to register guild commands:', err);
   }
 }
 
