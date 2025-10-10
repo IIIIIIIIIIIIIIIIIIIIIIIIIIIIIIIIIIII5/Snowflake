@@ -4,37 +4,57 @@ const { GetJsonBin, SaveJsonBin } = require('../roblox');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('host')
-    .setDescription('Host a training!')
-    .addUserOption(opt => opt.setName('cohost').setDescription('Co-host (optional)'))
-    .addUserOption(opt => opt.setName('supervisor').setDescription('Supervisor (optional)')),
+    .setDescription('Host a training session')
+    .addUserOption(opt =>
+      opt.setName('cohost').setDescription('Co-host (optional)')
+    )
+    .addUserOption(opt =>
+      opt.setName('supervisor').setDescription('Supervisor (optional)')
+    ),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
-    const member = interaction.member;
-    if (!member.roles.cache.has('1424007337210937445')) return interaction.editReply({ content: 'You do not have permission!' });
+
+    const allowedRoleId = '1424007337210937445';
+    if (!interaction.member.roles.cache.has(allowedRoleId)) {
+      return interaction.editReply({
+        content: 'You do not have permission to host a training.'
+      });
+    }
 
     const host = interaction.user;
     const cohost = interaction.options.getUser('cohost');
     const supervisor = interaction.options.getUser('supervisor');
     const db = await GetJsonBin();
-    const channel = await interaction.guild.channels.fetch('1398706795840536696').catch(() => null);
-    if (!channel) return interaction.editReply({ content: 'Channel not found.' });
+
+    const channelId = '1398706795840536696';
+    const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
+    if (!channel) {
+      return interaction.editReply({ content: 'Channel not found.' });
+    }
 
     const embed = new EmbedBuilder()
       .setColor(0x3498db)
       .setTitle('A TRAINING IS BEING HOSTED')
-      .setDescription(`Host: <@${host.id}>\nCo-Host: ${cohost ? `<@${cohost.id}>` : 'None'}\nSupervisor: ${supervisor ? `<@${supervisor.id}>` : 'None'}\nLink: [Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)`);
+      .setDescription(
+        `Host: <@${host.id}>\n` +
+        `Co-Host: ${cohost ? `<@${cohost.id}>` : 'None'}\n` +
+        `Supervisor: ${supervisor ? `<@${supervisor.id}>` : 'None'}\n` +
+        `[Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)`
+      );
 
-    await channel.send({ content: '<@&1404500986633916479>', embeds: [embed] });
+    await channel.send({
+      content: '<@&1404500986633916479>',
+      embeds: [embed]
+    });
 
     const monthKey = new Date().toISOString().slice(0, 7);
     const addTraining = (id, type) => {
       db.Trainings = db.Trainings || {};
       db.Trainings[id] = db.Trainings[id] || { hosted: {}, cohosted: {}, supervised: {} };
-      const data = db.Trainings[id][type];
-      if (data.lastMonth !== monthKey) { data[monthKey] = 0; data.lastMonth = monthKey; }
-      data[monthKey] = (data[monthKey] || 0) + 1;
-      data.total = (data.total || 0) + 1;
+      const section = db.Trainings[id][type];
+      section[monthKey] = (section[monthKey] || 0) + 1;
+      section.total = (section.total || 0) + 1;
     };
 
     addTraining(host.id, 'hosted');
@@ -42,6 +62,6 @@ module.exports = {
     if (supervisor) addTraining(supervisor.id, 'supervised');
     await SaveJsonBin(db);
 
-    return interaction.editReply({ content: `Announcement sent to ${channel.name}.` });
-  }
+    return interaction.editReply({ content: `Training announcement sent to ${channel.name}.` });
+  },
 };
