@@ -5,33 +5,24 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('host')
     .setDescription('Host a training session')
-    .addUserOption(opt =>
-      opt.setName('cohost').setDescription('Co-host (optional)')
-    )
-    .addUserOption(opt =>
-      opt.setName('supervisor').setDescription('Supervisor (optional)')
-    ),
+    .addUserOption(opt => opt.setName('cohost').setDescription('Co-host (optional)'))
+    .addUserOption(opt => opt.setName('supervisor').setDescription('Supervisor (optional)')),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
+    const db = await GetJsonBin();
     const allowedRoleId = '1424007337210937445';
-    if (!interaction.member.roles.cache.has(allowedRoleId)) {
-      return interaction.editReply({
-        content: 'You do not have permission to host a training.'
-      });
-    }
+    const memberRole = interaction.member.roles.resolve(allowedRoleId);
+    if (!memberRole) return interaction.editReply({ content: 'You do not have permission to host a training.' });
 
     const host = interaction.user;
     const cohost = interaction.options.getUser('cohost');
     const supervisor = interaction.options.getUser('supervisor');
-    const db = await GetJsonBin();
 
     const channelId = '1398706795840536696';
     const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
-    if (!channel) {
-      return interaction.editReply({ content: 'Channel not found.' });
-    }
+    if (!channel) return interaction.editReply({ content: 'Channel not found.' });
 
     const embed = new EmbedBuilder()
       .setColor(0x3498db)
@@ -43,10 +34,7 @@ module.exports = {
         `[Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)`
       );
 
-    await channel.send({
-      content: '<@&1404500986633916479>',
-      embeds: [embed]
-    });
+    await channel.send({ content: '<@&1404500986633916479>', embeds: [embed] });
 
     const monthKey = new Date().toISOString().slice(0, 7);
     const addTraining = (id, type) => {
@@ -63,5 +51,5 @@ module.exports = {
     await SaveJsonBin(db);
 
     return interaction.editReply({ content: `Training announcement sent to ${channel.name}.` });
-  },
+  }
 };
