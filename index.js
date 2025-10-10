@@ -31,24 +31,34 @@ function GetCommandFiles(dir) {
 
 const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
 for (const file of CommandFiles) {
-  delete require.cache[require.resolve(file)];
-  const cmd = require(file);
-  if (cmd && cmd.data && cmd.execute) ClientBot.Commands.set(cmd.data.name, cmd);
-
-  if (!cmd || !cmd.data || !cmd.execute) {
-    console.warn(`Invalid command file: ${file}`);
-    console.warn(cmd);
+  try {
+    delete require.cache[require.resolve(file)];
+    const cmd = require(file);
+    if (cmd && cmd.data && cmd.execute) {
+      ClientBot.Commands.set(cmd.data.name, cmd);
+      console.log(`Loaded command: ${cmd.data.name}`);
+    } else {
+      console.warn(`Invalid command structure in: ${file}`);
+    }
+  } catch (err) {
+    console.error(`Failed to load command ${file}:`, err);
   }
 }
 
-async function RefreshGlobalCommands() {
+async function RefreshCommands() {
   const rest = new REST({ version: '10' }).setToken(BotToken);
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
+
+  console.log('Commands to register:', payload.map(p => p.name));
+
   try {
+    await rest.put(Routes.applicationCommands(ClientId), { body: [] });
+    console.log('Cleared old global commands.');
+
     await rest.put(Routes.applicationCommands(ClientId), { body: payload });
     console.log(`Registered ${payload.length} global commands.`);
   } catch (err) {
-    console.error('Failed to register global commands:', err.message);
+    console.error('Failed to register commands:', err);
   }
 }
 
@@ -57,13 +67,15 @@ global.ClientBot = ClientBot;
 ClientBot.once('ready', async () => {
   console.log(`Logged in as ${ClientBot.user.tag}`);
   ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
-  await RefreshGlobalCommands();
-  console.log('All global commands synced.');
+  await RefreshCommands();
+  console.log('Command sync complete.');
   StartApi();
 });
 
 ClientBot.on('interactionCreate', async interaction => {
-  if (interaction.isButton() && interaction.customId === 'done_verification') return Roblox.HandleVerificationButton(interaction);
+  if (interaction.isButton() && interaction.customId === 'done_verification')
+    return Roblox.HandleVerificationButton(interaction);
+
   if (!interaction.isChatInputCommand()) return;
   const cmd = ClientBot.Commands.get(interaction.commandName);
   if (!cmd) return;
@@ -71,6 +83,7 @@ ClientBot.on('interactionCreate', async interaction => {
   try {
     await cmd.execute(interaction, ClientBot);
   } catch (err) {
+    console.error(`Error executing /${interaction.commandName}:`, err);
     if (!interaction.replied && !interaction.deferred)
       await interaction.reply({ content: 'An error occurred.', ephemeral: true });
     else
