@@ -34,6 +34,11 @@ for (const file of CommandFiles) {
   delete require.cache[require.resolve(file)];
   const cmd = require(file);
   if (cmd && cmd.data && cmd.execute) ClientBot.Commands.set(cmd.data.name, cmd);
+
+  if (!cmd || !cmd.data || !cmd.execute) {
+    console.warn(`Invalid command file: ${file}`);
+    console.warn(cmd);
+  }
 }
 
 async function RefreshGlobalCommands() {
