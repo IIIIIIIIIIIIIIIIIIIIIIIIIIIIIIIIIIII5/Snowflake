@@ -46,7 +46,11 @@ module.exports = {
         { name: 'Trainings Supervised Total', value: `${supervised.total}`, inline: true }
       );
 
-    if (thumb) embed.setThumbnail(thumb);
+    if (robloxId) {
+      embed.setAuthor({ name: username, url, iconURL: thumb });
+      embed.setThumbnail(thumb);
+    }
+
     return interaction.editReply({ embeds: [embed] });
   }
 };
