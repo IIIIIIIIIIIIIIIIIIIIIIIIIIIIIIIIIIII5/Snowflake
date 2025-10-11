@@ -49,6 +49,11 @@ async function GetCurrentRank(groupId, userId) {
   return { Rank: group.role.rank, Name: group.role.name };
 }
 
+async function GetRobloxUsername(userId) {
+  const res = await axios.get(`https://users.roblox.com/v1/users/${userId}`);
+  return res.data.name;
+}
+
 async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, client = global.ClientBot) {
   const roles = await FetchRoles(groupId);
   const roleInfo = roles[rankName.toLowerCase()];
@@ -101,6 +106,10 @@ async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, clie
   });
   await SaveJsonBin(data);
 
+  const username = await GetRobloxUsername(userId);
+  const action = roleInfo.Rank > target.Rank ? 'Promoted' :
+                 roleInfo.Rank < target.Rank ? 'Demoted' : 'Set Rank';
+
   const guild = client?.guilds ? await client.guilds.fetch(guildId).catch(() => null) : null;
   const logChannel = guild?.channels?.cache?.get('1424381038393556992');
 
@@ -110,8 +119,8 @@ async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, clie
       title: 'Rank Updated',
       fields: [
         { name: 'Action By:', value: `<@${issuerDiscordId}>`, inline: true },
-        { name: 'Action On:', value: `${userId}`, inline: true },
-        { name: 'Action:', value: 'Promoted', inline: true },
+        { name: 'Action On:', value: username, inline: true },
+        { name: 'Action:', value: action, inline: true },
         { name: 'New Rank:', value: `${roleInfo.Name}`, inline: false }
       ],
       timestamp: new Date()
