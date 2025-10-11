@@ -32,6 +32,7 @@ module.exports = {
       const info = await GetRobloxUserInfo(robloxId);
       username = info.name;
       url = `https://www.roblox.com/users/${robloxId}/profile`;
+
       const thumbRes = await axios.get(
         `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=150x150&format=Png&isCircular=false`
       );
@@ -51,10 +52,7 @@ module.exports = {
         { name: 'Trainings Supervised Total', value: `${supervised.total}`, inline: true }
       );
 
-    if (thumb) {
-      embed.setAuthor({ name: username, url, iconURL: thumb });
-      embed.setThumbnail(thumb);
-    }
+    if (thumb) embed.setThumbnail(thumb);
 
     return interaction.editReply({ embeds: [embed] });
   }
