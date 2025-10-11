@@ -1,6 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, GetRobloxUserInfo } = require('../roblox');
-const axios = require('axios');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -26,17 +25,11 @@ module.exports = {
     const supervised = getStats('supervised');
 
     const robloxId = db.VerifiedUsers?.[target.id];
-    let username = 'Not Verified', url, thumb;
-
+    let username = 'Not Verified', url;
     if (robloxId) {
       const info = await GetRobloxUserInfo(robloxId);
       username = info.name;
       url = `https://www.roblox.com/users/${robloxId}/profile`;
-
-      const thumbRes = await axios.get(
-        `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=150x150&format=Png&isCircular=false`
-      );
-      thumb = thumbRes.data?.data?.[0]?.imageUrl || null;
     }
 
     const embed = new EmbedBuilder()
@@ -51,8 +44,6 @@ module.exports = {
         { name: 'Trainings Co-Hosted Total', value: `${cohosted.total}`, inline: true },
         { name: 'Trainings Supervised Total', value: `${supervised.total}`, inline: true }
       );
-
-    if (thumb) embed.setThumbnail(thumb);
 
     return interaction.editReply({ embeds: [embed] });
   }
