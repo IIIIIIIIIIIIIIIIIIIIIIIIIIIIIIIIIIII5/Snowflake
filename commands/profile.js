@@ -1,6 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, GetRobloxUserInfo } = require('../roblox');
-const fetch = require('node-fetch');
 
 module.exports = {
   data: new SlashCommandBuilder()
