@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, GetRobloxUserInfo } = require('../roblox');
+const fetch = require('node-fetch');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -38,7 +39,12 @@ module.exports = {
       const info = await GetRobloxUserInfo(robloxId);
       username = info.name;
       url = `https://www.roblox.com/users/${robloxId}/profile`;
-      avatarUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${robloxId}&width=420&height=420&format=png`;
+
+      const thumbRes = await fetch(
+        `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=420x420&format=Png&isCircular=false`
+      );
+      const thumbData = await thumbRes.json();
+      avatarUrl = thumbData?.data?.[0]?.imageUrl;
     }
 
     const embed = new EmbedBuilder()
