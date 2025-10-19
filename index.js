@@ -83,7 +83,9 @@ ClientBot.on('messageCreate', async message => {
   if (cmd === '!accept' || cmd === '!decline') {
     const groupId = parts[1]
     if (!groupId || !Roblox.PendingApprovals[groupId]) return message.reply('')
+
     const { requesterId } = Roblox.PendingApprovals[groupId]
+
     if (cmd === '!accept') {
       try { await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been accepted.`) } catch {}
       delete Roblox.PendingApprovals[groupId]
@@ -109,33 +111,29 @@ ClientBot.on('messageCreate', async message => {
     const targetMention = parts[1]
     const type = parts[2]?.toLowerCase()
     const value = Number(parts[3])
-    if (!targetMention || !type || isNaN(value)) return message.reply('')
+    if (!targetMention || !type || isNaN(value)) return message.reply('Invalid command format.')
 
     const userIdMatch = targetMention.match(/^<@!?(\d+)>$/)
-    if (!userIdMatch) return message.reply('')
+    if (!userIdMatch) return message.reply('Invalid user mention.')
 
     const discordId = userIdMatch[1]
     const robloxId = db.VerifiedUsers?.[discordId]
-    if (!robloxId) return message.reply('')
+    if (!robloxId) return message.reply('User not verified.')
 
     db.Trainings[robloxId] = db.Trainings[robloxId] || { hosted: {}, cohosted: {}, supervised: {} }
+    db.Trainings[robloxId][type] = db.Trainings[robloxId][type] || {}
     const stat = db.Trainings[robloxId][type]
     const currentMonth = new Date().toISOString().slice(0, 7)
 
-    stat[currentMonth] = stat[currentMonth] || 0
-    stat.lastMonth = currentMonth
-    stat.total = stat.total || 0
-
-    if (cmd === '!add') {
-      stat[currentMonth] += value
-      stat.total += value
-    } else if (cmd === '!remove') {
-      stat[currentMonth] -= value
-      stat.total -= value
-    } else if (cmd === '!set') {
-      stat.total = (stat.total - (stat[currentMonth] || 0)) + value
+    if (cmd === '!set') {
       stat[currentMonth] = value
+    } else {
+      stat[currentMonth] = stat[currentMonth] || 0
+      stat[currentMonth] += (cmd === '!add' ? value : -value)
     }
+
+    stat.lastMonth = currentMonth
+    stat.total = Object.keys(stat).filter(k => k !== 'lastMonth').reduce((acc, k) => acc + stat[k], 0)
 
     await Roblox.SaveJsonBin(db)
     return message.channel.send(`Updated ${type} for <@${discordId}>: this month = ${stat[currentMonth]}, total = ${stat.total}`)
