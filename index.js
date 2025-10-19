@@ -7,6 +7,7 @@ const { StartApi } = require('./api');
 const BotToken = process.env.BOT_TOKEN;
 const ClientId = process.env.CLIENT_ID;
 const AdminId = process.env.ADMIN_ID;
+const TestGuildId = '1386275140815425557';
 
 const ClientBot = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
@@ -37,16 +38,9 @@ for (const file of CommandFiles) {
 async function RefreshCommands() {
   const rest = new REST({ version: '10' }).setToken(BotToken);
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    await rest.put(Routes.applicationCommands(ClientId), { body: [], signal: controller.signal });
-    await rest.put(Routes.applicationCommands(ClientId), { body: payload, signal: controller.signal });
-  } catch (err) {
-    console.log('[RefreshCommands] Registration failed or timed out:', err);
-  } finally {
-    clearTimeout(timeout);
-  }
+    await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: payload });
+  } catch {}
 }
 
 global.ClientBot = ClientBot;
@@ -86,15 +80,11 @@ ClientBot.on('messageCreate', async message => {
     if (!groupId || !Roblox.PendingApprovals[groupId]) return message.reply('Invalid group ID or no pending approval.');
     const { requesterId } = Roblox.PendingApprovals[groupId];
     if (cmd === '!accept') {
-      try {
-        await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been accepted.`);
-      } catch {}
+      try { await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been accepted.`); } catch {}
       delete Roblox.PendingApprovals[groupId];
       return message.channel.send(`Accepted group ${groupId} and notified <@${requesterId}>`);
     } else {
-      try {
-        await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been declined.`);
-      } catch {}
+      try { await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been declined.`); } catch {}
       delete Roblox.PendingApprovals[groupId];
       return message.channel.send(`Declined group ${groupId} and notified <@${requesterId}>`);
     }
