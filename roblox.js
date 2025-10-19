@@ -14,9 +14,17 @@ async function GetJsonBin() {
 }
 
 async function SaveJsonBin(data) {
-  await axios.put(`https://api.jsonbin.io/v3/b/${JsonBinId}`, data, { 
-    headers: { 'X-Master-Key': JsonBinSecret, 'Content-Type': 'application/json' } 
-  });
+  try {
+    await axios.put(`https://api.jsonbin.io/v3/b/${JsonBinId}`, data, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JsonBinSecret,
+        'X-Bin-Versioning': 'false'
+      }
+    });
+  } catch (err) {
+    console.error('Failed to save JSONBin:', err.response?.data || err.message);
+  }
 }
 
 async function GetRobloxCookie(guildId) {
