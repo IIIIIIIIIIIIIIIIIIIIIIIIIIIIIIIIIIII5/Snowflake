@@ -154,16 +154,22 @@ async function HandleVerificationButton(interaction) {
   const data = Verifications[interaction.user.id];
   if (!data) return interaction.editReply({ content: "You haven't started verification yet." });
 
-  const desc = await GetRobloxDescription(data.RobloxUserId);
-  if (desc.includes(data.Code)) {
+  try {
+    const desc = await GetRobloxDescription(data.RobloxUserId);
+    if (!desc.includes(data.Code)) 
+      return interaction.editReply({ content: "Code not found in your profile. Make sure you added it and try again." });
+
     const db = await GetJsonBin();
     db.VerifiedUsers = db.VerifiedUsers || {};
     db.VerifiedUsers[interaction.user.id] = data.RobloxUserId;
+
     await SaveJsonBin(db);
     delete Verifications[interaction.user.id];
+
     return interaction.editReply({ content: `Verified! Linked to Roblox ID ${data.RobloxUserId}` });
-  } else {
-    return interaction.editReply({ content: "Code not found in your profile. Make sure you added it and try again." });
+  } catch (err) {
+    console.error('Verification failed:', err);
+    return interaction.editReply({ content: "An error occurred during verification." });
   }
 }
 
