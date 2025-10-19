@@ -1,48 +1,41 @@
 const axios = require('axios');
-const admin = require('firebase-admin');
-const firebaseConfig = require('./firebase-credentials.json');
-
-admin.initializeApp({
-  credential: admin.credential.cert(firebaseConfig)
-});
-
-const db = admin.firestore();
-
+const JsonBinId = process.env.JSONBIN_ID;
+const JsonBinSecret = process.env.JSONBIN_SECRET;
 const Verifications = {};
 const PendingApprovals = {};
 
-async function GetDatabase() {
-  const doc = await db.collection('system').doc('main').get();
-  if (!doc.exists) return {};
-  return doc.data() || {};
+async function GetJsonBin() {
+  try {
+    const res = await axios.get(`https://api.jsonbin.io/v3/b/${JsonBinId}/latest`, { 
+      headers: { 'X-Master-Key': JsonBinSecret } 
+    });
+    return res.data.record || {};
+  } catch { return {}; }
 }
 
-async function SaveDatabase(data) {
-  await db.collection('system').doc('main').set(data, { merge: true });
+async function SaveJsonBin(data) {
+  await axios.put(`https://api.jsonbin.io/v3/b/${JsonBinId}`, data, { 
+    headers: { 'X-Master-Key': JsonBinSecret, 'Content-Type': 'application/json' } 
+  });
 }
 
 async function GetRobloxCookie(guildId) {
-  const data = await GetDatabase();
-  if (data.CustomTokens && data.CustomTokens[guildId])
-    return data.CustomTokens[guildId];
+  const db = await GetJsonBin();
+  if (db.CustomTokens && db.CustomTokens[guildId]) return db.CustomTokens[guildId];
   return process.env.ROBLOSECURITY;
 }
 
 async function FetchRoles(groupId) {
   const res = await axios.get(`https://groups.roblox.com/v1/groups/${groupId}/roles`);
   const roles = {};
-  res.data.roles.forEach(r => {
-    roles[r.name.toLowerCase()] = { Name: r.name, Rank: r.rank, RoleId: r.id };
-  });
+  res.data.roles.forEach(r => roles[r.name.toLowerCase()] = { Name: r.name, Rank: r.rank, RoleId: r.id });
   return roles;
 }
 
 async function GetXsrfToken(guildId) {
   const cookie = await GetRobloxCookie(guildId);
   try {
-    const res = await axios.post('https://auth.roblox.com/v2/logout', {}, {
-      headers: { Cookie: `.ROBLOSECURITY=${cookie}` }
-    });
+    const res = await axios.post('https://auth.roblox.com/v2/logout', {}, { headers: { Cookie: `.ROBLOSECURITY=${cookie}` } });
     return res.headers['x-csrf-token'] || '';
   } catch (err) {
     return err.response?.headers['x-csrf-token'] || '';
@@ -67,18 +60,14 @@ async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, clie
   if (!roleInfo) throw new Error('Invalid rank name: ' + rankName);
 
   const target = await GetCurrentRank(groupId, userId);
-  const dbData = await GetDatabase();
-
-  const issuerRobloxId = dbData.VerifiedUsers?.[issuerDiscordId];
+  const db = await GetJsonBin();
+  const issuerRobloxId = db.VerifiedUsers?.[issuerDiscordId];
   if (!issuerRobloxId) throw new Error('You must verify first.');
 
   const issuerRank = await GetCurrentRank(groupId, issuerRobloxId);
-  if (String(userId) === String(issuerRobloxId))
-    throw new Error('You cannot change your own rank.');
-  if (roleInfo.Rank >= issuerRank.Rank)
-    throw new Error('Cannot assign a rank equal or higher than yours.');
-  if (target.Rank >= issuerRank.Rank)
-    throw new Error('Cannot change rank of a user higher or equal to you.');
+  if (String(userId) === String(issuerRobloxId)) throw new Error('You cannot change your own rank.');
+  if (roleInfo.Rank >= issuerRank.Rank) throw new Error('Cannot assign a rank equal or higher than yours.');
+  if (target.Rank >= issuerRank.Rank) throw new Error('Cannot change rank of a user higher or equal to you.');
 
   const cookie = await GetRobloxCookie(guildId);
   const url = `https://groups.roblox.com/v1/groups/${groupId}/users/${userId}`;
@@ -102,12 +91,10 @@ async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, clie
           'X-CSRF-TOKEN': xsrf
         }
       });
-    } else {
-      throw new Error('Request failed: ' + (err.response?.data?.errors?.[0]?.message || err.message));
-    }
+    } else throw new Error('Request failed: ' + (err.response?.data?.errors?.[0]?.message || err.message));
   }
 
-  const data = await GetDatabase();
+  const data = await GetJsonBin();
   if (!data.RankChanges || !Array.isArray(data.RankChanges)) data.RankChanges = [];
   data.RankChanges.push({
     GroupId: groupId,
@@ -117,7 +104,7 @@ async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, clie
     Timestamp: new Date().toISOString(),
     GuildId: guildId
   });
-  await SaveDatabase(data);
+  await SaveJsonBin(data);
 
   const username = await GetRobloxUsername(userId);
   const action = roleInfo.Rank > target.Rank ? 'Promoted' :
@@ -143,11 +130,7 @@ async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, clie
 }
 
 async function GetRobloxUserId(username) {
-  const res = await axios.post(
-    'https://users.roblox.com/v1/usernames/users',
-    { usernames: [username] },
-    { headers: { 'Content-Type': 'application/json' } }
-  );
+  const res = await axios.post('https://users.roblox.com/v1/usernames/users', { usernames: [username] }, { headers: { 'Content-Type': 'application/json' } });
   if (!res.data.data || !res.data.data[0]) throw new Error('Invalid username');
   return res.data.data[0].id;
 }
@@ -173,10 +156,10 @@ async function HandleVerificationButton(interaction) {
 
   const desc = await GetRobloxDescription(data.RobloxUserId);
   if (desc.includes(data.Code)) {
-    const dbData = await GetDatabase();
-    dbData.VerifiedUsers = dbData.VerifiedUsers || {};
-    dbData.VerifiedUsers[interaction.user.id] = data.RobloxUserId;
-    await SaveDatabase(dbData);
+    const db = await GetJsonBin();
+    db.VerifiedUsers = db.VerifiedUsers || {};
+    db.VerifiedUsers[interaction.user.id] = data.RobloxUserId;
+    await SaveJsonBin(db);
     delete Verifications[interaction.user.id];
     return interaction.editReply({ content: `Verified! Linked to Roblox ID ${data.RobloxUserId}` });
   } else {
@@ -185,8 +168,8 @@ async function HandleVerificationButton(interaction) {
 }
 
 module.exports = {
-  GetDatabase,
-  SaveDatabase,
+  GetJsonBin,
+  SaveJsonBin,
   GetRobloxCookie,
   FetchRoles,
   GetXsrfToken,
@@ -198,7 +181,5 @@ module.exports = {
   Verifications,
   PendingApprovals,
   startVerification,
-  HandleVerificationButton,
-  GetJsonBin: GetDatabase,
-  SaveJsonBin: SaveDatabase
+  HandleVerificationButton
 };
