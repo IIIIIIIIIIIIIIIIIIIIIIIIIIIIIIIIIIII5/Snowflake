@@ -117,11 +117,9 @@ ClientBot.on('messageCreate', async message => {
     if (!userIdMatch) return message.reply('Invalid user mention.')
 
     const discordId = userIdMatch[1]
-    const robloxId = db.VerifiedUsers?.[discordId]
-    if (!robloxId) return message.reply('User not verified.')
 
-    db.Trainings[robloxId] = db.Trainings[robloxId] || { hosted: {}, cohosted: {}, supervised: {} }
-    db.Trainings[robloxId][type] = db.Trainings[robloxId][type] || {}
+    db.Trainings[discordId] = db.Trainings[discordId] || { hosted: {}, cohosted: {}, supervised: {} }
+    db.Trainings[discordId][type] = db.Trainings[discordId][type] || {}
     const stat = db.Trainings[robloxId][type]
     const currentMonth = new Date().toISOString().slice(0, 7)
 
