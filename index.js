@@ -55,7 +55,7 @@ async function RefreshCommands() {
 
 global.ClientBot = ClientBot
 
-ClientBot.once('ready', async () => {
+ClientBot.once('clientReady', async () => {
   ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching })
   await RefreshCommands()
   StartApi()
