@@ -164,7 +164,7 @@ async function HandleVerificationButton(interaction) {
 
   try {
     const desc = await GetRobloxDescription(data.RobloxUserId);
-    if (!desc.includes(data.Code)) 
+    if (!desc.includes(data.Code))
       return interaction.editReply({ content: "Code not found in your profile. Make sure you added it and try again." });
 
     const db = await GetJsonBin();
