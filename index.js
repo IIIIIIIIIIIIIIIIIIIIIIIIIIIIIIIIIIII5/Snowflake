@@ -119,10 +119,9 @@ ClientBot.on('messageCreate', async message => {
     if (!userIdMatch) return message.reply('')
 
     const discordId = userIdMatch[1]
-    const verifiedEntry = Object.entries(db.VerifiedUsers || {}).find(([robloxId, data]) => data === discordId || data.DiscordId === discordId)
-    if (!verifiedEntry) return message.reply('')
+    const robloxId = db.VerifiedUsers?.[discordId]
+    if (!robloxId) return message.reply('')
 
-    const [robloxId] = verifiedEntry
     db.Trainings[robloxId] = db.Trainings[robloxId] || { hosted: {}, cohosted: {}, supervised: {} }
 
     const currentMonth = new Date().toISOString().slice(0, 7)
