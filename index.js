@@ -83,9 +83,7 @@ ClientBot.on('messageCreate', async message => {
   if (cmd === '!accept' || cmd === '!decline') {
     const groupId = parts[1]
     if (!groupId || !Roblox.PendingApprovals[groupId]) return message.reply('')
-
     const { requesterId } = Roblox.PendingApprovals[groupId]
-
     if (cmd === '!accept') {
       try { await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been accepted.`) } catch {}
       delete Roblox.PendingApprovals[groupId]
