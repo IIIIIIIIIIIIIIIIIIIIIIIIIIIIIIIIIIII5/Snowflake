@@ -82,7 +82,7 @@ ClientBot.on('messageCreate', async message => {
 
   if (cmd === '!accept' || cmd === '!decline') {
     const groupId = parts[1]
-    if (!groupId || !Roblox.PendingApprovals[groupId]) return message.reply('')
+    if (!groupId || !Roblox.PendingApprovals[groupId]) return message.reply('Invalid group ID or no pending approval.')
 
     const { requesterId } = Roblox.PendingApprovals[groupId]
 
@@ -100,7 +100,7 @@ ClientBot.on('messageCreate', async message => {
   if (cmd === '!setbottoken') {
     const targetServerId = parts[1]
     const customToken = parts[2]
-    if (!targetServerId || !customToken) return message.reply('')
+    if (!targetServerId || !customToken) return message.reply('Invalid command format.')
     db.CustomTokens = db.CustomTokens || {}
     db.CustomTokens[targetServerId] = customToken
     await Roblox.SaveJsonBin(db)
@@ -120,7 +120,7 @@ ClientBot.on('messageCreate', async message => {
 
     db.Trainings[discordId] = db.Trainings[discordId] || { hosted: {}, cohosted: {}, supervised: {} }
     db.Trainings[discordId][type] = db.Trainings[discordId][type] || {}
-    const stat = db.Trainings[robloxId][type]
+    const stat = db.Trainings[discordId][type]
     const currentMonth = new Date().toISOString().slice(0, 7)
 
     if (cmd === '!set') {
