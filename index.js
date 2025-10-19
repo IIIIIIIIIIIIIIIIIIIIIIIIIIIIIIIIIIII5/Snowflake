@@ -43,16 +43,13 @@ for (const file of CommandFiles) {
 }
 
 async function RefreshCommands() {
-  const rest = new REST({ version: '10' }).setToken(BotToken);
-  const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
-
+  const rest = new REST({ version: '10' }).setToken(BotToken)
+  const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON())
   try {
-    console.log(`[INFO] Registering ${payload.length} global commands...`);
-    await rest.put(Routes.applicationCommands(ClientId), { body: payload });
-    console.log('[SUCCESS] Global commands updated successfully.');
-    console.log('Note: Global commands may take up to 1 hour to appear in Discord.');
+    await rest.put(Routes.applicationCommands(ClientId), { body: [] })
+    await rest.put(Routes.applicationCommands(ClientId), { body: payload })
   } catch (err) {
-    console.error('[ERROR] Failed to register global commands:', err);
+    console.error('Failed to register global commands:', err)
   }
 }
 
