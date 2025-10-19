@@ -198,5 +198,7 @@ module.exports = {
   Verifications,
   PendingApprovals,
   startVerification,
-  HandleVerificationButton
+  HandleVerificationButton,
+  GetJsonBin: GetDatabase,
+  SaveJsonBin: SaveDatabase
 };
