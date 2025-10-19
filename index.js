@@ -109,11 +109,9 @@ ClientBot.on('messageCreate', async message => {
 
   if (cmd === '!add' || cmd === '!remove' || cmd === '!set') {
     const targetMention = parts[1]
-    const category = parts[2]?.toLowerCase()
-    const type = parts[3]?.toLowerCase()
-    const value = Number(parts[4])
-
-    if (!targetMention || category !== 'trainings' || !type || isNaN(value)) return message.reply('')
+    const type = parts[2]?.toLowerCase()
+    const value = Number(parts[3])
+    if (!targetMention || !type || isNaN(value)) return message.reply('')
 
     const userIdMatch = targetMention.match(/^<@!?(\d+)>$/)
     if (!userIdMatch) return message.reply('')
@@ -123,9 +121,8 @@ ClientBot.on('messageCreate', async message => {
     if (!robloxId) return message.reply('')
 
     db.Trainings[robloxId] = db.Trainings[robloxId] || { hosted: {}, cohosted: {}, supervised: {} }
-
-    const currentMonth = new Date().toISOString().slice(0, 7)
     const stat = db.Trainings[robloxId][type]
+    const currentMonth = new Date().toISOString().slice(0, 7)
 
     stat[currentMonth] = stat[currentMonth] || 0
     stat.lastMonth = currentMonth
@@ -143,7 +140,6 @@ ClientBot.on('messageCreate', async message => {
     }
 
     await Roblox.SaveJsonBin(db)
-
     return message.channel.send(`Updated ${type} for <@${discordId}>: this month = ${stat[currentMonth]}, total = ${stat.total}`)
   }
 })
