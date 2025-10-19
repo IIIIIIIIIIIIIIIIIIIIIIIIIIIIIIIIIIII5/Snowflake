@@ -1,12 +1,10 @@
 const axios = require('axios');
 const admin = require('firebase-admin');
-const serviceAccount = require('./firebase-service-account.json');
+const firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG);
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
-}
+admin.initializeApp({
+  credential: admin.credential.cert(firebaseConfig)
+});
 
 const db = admin.firestore();
 
