@@ -113,13 +113,19 @@ ClientBot.on('messageCreate', async message => {
     db.Trainings[discordId][type] = db.Trainings[discordId][type] || {};
     const stat = db.Trainings[discordId][type];
     const currentMonth = new Date().toISOString().slice(0, 7);
-    if (cmd === '!set') stat[currentMonth] = value;
-    else {
+
+    if (cmd === '!set') {
+      stat[currentMonth] = value;
+      stat.total = value;
+    } else {
       stat[currentMonth] = stat[currentMonth] || 0;
       stat[currentMonth] += cmd === '!add' ? value : -value;
+      stat.total = Object.keys(stat)
+        .filter(k => k !== 'lastMonth')
+        .reduce((acc, k) => acc + stat[k], 0);
     }
+
     stat.lastMonth = currentMonth;
-    stat.total = Object.keys(stat).filter(k => k !== 'lastMonth').reduce((acc, k) => acc + stat[k], 0);
     await Roblox.SaveJsonBin(db);
     return message.channel.send(`Updated ${type} for <@${discordId}> — this month: ${stat[currentMonth]}, total: ${stat.total}`);
   }
