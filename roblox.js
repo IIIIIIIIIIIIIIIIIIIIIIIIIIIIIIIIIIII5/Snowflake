@@ -19,7 +19,8 @@ async function GetJsonBin() {
   try {
     const doc = await db.collection('botData').doc('main').get();
     return doc.exists ? doc.data() : {};
-  } catch {
+  } catch (err) {
+    console.error('Failed to load Firestore data:', err.message);
     return {};
   }
 }
