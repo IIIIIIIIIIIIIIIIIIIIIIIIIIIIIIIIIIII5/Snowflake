@@ -8,18 +8,17 @@ if (!admin.apps.length) {
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
       privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
     }),
-    databaseURL: process.env.FIREBASE_DATABASE_URL,
   });
 }
 
-const db = admin.database();
+const db = admin.firestore();
 const Verifications = {};
 const PendingApprovals = {};
 
 async function GetJsonBin() {
   try {
-    const snapshot = await db.ref('data').once('value');
-    return snapshot.val() || {};
+    const doc = await db.collection('botData').doc('main').get();
+    return doc.exists ? doc.data() : {};
   } catch {
     return {};
   }
@@ -27,9 +26,9 @@ async function GetJsonBin() {
 
 async function SaveJsonBin(data) {
   try {
-    await db.ref('data').set(data);
+    await db.collection('botData').doc('main').set(data, { merge: true });
   } catch (err) {
-    console.error('Failed to save Firebase data:', err.message);
+    console.error('Failed to save Firestore data:', err.message);
   }
 }
 
