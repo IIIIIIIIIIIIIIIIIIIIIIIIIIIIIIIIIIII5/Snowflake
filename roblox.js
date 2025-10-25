@@ -1,49 +1,59 @@
 const axios = require('axios');
-const JsonBinId = process.env.JSONBIN_ID;
-const JsonBinSecret = process.env.JSONBIN_SECRET;
+const admin = require('firebase-admin');
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    }),
+    databaseURL: process.env.FIREBASE_DATABASE_URL,
+  });
+}
+
+const db = admin.database();
 const Verifications = {};
 const PendingApprovals = {};
 
 async function GetJsonBin() {
   try {
-    const res = await axios.get(`https://api.jsonbin.io/v3/b/${JsonBinId}/latest`, { 
-      headers: { 'X-Master-Key': JsonBinSecret } 
-    });
-    return res.data.record || {};
-  } catch { return {}; }
+    const snapshot = await db.ref('data').once('value');
+    return snapshot.val() || {};
+  } catch {
+    return {};
+  }
 }
 
 async function SaveJsonBin(data) {
   try {
-    await axios.put(`https://api.jsonbin.io/v3/b/${JsonBinId}`, data, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': JsonBinSecret,
-        'X-Bin-Versioning': 'false'
-      }
-    });
+    await db.ref('data').set(data);
   } catch (err) {
-    console.error('Failed to save JSONBin:', err.response?.data || err.message);
+    console.error('Failed to save Firebase data:', err.message);
   }
 }
 
 async function GetRobloxCookie(guildId) {
-  const db = await GetJsonBin();
-  if (db.CustomTokens && db.CustomTokens[guildId]) return db.CustomTokens[guildId];
+  const data = await GetJsonBin();
+  if (data.CustomTokens && data.CustomTokens[guildId]) return data.CustomTokens[guildId];
   return process.env.ROBLOSECURITY;
 }
 
 async function FetchRoles(groupId) {
   const res = await axios.get(`https://groups.roblox.com/v1/groups/${groupId}/roles`);
   const roles = {};
-  res.data.roles.forEach(r => roles[r.name.toLowerCase()] = { Name: r.name, Rank: r.rank, RoleId: r.id });
+  res.data.roles.forEach(r => {
+    roles[r.name.toLowerCase()] = { Name: r.name, Rank: r.rank, RoleId: r.id };
+  });
   return roles;
 }
 
 async function GetXsrfToken(guildId) {
   const cookie = await GetRobloxCookie(guildId);
   try {
-    const res = await axios.post('https://auth.roblox.com/v2/logout', {}, { headers: { Cookie: `.ROBLOSECURITY=${cookie}` } });
+    const res = await axios.post('https://auth.roblox.com/v2/logout', {}, {
+      headers: { Cookie: `.ROBLOSECURITY=${cookie}` }
+    });
     return res.headers['x-csrf-token'] || '';
   } catch (err) {
     return err.response?.headers['x-csrf-token'] || '';
@@ -68,8 +78,8 @@ async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, clie
   if (!roleInfo) throw new Error('Invalid rank name: ' + rankName);
 
   const target = await GetCurrentRank(groupId, userId);
-  const db = await GetJsonBin();
-  const issuerRobloxId = db.VerifiedUsers?.[issuerDiscordId];
+  const dbData = await GetJsonBin();
+  const issuerRobloxId = dbData.VerifiedUsers?.[issuerDiscordId];
   if (!issuerRobloxId) throw new Error('You must verify first.');
 
   const issuerRank = await GetCurrentRank(groupId, issuerRobloxId);
@@ -99,7 +109,9 @@ async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, clie
           'X-CSRF-TOKEN': xsrf
         }
       });
-    } else throw new Error('Request failed: ' + (err.response?.data?.errors?.[0]?.message || err.message));
+    } else {
+      throw new Error('Request failed: ' + (err.response?.data?.errors?.[0]?.message || err.message));
+    }
   }
 
   const data = await GetJsonBin();
@@ -138,7 +150,9 @@ async function SetRank(groupId, userId, rankName, issuerDiscordId, guildId, clie
 }
 
 async function GetRobloxUserId(username) {
-  const res = await axios.post('https://users.roblox.com/v1/usernames/users', { usernames: [username] }, { headers: { 'Content-Type': 'application/json' } });
+  const res = await axios.post('https://users.roblox.com/v1/usernames/users', { usernames: [username] }, {
+    headers: { 'Content-Type': 'application/json' }
+  });
   if (!res.data.data || !res.data.data[0]) throw new Error('Invalid username');
   return res.data.data[0].id;
 }
@@ -167,11 +181,11 @@ async function HandleVerificationButton(interaction) {
     if (!desc.includes(data.Code))
       return interaction.editReply({ content: "Code not found in your profile. Make sure you added it and try again." });
 
-    const db = await GetJsonBin();
-    db.VerifiedUsers = db.VerifiedUsers || {};
-    db.VerifiedUsers[interaction.user.id] = data.RobloxUserId;
+    const dbData = await GetJsonBin();
+    dbData.VerifiedUsers = dbData.VerifiedUsers || {};
+    dbData.VerifiedUsers[interaction.user.id] = data.RobloxUserId;
 
-    await SaveJsonBin(db);
+    await SaveJsonBin(dbData);
     delete Verifications[interaction.user.id];
 
     return interaction.editReply({ content: `Verified! Linked to Roblox ID ${data.RobloxUserId}` });
