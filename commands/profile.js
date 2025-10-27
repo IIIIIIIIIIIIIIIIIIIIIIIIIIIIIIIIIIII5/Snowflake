@@ -71,8 +71,8 @@ module.exports = {
       );
 
     const buttons = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`show_hosting_${target.id}`).setLabel("📊 Hosting Stats").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`show_group_${target.id}`).setLabel("🔗 Group Stats").setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder().setCustomId(`show_hosting_${target.id}`).setLabel("📊").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`show_group_${target.id}`).setLabel("🔗").setStyle(ButtonStyle.Secondary)
     );
 
     const reply = await interaction.editReply({ embeds: [hostingEmbed], components: [buttons] });
