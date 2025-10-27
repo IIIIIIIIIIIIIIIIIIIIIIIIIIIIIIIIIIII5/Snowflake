@@ -1,5 +1,16 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const { GetJsonBin, GetRobloxUserInfo, getCurrentRank, fetchRoles } = require("../roblox");
+const axios = require("axios");
+const { GetJsonBin, GetRobloxUserInfo, GetCurrentRank, FetchRoles } = require("../roblox");
+
+const BIN_ID = process.env.SNOWFLAKE_MODERATION_BIN_ID;
+const API_KEY = process.env.SNOWFLAKE_JSONBIN_API_KEY;
+
+async function GetModerationData() {
+  const res = await axios.get(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+    headers: { "X-Master-Key": API_KEY }
+  });
+  return res.data.record;
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -13,6 +24,8 @@ module.exports = {
     await interaction.deferReply({ ephemeral: false });
 
     const db = await GetJsonBin();
+    const moderationData = await GetModerationData();
+
     const target = interaction.options.getUser("user") || interaction.user;
     const trainings = db.Trainings?.[target.id] || { hosted: {}, cohosted: {}, supervised: {} };
     const monthKey = new Date().toISOString().slice(0, 7);
@@ -43,7 +56,7 @@ module.exports = {
       avatarUrl = thumbData?.data?.[0]?.imageUrl;
     }
 
-    const statsEmbed = new EmbedBuilder()
+    const hostingEmbed = new EmbedBuilder()
       .setTitle(`${username}'s Hosting Statistics`)
       .setURL(url)
       .setColor(0x1abc9c)
@@ -62,7 +75,7 @@ module.exports = {
       new ButtonBuilder().setCustomId(`show_group_${target.id}`).setLabel("🔗 Group Stats").setStyle(ButtonStyle.Secondary)
     );
 
-    const reply = await interaction.editReply({ embeds: [statsEmbed], components: [buttons] });
+    const reply = await interaction.editReply({ embeds: [hostingEmbed], components: [buttons] });
 
     const collector = reply.createMessageComponentCollector({ time: 60000 });
 
@@ -70,7 +83,7 @@ module.exports = {
       if (btn.user.id !== interaction.user.id) return btn.reply({ content: "This menu isn’t for you.", ephemeral: true });
 
       if (btn.customId === `show_hosting_${target.id}`) {
-        await btn.update({ embeds: [statsEmbed], components: [buttons] });
+        await btn.update({ embeds: [hostingEmbed], components: [buttons] });
       }
 
       if (btn.customId === `show_group_${target.id}`) {
@@ -82,16 +95,22 @@ module.exports = {
             .setDescription("This user is not verified with Roblox.");
         } else {
           const serverConfig = db.ServerConfig?.[interaction.guild.id];
-          let groupName = "Unknown", groupRank = "Unknown", warnings = "None", lastPunishment = "Nil";
+          let groupRank = "Unknown", warnings = "None", lastPunishment = "Nil";
 
           if (serverConfig?.GroupId) {
-            const roles = await fetchRoles(serverConfig.GroupId);
-            const currentRank = await getCurrentRank(serverConfig.GroupId, robloxId).catch(() => null);
-            if (currentRank) groupRank = roles[currentRank]?.name || "Unknown";
+            const roles = await FetchRoles(serverConfig.GroupId);
+            const currentRank = await GetCurrentRank(serverConfig.GroupId, robloxId).catch(() => null);
+            if (currentRank) groupRank = roles[currentRank.Name.toLowerCase()]?.Name || currentRank.Name;
           }
 
-          if (db.Warnings?.[robloxId]) warnings = String(db.Warnings[robloxId].length || 0);
-          if (db.LastPunishments?.[robloxId]) lastPunishment = db.LastPunishments[robloxId];
+          const userModeration = moderationData.filter(m => m.user === target.id);
+          if (userModeration.length > 0) {
+            const warnCount = userModeration.filter(m => m.type === "warn").length;
+            warnings = warnCount > 0 ? String(warnCount) : "None";
+
+            const lastAction = userModeration[userModeration.length - 1];
+            if (lastAction) lastPunishment = lastAction.timestamp === "Unknown" ? "Unknown" : lastAction.timestamp;
+          }
 
           groupEmbed = new EmbedBuilder()
             .setTitle(`${username}'s Group Statistics`)
@@ -100,7 +119,7 @@ module.exports = {
             .setThumbnail(avatarUrl || target.displayAvatarURL({ size: 128 }))
             .addFields(
               { name: "Group Rank", value: groupRank, inline: true },
-              { name: "Warnings", value: warnings === "0" ? "None" : warnings, inline: true },
+              { name: "Warnings", value: warnings, inline: true },
               { name: "Last Punishment", value: lastPunishment || "Nil", inline: true }
             );
         }
@@ -110,9 +129,7 @@ module.exports = {
     });
 
     collector.on("end", async () => {
-      try {
-        await interaction.editReply({ components: [] });
-      } catch {}
+      try { await interaction.editReply({ components: [] }); } catch {}
     });
   }
 };
