@@ -57,7 +57,6 @@ module.exports = {
 
     const hostingEmbed = new EmbedBuilder()
       .setTitle(`${username}'s Hosting Stats`)
-      .setURL(url)
       .setColor(0x1abc9c)
       .setThumbnail(avatarUrl || target.displayAvatarURL({ size: 128 }))
       .addFields(
@@ -113,13 +112,12 @@ module.exports = {
 
           groupEmbed = new EmbedBuilder()
             .setTitle(`${username}'s Group Stats`)
-            .setURL(url)
             .setColor(0x5865f2)
             .setThumbnail(avatarUrl || target.displayAvatarURL({ size: 128 }))
             .addFields(
-              { name: "Group Rank", value: groupRank, inline: true },
-              { name: "Warnings", value: warnings, inline: true },
-              { name: "Last Punishment", value: lastPunishment || "Nil", inline: true }
+              { name: "Group Rank", value: groupRank, inline: false },
+              { name: "Warnings", value: warnings, inline: false },
+              { name: "Last Punishment", value: lastPunishment || "Nil", inline: false }
             );
         }
 
