@@ -25,7 +25,6 @@ module.exports = {
 
     const db = await GetJsonBin();
     const moderationData = await GetModerationData();
-
     const target = interaction.options.getUser("user") || interaction.user;
     const trainings = db.Trainings?.[target.id] || { hosted: {}, cohosted: {}, supervised: {} };
     const monthKey = new Date().toISOString().slice(0, 7);
@@ -57,7 +56,7 @@ module.exports = {
     }
 
     const hostingEmbed = new EmbedBuilder()
-      .setTitle(`${username}'s Hosting Statistics`)
+      .setTitle(`${username}'s Hosting Stats`)
       .setURL(url)
       .setColor(0x1abc9c)
       .setThumbnail(avatarUrl || target.displayAvatarURL({ size: 128 }))
@@ -90,7 +89,7 @@ module.exports = {
         let groupEmbed;
         if (!robloxId) {
           groupEmbed = new EmbedBuilder()
-            .setTitle(`${username}'s Group Statistics`)
+            .setTitle(`${username}'s Group Stats`)
             .setColor(0xe74c3c)
             .setDescription("This user is not verified with Roblox.");
         } else {
@@ -113,7 +112,7 @@ module.exports = {
           }
 
           groupEmbed = new EmbedBuilder()
-            .setTitle(`${username}'s Group Statistics`)
+            .setTitle(`${username}'s Group Stats`)
             .setURL(url)
             .setColor(0x5865f2)
             .setThumbnail(avatarUrl || target.displayAvatarURL({ size: 128 }))
@@ -126,10 +125,6 @@ module.exports = {
 
         await btn.update({ embeds: [groupEmbed], components: [buttons] });
       }
-    });
-
-    collector.on("end", async () => {
-      try { await interaction.editReply({ components: [] }); } catch {}
     });
   }
 };
