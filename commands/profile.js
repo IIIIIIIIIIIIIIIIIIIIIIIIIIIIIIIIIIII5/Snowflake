@@ -124,5 +124,11 @@ module.exports = {
         await btn.update({ embeds: [groupEmbed], components: [buttons] });
       }
     });
+
+    collector.on("end", async () => {
+      try {
+        await interaction.editReply({ components: [] });
+      } catch {}
+    });
   }
 };
