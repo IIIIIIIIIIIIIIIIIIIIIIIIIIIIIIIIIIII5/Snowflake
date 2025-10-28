@@ -1,14 +1,15 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { GetJsonBin, SuspendUser, GetRobloxUserId, GetCurrentRank } = require('../roblox');
-const { SaveJsonBin } = require('../utils');
+const { GetJsonBin, SuspendUser, GetRobloxUserId, GetCurrentRank, SaveJsonBin } = require('../roblox');
 
 const ALLOWED_ROLE = "1398691449939169331";
 
 function parseDuration(input) {
   const match = input.match(/^(\d+)([smhdwM])$/i);
-  if (!match) throw new Error("Invalid duration format. Use 1h, 1d, 1w, 1M, etc.");
+  if (!match) throw new Error("Invalid duration format. Use 1s,1m,1h,1d,1w,1M");
+
   const value = parseInt(match[1]);
-  const unit = match[2].toLowerCase();
+  const unit = match[2];
+
   const multipliers = {
     s: 1000,
     m: 1000 * 60,
@@ -17,23 +18,25 @@ function parseDuration(input) {
     w: 1000 * 60 * 60 * 24 * 7,
     M: 1000 * 60 * 60 * 24 * 30
   };
-  const duration = value * multipliers[unit];
-  if (duration > multipliers.M) throw new Error("Maximum suspension duration is 1 month.");
-  if (duration < 1000) throw new Error("Minimum suspension duration is 1 second.");
-  return duration;
+
+  const durationMs = value * multipliers[unit];
+  if (durationMs > multipliers.M) throw new Error("Maximum duration is 1 month.");
+  if (durationMs < 1000) throw new Error("Minimum duration is 1 second.");
+  return durationMs;
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('suspend')
-    .setDescription("Suspend a Roblox user from their rank.")
-    .addStringOption(opt => opt.setName('username').setDescription('Roblox username to suspend').setRequired(true))
+    .setDescription("Suspend a Roblox user from their rank")
+    .addStringOption(opt => opt.setName('username').setDescription('Roblox username').setRequired(true))
     .addStringOption(opt => opt.setName('reason').setDescription('Reason for suspension').setRequired(true))
-    .addStringOption(opt => opt.setName('duration').setDescription('Duration (e.g. 1h, 1d, 1w, 1M)').setRequired(true)),
+    .addStringOption(opt => opt.setName('duration').setDescription('Duration e.g. 1h, 1d, 1w, 1M').setRequired(true)),
 
   async execute(interaction) {
-    if (!interaction.member.roles.cache.has(ALLOWED_ROLE))
-      return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
+    if (!interaction.member.roles.cache.has(ALLOWED_ROLE)) {
+      return interaction.reply({ content: "You don't have permission.", ephemeral: true });
+    }
 
     await interaction.deferReply({ ephemeral: true });
 
@@ -41,32 +44,32 @@ module.exports = {
       const db = await GetJsonBin();
       const GuildId = interaction.guild.id;
       if (!db.ServerConfig?.[GuildId]?.GroupId)
-        return interaction.editReply({ content: 'Group ID not set. Run /config first.' });
+        return interaction.editReply({ content: "Group ID not set. Run /config first." });
 
       const GroupId = db.ServerConfig[GuildId].GroupId;
       const username = interaction.options.getString('username');
       const reason = interaction.options.getString('reason');
       const durationStr = interaction.options.getString('duration');
-
       const durationMs = parseDuration(durationStr);
+
       const UserId = await GetRobloxUserId(username);
       const current = await GetCurrentRank(GroupId, UserId);
 
       await SuspendUser(GroupId, UserId, interaction.user.id, GuildId, interaction.client);
 
-      const suspensionEmbed = new EmbedBuilder()
-        .setTitle('YOU HAVE BEEN SUSPENDED')
+      const embed = new EmbedBuilder()
+        .setTitle("YOU HAVE BEEN SUSPENDED")
         .setColor(0xff0000)
-        .setDescription(`Dear, <@${interaction.user.id}> you have been suspended from your rank in Snowflake Penitentiary**${current.Name}** for the reason (**${reason}**).\n\nBelow are the details of your suspension:`)
+        .setDescription(`Dear, <@${interaction.user.id}>, you have been suspended from Snowflake Penitentiary from your rank **${current.Name}** for the reason (**${reason}**).\n\nBelow are the details of your suspension:`)
         .addFields(
-          { name: 'Username', value: username, inline: true },
-          { name: 'Current Rank', value: current.Name, inline: true },
-          { name: 'Reason for Suspension', value: reason, inline: false },
-          { name: 'Duration', value: durationStr, inline: true },
-          { name: 'Appeal', value: '[Join Administration Server](https://discord.gg/ZSJuzdVAee)', inline: false }
+          { name: "Username", value: username, inline: true },
+          { name: "Current Rank", value: current.Name, inline: true },
+          { name: "Reason", value: reason, inline: false },
+          { name: "Duration", value: durationStr, inline: true },
+          { name: "Appeal", value: "[Join Administration Server](https://discord.gg/ZSJuzdVAee)", inline: false }
         );
 
-      await interaction.editReply({ embeds: [suspensionEmbed] });
+      await interaction.editReply({ embeds: [embed] });
 
       db.Suspensions = db.Suspensions || {};
       db.Suspensions[UserId] = {
@@ -91,9 +94,9 @@ module.exports = {
         await SaveJsonBin(dbCheck);
 
         const endEmbed = new EmbedBuilder()
-          .setTitle('YOUR SUSPENSION HAS ENDED')
+          .setTitle("YOUR SUSPENSION HAS ENDED")
           .setColor(0x00ff00)
-          .setDescription(`Dear, <@${interaction.user.id}> your suspension which was issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has reached its duration and your suspension has been officially lifted.\n\nYou may run /getrole in the main server to regain your roles.`);
+          .setDescription(`Dear, <@${interaction.user.id}>, your suspension issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has reached its duration and has been lifted.\n\nYou may run /getrole in the main server to regain your roles.`);
 
         await interaction.followUp({ embeds: [endEmbed] });
       }, durationMs).unref();
