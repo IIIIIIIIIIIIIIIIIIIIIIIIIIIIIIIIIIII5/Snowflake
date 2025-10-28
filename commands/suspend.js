@@ -25,34 +25,37 @@ module.exports = {
     .addStringOption(opt => opt.setName('duration').setDescription('Duration e.g. 1h, 1d, 1w, 1M').setRequired(true)),
 
   async execute(interaction) {
-    if (!interaction.guild) return interaction.reply({ content: "This command must be run in a server.", ephemeral: true });
+    if (!interaction.guild) {
+      return interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
+    }
+
     const GuildId = interaction.guild.id;
 
-    if (!interaction.member.roles.cache.has(ALLOWED_ROLE))
-      return interaction.reply({ content: "You don't have permission.", ephemeral: true });
+    if (!interaction.member.roles.cache.has(ALLOWED_ROLE)) {
+      return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
+    }
 
     await interaction.deferReply({ ephemeral: true });
 
     try {
       const db = await GetJsonBin();
-      if (!db.ServerConfig?.[GuildId]?.GroupId)
-        return interaction.editReply({ content: "Group ID not set. Run /config first." });
+      const groupId = db.ServerConfig?.[GuildId]?.GroupId;
+      if (!groupId) return interaction.editReply({ content: "Group ID not set. Run /config first." });
 
-      const GroupId = db.ServerConfig[GuildId].GroupId;
       const username = interaction.options.getString('username');
       const reason = interaction.options.getString('reason');
       const durationStr = interaction.options.getString('duration');
       const durationMs = parseDuration(durationStr);
 
-      const UserId = await GetRobloxUserId(username);
-      const current = await GetCurrentRank(GroupId, UserId);
+      const userId = await GetRobloxUserId(username);
+      const current = await GetCurrentRank(groupId, userId);
 
-      await SuspendUser(GroupId, UserId, interaction.user.id, GuildId, interaction.client);
+      await SuspendUser(groupId, userId, interaction.user.id, GuildId, interaction.client);
 
       const embed = new EmbedBuilder()
         .setTitle("YOU HAVE BEEN SUSPENDED")
         .setColor(0xff0000)
-        .setDescription(`Dear, **${username}**, you have been suspended from Snowflake Penitentiary from your rank **${current.Name}** for the reason (**${reason}**).\n\nBelow are the details of your suspension:`)
+        .setDescription(`Dear, <@${interaction.user.id}>, you have been suspended from Snowflake Penitentiary from your rank **${current.Name}** for the reason (**${reason}**).\n\nBelow are the details of your suspension:`)
         .addFields(
           { name: "Username", value: username, inline: true },
           { name: "Current Rank", value: current.Name, inline: true },
@@ -64,7 +67,7 @@ module.exports = {
       await interaction.editReply({ embeds: [embed] });
 
       db.Suspensions = db.Suspensions || {};
-      db.Suspensions[UserId] = {
+      db.Suspensions[userId] = {
         username,
         guildId: GuildId,
         reason,
@@ -79,7 +82,7 @@ module.exports = {
 
       setTimeout(async () => {
         const dbCheck = await GetJsonBin();
-        const suspension = dbCheck.Suspensions?.[UserId];
+        const suspension = dbCheck.Suspensions?.[userId];
         if (!suspension || !suspension.active) return;
 
         suspension.active = false;
@@ -88,12 +91,13 @@ module.exports = {
         const endEmbed = new EmbedBuilder()
           .setTitle("YOUR SUSPENSION HAS ENDED")
           .setColor(0x00ff00)
-          .setDescription(`Dear, **${username}**, your suspension issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has reached its duration and has been lifted.\n\nYou may run /getrole in the main server to regain your roles.`);
+          .setDescription(`Dear, <@${interaction.user.id}>, your suspension issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has reached its duration and has been lifted.\n\nYou may run /getrole in the main server to regain your roles.`);
 
         await interaction.followUp({ embeds: [endEmbed] });
       }, durationMs).unref();
 
     } catch (err) {
+      console.error(err);
       return interaction.editReply({ content: `Error: ${err.message}` });
     }
   }
