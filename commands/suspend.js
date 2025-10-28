@@ -6,16 +6,10 @@ const ALLOWED_ROLE = "1398691449939169331";
 function parseDuration(input) {
   const match = input.match(/^(\d+)([smhdwM])$/i);
   if (!match) throw new Error("Invalid duration format. Use 1s,1m,1h,1d,1w,1M");
+
   const value = parseInt(match[1]);
   const unit = match[2];
-  const multipliers = {
-    s: 1000,
-    m: 1000 * 60,
-    h: 1000 * 60 * 60,
-    d: 1000 * 60 * 60 * 24,
-    w: 1000 * 60 * 60 * 24 * 7,
-    M: 1000 * 60 * 60 * 24 * 30
-  };
+  const multipliers = { s:1000, m:60000, h:3600000, d:86400000, w:604800000, M:2592000000 };
   const durationMs = value * multipliers[unit];
   if (durationMs > multipliers.M) throw new Error("Maximum duration is 1 month.");
   if (durationMs < 1000) throw new Error("Minimum duration is 1 second.");
@@ -31,6 +25,7 @@ module.exports = {
     .addStringOption(opt => opt.setName('duration').setDescription('Duration e.g. 1h, 1d, 1w, 1M').setRequired(true)),
 
   async execute(interaction) {
+    if (!interaction.guild) return interaction.reply({ content: "This command must be run in a server.", ephemeral: true });
     const GuildId = interaction.guild.id;
 
     if (!interaction.member.roles.cache.has(ALLOWED_ROLE))
