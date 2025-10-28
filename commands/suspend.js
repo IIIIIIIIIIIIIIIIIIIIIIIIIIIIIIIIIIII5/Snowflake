@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, SuspendUser, GetRobloxUserId, GetCurrentRank } = require('../roblox');
 const { SaveJsonBin } = require('../utils');
 
@@ -9,7 +9,6 @@ function parseDuration(input) {
   if (!match) throw new Error("Invalid duration format. Use 1h, 1d, 1w, 1M, etc.");
   const value = parseInt(match[1]);
   const unit = match[2].toLowerCase();
-
   const multipliers = {
     s: 1000,
     m: 1000 * 60,
@@ -18,7 +17,6 @@ function parseDuration(input) {
     w: 1000 * 60 * 60 * 24 * 7,
     M: 1000 * 60 * 60 * 24 * 30
   };
-
   const duration = value * multipliers[unit];
   if (duration > multipliers.M) throw new Error("Maximum suspension duration is 1 month.");
   if (duration < 1000) throw new Error("Minimum suspension duration is 1 second.");
@@ -56,17 +54,19 @@ module.exports = {
 
       await SuspendUser(GroupId, UserId, interaction.user.id, GuildId, interaction.client);
 
-      const suspensionMsg =
-        "YOU HAVE BEEN SUSPENDED\n\n" +
-        "Dear, <@" + interaction.user.id + "> you have been suspended from Snowflake Penitentiary from your rank **" + current.Name + "** for the reason **" + reason + "**.\n\n" +
-        "Below are the details of your suspension:\n\n" +
-        "**Username:** " + username + "\n" +
-        "**Current Rank:** " + current.Name + "\n" +
-        "**Reason for Suspension:** " + reason + "\n" +
-        "**Duration:** " + durationStr + "\n\n" +
-        "If you believe you were suspended unfairly you may appeal your suspension in the administration server:\nhttps://discord.gg/ZSJuzdVAee";
+      const suspensionEmbed = new EmbedBuilder()
+        .setTitle('YOU HAVE BEEN SUSPENDED')
+        .setColor(0xff0000)
+        .setDescription(`Dear, <@${interaction.user.id}> you have been suspended from your rank in Snowflake Penitentiary**${current.Name}** for the reason (**${reason}**).\n\nBelow are the details of your suspension:`)
+        .addFields(
+          { name: 'Username', value: username, inline: true },
+          { name: 'Current Rank', value: current.Name, inline: true },
+          { name: 'Reason for Suspension', value: reason, inline: false },
+          { name: 'Duration', value: durationStr, inline: true },
+          { name: 'Appeal', value: '[Join Administration Server](https://discord.gg/ZSJuzdVAee)', inline: false }
+        );
 
-      await interaction.editReply({ content: suspensionMsg });
+      await interaction.editReply({ embeds: [suspensionEmbed] });
 
       db.Suspensions = db.Suspensions || {};
       db.Suspensions[UserId] = {
@@ -83,25 +83,19 @@ module.exports = {
       await SaveJsonBin(db);
 
       setTimeout(async () => {
-        try {
-          const dbCheck = await GetJsonBin();
-          const suspension = dbCheck.Suspensions?.[UserId];
-          if (!suspension || !suspension.active) return;
+        const dbCheck = await GetJsonBin();
+        const suspension = dbCheck.Suspensions?.[UserId];
+        if (!suspension || !suspension.active) return;
 
-          suspension.active = false;
-          await SaveJsonBin(dbCheck);
+        suspension.active = false;
+        await SaveJsonBin(dbCheck);
 
-          const endMsg =
-            "YOUR SUSPENSION HAS ENDED\n\n" +
-            "Dear, <@" + interaction.user.id + "> your suspension which was issued on " +
-            new Date(suspension.issuedAt).toLocaleDateString() +
-            " has reached its duration and your suspension has been officially lifted.\n\n" +
-            "You may run /getrole in the main server to regain your roles.";
+        const endEmbed = new EmbedBuilder()
+          .setTitle('YOUR SUSPENSION HAS ENDED')
+          .setColor(0x00ff00)
+          .setDescription(`Dear, <@${interaction.user.id}> your suspension which was issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has reached its duration and your suspension has been officially lifted.\n\nYou may run /getrole in the main server to regain your roles.`);
 
-          await interaction.followUp({ content: endMsg });
-        } catch (err) {
-          console.error("Error ending suspension:", err);
-        }
+        await interaction.followUp({ embeds: [endEmbed] });
       }, durationMs).unref();
 
     } catch (err) {
