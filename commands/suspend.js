@@ -58,7 +58,7 @@ module.exports = {
             const userEmbed = new EmbedBuilder()
                 .setTitle("YOU HAVE BEEN SUSPENDED")
                 .setColor(0xff0000)
-                .setDescription(`Dear, **${username}**, you have been suspended from Snowflake Penitentiary from your rank **${currentRank.Name}** for the reason (**${reason}**).\n\nBelow are the details of your suspension:`)
+                .setDescription(`Dear, **${username}**, you have been suspended from Snowflake Penitentiary from your rank **${currentRank.Name}**\n\nBelow are the details of your suspension:`)
                 .addFields(
                     { name: "Username", value: username, inline: true },
                     { name: "Reason", value: reason, inline: false },
