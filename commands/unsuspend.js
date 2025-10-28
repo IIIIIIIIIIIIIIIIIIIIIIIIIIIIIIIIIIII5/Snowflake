@@ -12,53 +12,60 @@ module.exports = {
 
   async execute(interaction) {
     const GuildId = interaction.guild.id;
-
-    if (!interaction.member.roles.cache.has(ALLOWED_ROLE))
-      return interaction.reply({ content: "You don't have permission.", ephemeral: true });
+    if (!interaction.member.roles.cache.has(ALLOWED_ROLE)) return interaction.reply({ content: "You don't have permission.", ephemeral: true });
 
     await interaction.deferReply({ ephemeral: true });
 
     try {
       const db = await GetJsonBin();
-      if (!db.ServerConfig?.[GuildId]?.GroupId)
-        return interaction.editReply({ content: "Group ID not set. Run /config first." });
+      if (!db.ServerConfig?.[GuildId]?.GroupId) return interaction.editReply({ content: "Group ID not set. Run /config first." });
 
       const username = interaction.options.getString('username');
       const reason = interaction.options.getString('reason');
       const UserId = await GetRobloxUserId(username);
 
       const suspension = db.Suspensions?.[UserId];
-      if (!suspension || !suspension.active)
-        return interaction.editReply({ content: `${username} is not currently suspended.` });
+      if (!suspension || !suspension.active) return interaction.editReply({ content: `${username} is not currently suspended.` });
 
       suspension.active = false;
       await SaveJsonBin(db);
+
+      const durationStr = suspension.durationStr || 'N/A';
+      const userEmbed = new EmbedBuilder()
+        .setTitle("YOUR SUSPENSION HAS ENDED EARLY")
+        .setColor(0x00ff00)
+        .setDescription(`Dear, **${username}**, your suspension which was issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has ended early for the reason: **${reason}**.\n\nBelow are the details of your suspension:`)
+        .addFields(
+          { name: "Username", value: username, inline: true },
+          { name: "Reason", value: reason, inline: false },
+          { name: "Duration", value: durationStr, inline: true },
+          { name: "Appeal", value: "[Join Administration Server](https://discord.gg/ZSJuzdVAee)", inline: false }
+        );
+
+      const logEmbed = new EmbedBuilder()
+        .setTitle("User Unsuspended")
+        .setColor(0x00ff00)
+        .addFields(
+          { name: "Username", value: username, inline: true },
+          { name: "Unsuspended By", value: `<@${interaction.user.id}>`, inline: true },
+          { name: "Reason", value: reason, inline: false },
+          { name: "Duration", value: durationStr, inline: true }
+        )
+        .setTimestamp(new Date());
 
       const targetDiscordId = Object.keys(db.VerifiedUsers || {}).find(id => db.VerifiedUsers[id] === UserId);
       if (targetDiscordId) {
         try {
           const targetUser = await interaction.client.users.fetch(targetDiscordId);
-          const durationStr = suspension.durationStr || 'N/A';
-
-          await targetUser.send({
-            embeds: [{
-              title: "YOU HAVE BEEN SUSPENDED",
-              color: 0xff0000,
-              description: `Dear, **${username}**, you have been suspended from Snowflake Penitentiary from your rank **${suspension.oldRank || 'Unknown'}** for the reason (**${reason}**).\n\nBelow are the details of your suspension:`,
-              fields: [
-                { name: "Username", value: username, inline: true },
-                { name: "Reason", value: reason, inline: false },
-                { name: "Duration", value: durationStr, inline: true },
-                { name: "Appeal", value: "[Join Administration Server](https://discord.gg/ZSJuzdVAee)", inline: false }
-              ]
-            }]
-          });
+          await targetUser.send({ embeds: [userEmbed] });
 
           if (suspension.oldRank)
             await SetRank(db.ServerConfig[GuildId].GroupId, UserId, suspension.oldRank, interaction.user.id, GuildId, interaction.client);
-
         } catch {}
       }
+
+      const logChannel = await interaction.client.channels.fetch('1424381038393556992').catch(() => null);
+      if (logChannel?.isTextBased()) await logChannel.send({ embeds: [logEmbed] });
 
       await interaction.editReply({ content: `Successfully unsuspended ${username}. DM sent to the user.` });
 
