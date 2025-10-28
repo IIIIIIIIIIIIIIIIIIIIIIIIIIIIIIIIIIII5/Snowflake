@@ -207,14 +207,16 @@ async function SuspendUser(groupId, userId, issuerDiscordId, guildId, client = g
 
     const username = await GetRobloxUsername(userId);
 
-    dbData.Suspensions = dbData.Suspensions || [];
-    dbData.Suspensions.push({
+    dbData.Suspensions = dbData.Suspensions || {};
+    dbData.Suspensions[userId] = {
         Username: username,
         IssuedBy: issuerDiscordId,
         Timestamp: new Date().toISOString(),
         guildId,
-        GroupId: groupId
-    });
+        GroupId: groupId,
+        active: true
+    };
+
     await SaveJsonBin(dbData);
 
     const guild = client?.guilds ? await client.guilds.fetch(guildId).catch(() => null) : null;
