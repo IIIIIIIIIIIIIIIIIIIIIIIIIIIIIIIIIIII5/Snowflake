@@ -1,6 +1,8 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { GetJsonBin, SuspendUser, GetRobloxUserId } = require('../roblox');
 
+const ALLOWED_ROLE = "1398691449939169331"
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('suspend')
@@ -8,6 +10,9 @@ module.exports = {
     .addStringOption(opt => opt.setName('username').setDescription('Roblox username to suspend').setRequired(true)),
 
     async execute(interaction) {
+      if (!interaction.member.roles.cache.has(ALLOWED_ROLE))
+      return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
+      
       await interaction.deferReply({ ephemeral: true });
       const db = await GetJsonBin();
       const GuildId = interaction.guild.id;
