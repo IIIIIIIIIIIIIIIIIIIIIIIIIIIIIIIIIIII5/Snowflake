@@ -171,6 +171,81 @@ function startVerification(discordId, robloxUserId, code) {
   Verifications[discordId] = { RobloxUserId: robloxUserId, Code: code };
 }
 
+async function SuspendUser(groupId, userId, issuerDiscordId, guildId, client = global.ClientBot) {
+    const dbData = await GetJsonBin();
+    const roles = await FetchRoles(groupId);
+    const suspendedRole = roles['suspended'];
+    if (!suspendedRole) throw new Error('Suspended rank not found in group.');
+
+    const issuerRobloxId = dbData.VerifiedUsers?.[issuerDiscordId];
+    if (!issuerRobloxId) throw new Error('You must verify first.');
+
+    const issuerRank = await GetCurrentRank(groupId, issuerRobloxId);
+    const targetRank = await GetCurrentRank(groupId, userId);
+
+    if (String(userId) === String(issuerRobloxId))
+        throw new Error('You cannot suspend yourself.');
+    if (targetRank.Rank >= issuerRank.Rank)
+        throw new Error('Cannot suspend a user with equal or higher rank.');
+
+    const cookie = await GetRobloxCookie(guildId);
+    let xsrf = await GetXsrfToken(guildId);
+
+    const url = `https://groups.roblox.com/v1/groups/${groupId}/users/${userId}`;
+    try {
+        await axios.patch(url, { roleId: suspendedRole.RoleId }, {
+            headers: {
+                Cookie: `.ROBLOSECURITY=${cookie}`,
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': xsrf
+            }
+        });
+    } catch (err) {
+        if (err.response?.status === 403 && err.response?.headers['x-csrf-token']) {
+            xsrf = err.response.headers['x-csrf-token'];
+            await axios.patch(url, { roleId: suspendedRole.RoleId }, {
+                headers: {
+                    Cookie: `.ROBLOSECURITY=${cookie}`,
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': xsrf
+                }
+            });
+        } else {
+            throw new Error(err.response?.data?.errors?.[0]?.message || err.message);
+        }
+    }
+
+    const username = await GetRobloxUsername(userId);
+
+    dbData.Suspensions = dbData.Suspensions || [];
+    dbData.Suspensions.push({
+        Username: username,
+        IssuedBy: issuerDiscordId,
+        Timestamp: new Date().toISOString(),
+        GuildId,
+        GroupId: groupId
+    });
+  
+    await SaveJsonBin(dbData);
+
+    const guild = client?.guilds ? await client.guilds.fetch(guildId).catch(() => null) : null;
+    const logChannelId = dbData.ServerConfig?.[guildId]?.LoggingChannel;
+    const logChannel = guild?.channels?.cache?.get(logChannelId);
+    if (logChannel) {
+        const embed = {
+            title: 'User Suspended',
+            color: 0xe74c3c,
+            fields: [
+                { name: 'Username', value: username, inline: true },
+                { name: 'Suspended By', value: `<@${issuerDiscordId}>`, inline: true },
+                { name: 'Date', value: new Date().toISOString().split('T')[0], inline: true }
+            ],
+            timestamp: new Date()
+        };
+        await logChannel.send({ embeds: [embed] });
+    }
+}
+
 async function HandleVerificationButton(interaction) {
   await interaction.deferReply({ ephemeral: true });
   const data = Verifications[interaction.user.id];
@@ -209,5 +284,6 @@ module.exports = {
   Verifications,
   PendingApprovals,
   startVerification,
-  HandleVerificationButton
+  HandleVerificationButton,
+  SuspendUser
 };
