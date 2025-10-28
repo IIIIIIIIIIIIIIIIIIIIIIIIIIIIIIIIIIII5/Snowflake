@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { GetJsonBin, SuspendUser, GetRobloxUserId, GetCurrentRank, SaveJsonBin } = require('../roblox');
+const { GetJsonBin, SuspendUser, GetRobloxUserId, GetCurrentRank, SaveJsonBin, SetRank } = require('../roblox');
 
 const ALLOWED_ROLE = "1398691449939169331";
 
@@ -35,7 +35,6 @@ module.exports = {
 
     async execute(interaction) {
         if (!interaction.guild) return interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
-
         if (!interaction.member.roles.cache.has(ALLOWED_ROLE))
             return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
 
@@ -60,7 +59,12 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setTitle("User Suspended")
                 .setColor(0xff0000)
-                .setDescription(`Successfully suspended **${username}** from rank **${currentRank.Name}** for reason: **${reason}**.\nDuration: **${durationStr}**.`);
+                .setDescription(`Successfully suspended **${username}** from rank **${currentRank.Name}**.`)
+                .addFields(
+                    { name: "Reason", value: reason, inline: false },
+                    { name: "Duration", value: durationStr, inline: true },
+                    { name: "Suspended By", value: `<@${interaction.user.id}>`, inline: true }
+                );
 
             await interaction.editReply({ embeds: [embed] });
 
@@ -72,10 +76,32 @@ module.exports = {
                 issuedBy: interaction.user.id,
                 issuedAt: Date.now(),
                 endsAt: Date.now() + durationMs,
+                oldRank: currentRank.Name,
                 durationStr,
                 active: true
             };
             await SaveJsonBin(db);
+
+            const targetDiscordId = Object.keys(db.VerifiedUsers || {}).find(id => db.VerifiedUsers[id] === userId);
+            if (targetDiscordId) {
+                try {
+                    const targetUser = await interaction.client.users.fetch(targetDiscordId);
+                    await targetUser.send({
+                        embeds: [{
+                            title: "YOU HAVE BEEN SUSPENDED",
+                            color: 0xff0000,
+                            fields: [
+                                { name: "Username", value: username, inline: true },
+                                { name: "Current Rank", value: currentRank.Name, inline: true },
+                                { name: "Reason", value: reason, inline: false },
+                                { name: "Duration", value: durationStr, inline: true },
+                                { name: "Suspended By", value: `<@${interaction.user.id}>`, inline: true }
+                            ],
+                            description: "You have been suspended from your rank. You may appeal by joining the administration server."
+                        }]
+                    });
+                } catch {}
+            }
 
             setTimeout(async () => {
                 const dbCheck = await GetJsonBin();
@@ -85,17 +111,27 @@ module.exports = {
                 suspension.active = false;
                 await SaveJsonBin(dbCheck);
 
-                try {
-                    const dmUser = await interaction.client.users.fetch(interaction.user.id);
-                    await dmUser.send({
-                        embeds: [{
-                            title: "YOUR SUSPENSION HAS ENDED",
-                            color: 0x00ff00,
-                            description: `Dear, **${username}**, your suspension issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has ended. You may run /getrole in the main server to regain your roles.`
-                        }]
-                    });
-                } catch {}
+                if (targetDiscordId) {
+                    try {
+                        const targetUser = await interaction.client.users.fetch(targetDiscordId);
+                        await targetUser.send({
+                            embeds: [{
+                                title: "YOUR SUSPENSION HAS ENDED",
+                                color: 0x00ff00,
+                                fields: [
+                                    { name: "Username", value: username, inline: true },
+                                    { name: "Restored Rank", value: suspension.oldRank, inline: true },
+                                    { name: "Original Duration", value: suspension.durationStr, inline: true }
+                                ],
+                                description: "Your suspension has ended. Your previous rank has been restored automatically."
+                            }]
+                        });
 
+                        if (suspension.oldRank)
+                            await SetRank(groupId, userId, suspension.oldRank, interaction.user.id, guildId, interaction.client);
+
+                    } catch {}
+                }
             }, durationMs).unref();
 
         } catch (err) {
