@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { GetJsonBin, SetRank, GetRobloxUserId } = require('../roblox');
+const { GetJsonBin, SuspendUser, GetRobloxUserId } = require('../roblox');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -18,7 +18,7 @@ module.exports = {
       const UserId = await GetRobloxUserId(username);
       
       try {
-        await SetRank(GroupId, UserId, "Suspended", interaction.user.id, GuildId);
+        await SuspendUser(GroupId, UserId, interaction.user.id, GuildId, interaction.client);
         return interaction.editReply({ content: `Suspended ${username}` });
       } catch (err) {
         return interaction.editReply({ content: `Error: ${err.message}` });
