@@ -222,7 +222,7 @@ async function SuspendUser(groupId, userId, issuerDiscordId, guildId, client = g
         Username: username,
         IssuedBy: issuerDiscordId,
         Timestamp: new Date().toISOString(),
-        GuildId,
+        guildId,
         GroupId: groupId
     });
   
