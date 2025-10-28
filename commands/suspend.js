@@ -6,7 +6,6 @@ const ALLOWED_ROLE = "1398691449939169331";
 function parseDuration(input) {
   const match = input.match(/^(\d+)([smhdwM])$/i);
   if (!match) throw new Error("Invalid duration format. Use 1s,1m,1h,1d,1w,1M");
-
   const value = parseInt(match[1]);
   const unit = match[2];
   const multipliers = { s:1000, m:60000, h:3600000, d:86400000, w:604800000, M:2592000000 };
@@ -29,8 +28,6 @@ module.exports = {
       return interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
     }
 
-    const GuildId = interaction.guild.id;
-
     if (!interaction.member.roles.cache.has(ALLOWED_ROLE)) {
       return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
     }
@@ -39,6 +36,7 @@ module.exports = {
 
     try {
       const db = await GetJsonBin();
+      const GuildId = interaction.guild.id;
       const groupId = db.ServerConfig?.[GuildId]?.GroupId;
       if (!groupId) return interaction.editReply({ content: "Group ID not set. Run /config first." });
 
@@ -55,7 +53,7 @@ module.exports = {
       const embed = new EmbedBuilder()
         .setTitle("YOU HAVE BEEN SUSPENDED")
         .setColor(0xff0000)
-        .setDescription(`Dear, <@${interaction.user.id}>, you have been suspended from Snowflake Penitentiary from your rank **${current.Name}** for the reason (**${reason}**).\n\nBelow are the details of your suspension:`)
+        .setDescription(`Dear, **${username}**, you have been suspended from Snowflake Penitentiary from your rank **${current.Name}** for the reason (**${reason}**).\n\nBelow are the details of your suspension:`)
         .addFields(
           { name: "Username", value: username, inline: true },
           { name: "Current Rank", value: current.Name, inline: true },
@@ -91,7 +89,7 @@ module.exports = {
         const endEmbed = new EmbedBuilder()
           .setTitle("YOUR SUSPENSION HAS ENDED")
           .setColor(0x00ff00)
-          .setDescription(`Dear, <@${interaction.user.id}>, your suspension issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has reached its duration and has been lifted.\n\nYou may run /getrole in the main server to regain your roles.`);
+          .setDescription(`Dear, **${username}**, your suspension issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has reached its duration and has been lifted.\n\nYou may run /getrole in the main server to regain your roles.`);
 
         await interaction.followUp({ embeds: [endEmbed] });
       }, durationMs).unref();
