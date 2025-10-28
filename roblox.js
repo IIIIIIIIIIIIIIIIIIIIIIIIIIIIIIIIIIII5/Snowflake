@@ -175,7 +175,7 @@ async function SuspendUser(groupId, userId, issuerDiscordId, guildId, client = g
     const dbData = await GetJsonBin();
     const roles = await FetchRoles(groupId);
     const suspendedRole = roles['suspended'];
-    if (!suspendedRole) throw new Error('Suspended rank not found in group.');
+    if (!suspendedRole) throw new Error('Suspended rank not found.');
 
     const issuerRobloxId = dbData.VerifiedUsers?.[issuerDiscordId];
     if (!issuerRobloxId) throw new Error('You must verify first.');
@@ -190,29 +190,19 @@ async function SuspendUser(groupId, userId, issuerDiscordId, guildId, client = g
 
     const cookie = await GetRobloxCookie(guildId);
     let xsrf = await GetXsrfToken(guildId);
-
     const url = `https://groups.roblox.com/v1/groups/${groupId}/users/${userId}`;
+
     try {
         await axios.patch(url, { roleId: suspendedRole.RoleId }, {
-            headers: {
-                Cookie: `.ROBLOSECURITY=${cookie}`,
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': xsrf
-            }
+            headers: { Cookie: `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': xsrf, 'Content-Type': 'application/json' }
         });
     } catch (err) {
         if (err.response?.status === 403 && err.response?.headers['x-csrf-token']) {
             xsrf = err.response.headers['x-csrf-token'];
             await axios.patch(url, { roleId: suspendedRole.RoleId }, {
-                headers: {
-                    Cookie: `.ROBLOSECURITY=${cookie}`,
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': xsrf
-                }
+                headers: { Cookie: `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': xsrf, 'Content-Type': 'application/json' }
             });
-        } else {
-            throw new Error(err.response?.data?.errors?.[0]?.message || err.message);
-        }
+        } else throw new Error(err.response?.data?.errors?.[0]?.message || err.message);
     }
 
     const username = await GetRobloxUsername(userId);
@@ -225,7 +215,6 @@ async function SuspendUser(groupId, userId, issuerDiscordId, guildId, client = g
         guildId,
         GroupId: groupId
     });
-  
     await SaveJsonBin(dbData);
 
     const guild = client?.guilds ? await client.guilds.fetch(guildId).catch(() => null) : null;
