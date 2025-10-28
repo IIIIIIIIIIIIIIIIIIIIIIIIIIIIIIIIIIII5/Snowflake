@@ -6,10 +6,8 @@ const ALLOWED_ROLE = "1398691449939169331";
 function parseDuration(input) {
   const match = input.match(/^(\d+)([smhdwM])$/i);
   if (!match) throw new Error("Invalid duration format. Use 1s,1m,1h,1d,1w,1M");
-
   const value = parseInt(match[1]);
   const unit = match[2];
-
   const multipliers = {
     s: 1000,
     m: 1000 * 60,
@@ -18,7 +16,6 @@ function parseDuration(input) {
     w: 1000 * 60 * 60 * 24 * 7,
     M: 1000 * 60 * 60 * 24 * 30
   };
-
   const durationMs = value * multipliers[unit];
   if (durationMs > multipliers.M) throw new Error("Maximum duration is 1 month.");
   if (durationMs < 1000) throw new Error("Minimum duration is 1 second.");
@@ -34,15 +31,15 @@ module.exports = {
     .addStringOption(opt => opt.setName('duration').setDescription('Duration e.g. 1h, 1d, 1w, 1M').setRequired(true)),
 
   async execute(interaction) {
-    if (!interaction.member.roles.cache.has(ALLOWED_ROLE)) {
+    const GuildId = interaction.guild.id;
+
+    if (!interaction.member.roles.cache.has(ALLOWED_ROLE))
       return interaction.reply({ content: "You don't have permission.", ephemeral: true });
-    }
 
     await interaction.deferReply({ ephemeral: true });
 
     try {
       const db = await GetJsonBin();
-      const GuildId = interaction.guild.id;
       if (!db.ServerConfig?.[GuildId]?.GroupId)
         return interaction.editReply({ content: "Group ID not set. Run /config first." });
 
@@ -60,7 +57,7 @@ module.exports = {
       const embed = new EmbedBuilder()
         .setTitle("YOU HAVE BEEN SUSPENDED")
         .setColor(0xff0000)
-        .setDescription(`Dear, <@${interaction.user.id}>, you have been suspended from Snowflake Penitentiary from your rank **${current.Name}** for the reason (**${reason}**).\n\nBelow are the details of your suspension:`)
+        .setDescription(`Dear, **${username}**, you have been suspended from Snowflake Penitentiary from your rank **${current.Name}** for the reason (**${reason}**).\n\nBelow are the details of your suspension:`)
         .addFields(
           { name: "Username", value: username, inline: true },
           { name: "Current Rank", value: current.Name, inline: true },
@@ -96,7 +93,7 @@ module.exports = {
         const endEmbed = new EmbedBuilder()
           .setTitle("YOUR SUSPENSION HAS ENDED")
           .setColor(0x00ff00)
-          .setDescription(`Dear, <@${interaction.user.id}>, your suspension issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has reached its duration and has been lifted.\n\nYou may run /getrole in the main server to regain your roles.`);
+          .setDescription(`Dear, **${username}**, your suspension issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has reached its duration and has been lifted.\n\nYou may run /getrole in the main server to regain your roles.`);
 
         await interaction.followUp({ embeds: [endEmbed] });
       }, durationMs).unref();
