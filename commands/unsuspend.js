@@ -38,14 +38,18 @@ module.exports = {
       if (targetDiscordId) {
         try {
           const targetUser = await interaction.client.users.fetch(targetDiscordId);
+          const durationStr = suspension.durationStr || 'N/A';
+
           await targetUser.send({
             embeds: [{
-              title: "YOUR SUSPENSION HAS ENDED EARLY",
-              color: 0x00ff00,
-              description: `Dear, **${username}**, your suspension which was issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has ended early for the reason: **${reason}**.\n\nYou may run /getrole in the main server to receive your roles.`,
+              title: "YOU HAVE BEEN SUSPENDED",
+              color: 0xff0000,
+              description: `Dear, **${username}**, you have been suspended from Snowflake Penitentiary from your rank **${suspension.oldRank || 'Unknown'}** for the reason (**${reason}**).\n\nBelow are the details of your suspension:`,
               fields: [
                 { name: "Username", value: username, inline: true },
-                { name: "Reason", value: reason, inline: false }
+                { name: "Reason", value: reason, inline: false },
+                { name: "Duration", value: durationStr, inline: true },
+                { name: "Appeal", value: "[Join Administration Server](https://discord.gg/ZSJuzdVAee)", inline: false }
               ]
             }]
           });
@@ -56,12 +60,7 @@ module.exports = {
         } catch {}
       }
 
-      const embed = new EmbedBuilder()
-        .setTitle("YOUR SUSPENSION HAS ENDED EARLY")
-        .setColor(0x00ff00)
-        .setDescription(`Dear, <@${interaction.user.id}>, your suspension which was issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has ended early for the reason: **${reason}**.\n\nYou may run /getrole in the main server to receive your roles.`);
-
-      await interaction.editReply({ embeds: [embed] });
+      await interaction.editReply({ content: `Successfully unsuspended ${username}. DM sent to the user.` });
 
     } catch (err) {
       return interaction.editReply({ content: `Error: ${err.message}` });
