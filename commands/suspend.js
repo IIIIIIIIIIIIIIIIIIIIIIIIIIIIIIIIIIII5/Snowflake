@@ -21,13 +21,14 @@ function parseDuration(input) {
 
   const duration = value * multipliers[unit];
   if (duration > multipliers.M) throw new Error("Maximum suspension duration is 1 month.");
+  if (duration < 1000) throw new Error("Minimum suspension duration is 1 second.");
   return duration;
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('suspend')
-    .setDescription("Suspend a user")
+    .setDescription("Suspend a Roblox user from their rank.")
     .addStringOption(opt => opt.setName('username').setDescription('Roblox username to suspend').setRequired(true))
     .addStringOption(opt => opt.setName('reason').setDescription('Reason for suspension').setRequired(true))
     .addStringOption(opt => opt.setName('duration').setDescription('Duration (e.g. 1h, 1d, 1w, 1M)').setRequired(true)),
@@ -38,17 +39,17 @@ module.exports = {
 
     await interaction.deferReply({ ephemeral: true });
 
-    const db = await GetJsonBin();
-    const GuildId = interaction.guild.id;
-    if (!db.ServerConfig?.[GuildId]?.GroupId)
-      return interaction.editReply({ content: 'Group ID not set. Run /config first.' });
-
-    const GroupId = db.ServerConfig[GuildId].GroupId;
-    const username = interaction.options.getString('username');
-    const reason = interaction.options.getString('reason');
-    const durationStr = interaction.options.getString('duration');
-
     try {
+      const db = await GetJsonBin();
+      const GuildId = interaction.guild.id;
+      if (!db.ServerConfig?.[GuildId]?.GroupId)
+        return interaction.editReply({ content: 'Group ID not set. Run /config first.' });
+
+      const GroupId = db.ServerConfig[GuildId].GroupId;
+      const username = interaction.options.getString('username');
+      const reason = interaction.options.getString('reason');
+      const durationStr = interaction.options.getString('duration');
+
       const durationMs = parseDuration(durationStr);
       const UserId = await GetRobloxUserId(username);
       const current = await GetCurrentRank(GroupId, UserId);
@@ -82,22 +83,26 @@ module.exports = {
       await SaveJsonBin(db);
 
       setTimeout(async () => {
-        const suspension = db.Suspensions[UserId];
-        if (!suspension || !suspension.active) return;
-
-        suspension.active = false;
-        await SaveJsonBin(db);
-
-        const endMsg =
-          "YOUR SUSPENSION HAS ENDED\n\n" +
-          "Dear, <@" + interaction.user.id + "> your suspension which was issued on " + new Date(suspension.issuedAt).toLocaleDateString() +
-          " has reached its duration and your suspension has been officially lifted.\n\n" +
-          "You may run /getrole in the main server to regain your roles.";
-
         try {
+          const dbCheck = await GetJsonBin();
+          const suspension = dbCheck.Suspensions?.[UserId];
+          if (!suspension || !suspension.active) return;
+
+          suspension.active = false;
+          await SaveJsonBin(dbCheck);
+
+          const endMsg =
+            "YOUR SUSPENSION HAS ENDED\n\n" +
+            "Dear, <@" + interaction.user.id + "> your suspension which was issued on " +
+            new Date(suspension.issuedAt).toLocaleDateString() +
+            " has reached its duration and your suspension has been officially lifted.\n\n" +
+            "You may run /getrole in the main server to regain your roles.";
+
           await interaction.followUp({ content: endMsg });
-        } catch {}
-      }, durationMs);
+        } catch (err) {
+          console.error("Error ending suspension:", err);
+        }
+      }, durationMs).unref();
 
     } catch (err) {
       return interaction.editReply({ content: `Error: ${err.message}` });
