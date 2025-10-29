@@ -147,8 +147,10 @@ module.exports = {
                 try {
                     await SetRank(GroupId, UserId, Db.Suspensions[UserId].OldRankId, 0, GuildId, Interaction.client);
                     const AfterRank = await GetCurrentRank(GroupId, UserId);
-                    if (AfterRank.Rank === Db.Suspensions[UserId].OldRankId) RankedBack = "Yes";
-                } catch {}
+                    if (String(AfterRank.Rank).trim() === String(Db.Suspensions[UserId].OldRankId).trim()) RankedBack = "Yes";
+                } catch {
+                    RankedBack = "No";
+                }
 
                 const EndEmbed = new EmbedBuilder()
                     .setTitle("Suspension Ended")
