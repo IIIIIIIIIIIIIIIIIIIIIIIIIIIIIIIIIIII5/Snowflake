@@ -156,7 +156,7 @@ module.exports = {
                     .addFields(
                         { name: "Rank Suspended From", value: Db.Suspensions[UserId].OldRank, inline: false },
                         { name: "Reason for Suspension", value: Reason, inline: false },
-                        { name: "Date Suspended On", value: FormatDate(new Date(Db.Suspensions[UserId].IssuedAt)), inline: false },
+                        { name: "Date Suspended On", value: `${FormatDate(new Date(Db.Suspensions[UserId].IssuedAt))}`, inline: false },
                         { name: "Duration", value: FullDuration, inline: false },
                         { name: "Ranked Back to Previous Position", value: RankedBack, inline: false }
                     )
