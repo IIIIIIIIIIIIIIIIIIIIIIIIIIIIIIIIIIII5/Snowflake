@@ -26,7 +26,8 @@ module.exports = {
         .setName('unsuspend')
         .setDescription("Remove a user's suspension")
         .addStringOption(opt => opt.setName('username').setDescription('Roblox username to unsuspend').setRequired(true))
-        .addStringOption(opt => opt.setName('reason').setDescription('Reason for ending the suspension').setRequired(true)),
+        .addStringOption(opt => opt.setName('reason').setDescription('Reason for ending the suspension').setRequired(true))
+        .addStringOption(opt => opt.setName('discordid').setDescription('Optional Discord ID to remove roles and give a specific role')),
 
     async execute(interaction) {
         const GuildId = interaction.guild.id;
@@ -42,6 +43,7 @@ module.exports = {
 
             const Username = interaction.options.getString('username');
             const Reason = interaction.options.getString('reason');
+            const DiscordIdOption = interaction.options.getString('discordid');
             const UserId = await GetRobloxUserId(Username);
 
             const Suspension = Db.Suspensions?.[UserId];
@@ -55,7 +57,10 @@ module.exports = {
                 ? FormatDuration(Suspension.endsAt - Suspension.issuedAt)
                 : 'N/A';
 
-            const TargetDiscordId = Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === UserId);
+            let TargetDiscordId = DiscordIdOption;
+            if (!TargetDiscordId) {
+                TargetDiscordId = Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === UserId);
+            }
 
             const UserEmbed = new EmbedBuilder()
                 .setTitle("YOUR SUSPENSION HAS ENDED EARLY")
@@ -82,15 +87,18 @@ module.exports = {
 
             if (TargetDiscordId) {
                 try {
-                    const Member = await interaction.guild.members.fetch(TargetDiscordId).catch(() => null);
+                    let Member = null;
+                    if (interaction.guild.members.cache.has(TargetDiscordId)) {
+                        Member = await interaction.guild.members.fetch(TargetDiscordId).catch(() => null);
+                    }
                     if (Member) {
                         const OldRoles = Member.roles.cache.map(r => r.id).filter(id => id !== interaction.guild.id);
                         if (OldRoles.length) await Member.roles.remove(OldRoles);
                         await Member.roles.add(DiscordRoleId).catch(() => {});
                         await Member.send({ embeds: [UserEmbed] }).catch(() => {});
                     } else {
-                        const TargetUser = await interaction.client.users.fetch(TargetDiscordId);
-                        await TargetUser.send({ embeds: [UserEmbed] }).catch(() => {});
+                        const TargetUser = await interaction.client.users.fetch(TargetDiscordId).catch(() => null);
+                        if (TargetUser) await TargetUser.send({ embeds: [UserEmbed] }).catch(() => {});
                     }
                 } catch {}
             }
