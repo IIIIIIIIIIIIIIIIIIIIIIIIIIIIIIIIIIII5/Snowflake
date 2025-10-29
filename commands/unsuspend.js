@@ -58,7 +58,7 @@ module.exports = {
             const TargetDiscordId = Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === UserId);
 
             const UserEmbed = new EmbedBuilder()
-                .setTitle("Your Suspension Has Ended Early")
+                .setTitle("YOUR SUSPENSION HAS ENDED EARLY")
                 .setColor(0x00ff00)
                 .setDescription(
                     `Dear, <@${TargetDiscordId}>, your suspension has ended early.\n\n` +
