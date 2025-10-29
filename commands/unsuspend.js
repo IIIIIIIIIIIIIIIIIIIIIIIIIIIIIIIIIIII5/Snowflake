@@ -54,11 +54,13 @@ module.exports = {
                 ? formatDuration(suspension.endsAt - suspension.issuedAt)
                 : 'N/A';
 
+            const targetDiscordId = Object.keys(db.VerifiedUsers || {}).find(id => db.VerifiedUsers[id] === UserId);
+
             const userEmbed = new EmbedBuilder()
                 .setTitle("YOUR SUSPENSION HAS ENDED")
                 .setColor(0x00ff00)
                 .setDescription(
-                    `Dear, <@${interaction.user.id}> your suspension has ended.\n\n` +
+                    `Dear, <@${targetDiscordId}>, your suspension has ended.\n\n` +
                     `You have been ranked to your original role and may run **/getrole**.\n\n` +
                     `If you have not been ranked please open a ticket in the [Administration](https://discord.gg/ZSJuzdVAee) server.`
                 );
@@ -77,7 +79,6 @@ module.exports = {
             if (suspension.oldRank)
                 await SetRank(db.ServerConfig[GuildId].GroupId, UserId, suspension.oldRank, interaction.user.id, GuildId, interaction.client);
 
-            const targetDiscordId = Object.keys(db.VerifiedUsers || {}).find(id => db.VerifiedUsers[id] === UserId);
             if (targetDiscordId) {
                 try {
                     const targetUser = await interaction.client.users.fetch(targetDiscordId);
