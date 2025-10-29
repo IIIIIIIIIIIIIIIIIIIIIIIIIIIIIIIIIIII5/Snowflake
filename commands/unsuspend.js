@@ -86,7 +86,7 @@ module.exports = {
                 } catch {}
             }
 
-            const logChannel = await interaction.client.channels.fetch('1424381038393556992').catch(() => null);
+            const logChannel = await interaction.client.channels.fetch('1433025723932741694').catch(() => null);
             if (logChannel?.isTextBased())
                 await logChannel.send({ embeds: [logEmbed] });
 
