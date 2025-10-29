@@ -61,11 +61,12 @@ module.exports = {
             const UserId = await GetRobloxUserId(Username);
             const TargetCurrentRank = await GetCurrentRank(GroupId, UserId);
 
-            const IssuerRobloxId = Object.keys(Db.VerifiedUsers || {}).find(id => id === Interaction.user.id);
-            if (IssuerRobloxId && IssuerRobloxId == UserId) return Interaction.editReply({ content: "You cannot suspend yourself.", ephemeral: true });
-
-            const IssuerRank = await GetCurrentRank(GroupId, IssuerRobloxId);
-            if (TargetCurrentRank.Rank >= IssuerRank.Rank) return Interaction.editReply({ content: "You cannot suspend a user with equal or higher rank.", ephemeral: true });
+            const IssuerRobloxId = Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === Interaction.user.id);
+            if (IssuerRobloxId) {
+                if (IssuerRobloxId === UserId) return Interaction.editReply({ content: "You cannot suspend yourself.", ephemeral: true });
+                const IssuerRank = await GetCurrentRank(GroupId, IssuerRobloxId);
+                if (TargetCurrentRank.Rank >= IssuerRank.Rank) return Interaction.editReply({ content: "You cannot suspend a user with equal or higher rank.", ephemeral: true });
+            }
 
             await SuspendUser(GroupId, UserId, Interaction.user.id, GuildId, Interaction.client, DurationMs);
 
@@ -107,7 +108,7 @@ module.exports = {
                 )
                 .setTimestamp(new Date());
 
-            const TargetDiscordId = DiscordIdOption || Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === UserId);
+            let TargetDiscordId = DiscordIdOption || Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === UserId);
             if (TargetDiscordId) {
                 const Member = await Interaction.guild.members.fetch(TargetDiscordId).catch(() => null);
                 if (Member) {
