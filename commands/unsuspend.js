@@ -1,53 +1,100 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { GetJsonBin, SaveJsonBin, GetRobloxUserId, SetRoleByNameNoChecks, UnsuspendUserByRecord } = require('../roblox');
+const { GetJsonBin, SaveJsonBin, GetRobloxUserId, SetRank } = require('../roblox');
 
 const ALLOWED_ROLE = "1398691449939169331";
 
+function formatDuration(ms) {
+    const seconds = Math.floor(ms / 1000) % 60;
+    const minutes = Math.floor(ms / (60 * 1000)) % 60;
+    const hours = Math.floor(ms / (60 * 60 * 1000)) % 24;
+    const days = Math.floor(ms / (24 * 60 * 60 * 1000)) % 7;
+    const weeks = Math.floor(ms / (7 * 24 * 60 * 60 * 1000)) % 4;
+    const months = Math.floor(ms / (30 * 24 * 60 * 60 * 1000));
+    let result = [];
+    if (months) result.push(`${months} month${months > 1 ? 's' : ''}`);
+    if (weeks) result.push(`${weeks} week${weeks > 1 ? 's' : ''}`);
+    if (days) result.push(`${days} day${days > 1 ? 's' : ''}`);
+    if (hours) result.push(`${hours} hour${hours > 1 ? 's' : ''}`);
+    if (minutes) result.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
+    if (seconds) result.push(`${seconds} second${seconds > 1 ? 's' : ''}`);
+    return result.join(', ') || '0 seconds';
+}
+
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('unsuspend')
-    .setDescription('Remove a user\'s suspension')
-    .addStringOption(opt => opt.setName('username').setDescription('Roblox username to unsuspend').setRequired(true))
-    .addStringOption(opt => opt.setName('reason').setDescription('Reason for ending the suspension').setRequired(true)),
+    data: new SlashCommandBuilder()
+        .setName('unsuspend')
+        .setDescription("Remove a user's suspension")
+        .addStringOption(opt => opt.setName('username').setDescription('Roblox username to unsuspend').setRequired(true))
+        .addStringOption(opt => opt.setName('reason').setDescription('Reason for ending the suspension').setRequired(true)),
 
-  async execute(interaction) {
-    if (!interaction.guild) return interaction.reply({ content: 'This command can only be used in a server.', ephemeral: true });
-    if (!interaction.member.roles.cache.has(ALLOWED_ROLE)) return interaction.reply({ content: "You don't have permission.", ephemeral: true });
+    async execute(interaction) {
+        const GuildId = interaction.guild.id;
+        if (!interaction.member.roles.cache.has(ALLOWED_ROLE))
+            return interaction.reply({ content: "You don't have permission.", ephemeral: true });
 
-    await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ ephemeral: true });
 
-    try {
-      const db = await GetJsonBin();
-      const guildId = interaction.guild.id;
-      if (!db.ServerConfig?.[guildId]?.GroupId) return interaction.editReply({ content: 'Group ID not set. Run /config first.' });
+        try {
+            const db = await GetJsonBin();
+            if (!db.ServerConfig?.[GuildId]?.GroupId)
+                return interaction.editReply({ content: "Group ID not set. Run /config first." });
 
-      const username = interaction.options.getString('username');
-      const reason = interaction.options.getString('reason');
-      const userId = await GetRobloxUserId(username);
+            const username = interaction.options.getString('username');
+            const reason = interaction.options.getString('reason');
+            const UserId = await GetRobloxUserId(username);
 
-      const suspension = db.Suspensions?.[userId];
-      if (!suspension || !suspension.active) return interaction.editReply({ content: `${username} is not currently suspended.` });
+            const suspension = db.Suspensions?.[UserId];
+            if (!suspension || !suspension.active)
+                return interaction.editReply({ content: `${username} is not currently suspended.` });
 
-      await UnsuspendUserByRecord(userId, guildId, interaction.client, interaction.user.id, reason);
+            suspension.active = false;
+            await SaveJsonBin(db);
 
-      suspension.active = false;
-      suspension.endedAt = Date.now();
-      suspension.endedBy = interaction.user.id;
-      suspension.endedReason = reason;
-      await SaveJsonBin(db);
+            const durationStr = suspension.issuedAt && suspension.endsAt
+                ? formatDuration(suspension.endsAt - suspension.issuedAt)
+                : 'N/A';
 
-      const embed = new EmbedBuilder()
-        .setTitle('YOUR SUSPENSION HAS ENDED EARLY')
-        .setColor(0x00ff00)
-        .setDescription(`Dear, **${username}**, your suspension which was issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has ended early for the reason: **${reason}**.\n\nYou may run /getrole in the main server to receive your roles.`)
-        .addFields(
-          { name: 'Username', value: username, inline: true },
-          { name: 'Reason', value: reason, inline: false }
-        );
+            const userEmbed = new EmbedBuilder()
+                .setTitle("YOUR SUSPENSION HAS ENDED EARLY")
+                .setColor(0x00ff00)
+                .setDescription(`Dear, **${username}**, your suspension which was issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has ended early\n\nBelow are the details of your suspension:`)
+                .addFields(
+                    { name: "Username", value: username, inline: true },
+                    { name: "Reason", value: reason, inline: false },
+                    { name: "Duration", value: durationStr, inline: true },
+                    { name: "Appeal", value: "[Join Administration Server](https://discord.gg/ZSJuzdVAee)", inline: false }
+                );
 
-      await interaction.editReply({ embeds: [embed] });
-    } catch (err) {
-      return interaction.editReply({ content: `Error: ${err.message}` });
+            const logEmbed = new EmbedBuilder()
+                .setTitle("User Unsuspended")
+                .setColor(0x00ff00)
+                .addFields(
+                    { name: "Username", value: username, inline: true },
+                    { name: "Unsuspended By", value: `<@${interaction.user.id}>`, inline: true },
+                    { name: "Reason", value: reason, inline: false },
+                    { name: "Duration", value: durationStr, inline: true }
+                )
+                .setTimestamp(new Date());
+
+            if (suspension.oldRank)
+                await SetRank(db.ServerConfig[GuildId].GroupId, UserId, suspension.oldRank, interaction.user.id, GuildId, interaction.client);
+
+            const targetDiscordId = Object.keys(db.VerifiedUsers || {}).find(id => db.VerifiedUsers[id] === UserId);
+            if (targetDiscordId) {
+                try {
+                    const targetUser = await interaction.client.users.fetch(targetDiscordId);
+                    await targetUser.send({ embeds: [userEmbed] });
+                } catch {}
+            }
+
+            const logChannel = await interaction.client.channels.fetch('1424381038393556992').catch(() => null);
+            if (logChannel?.isTextBased())
+                await logChannel.send({ embeds: [logEmbed] });
+
+            await interaction.editReply({ content: `Successfully unsuspended ${username}. DM sent to the user.` });
+
+        } catch (err) {
+            return interaction.editReply({ content: `Error: ${err.message}` });
+        }
     }
-  }
 };
