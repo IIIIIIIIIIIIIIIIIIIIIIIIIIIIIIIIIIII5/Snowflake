@@ -103,10 +103,10 @@ module.exports = {
                 .setColor(0xff0000)
                 .setDescription(`Dear, **${Username}**, you have been suspended from Snowflake Penitentiary from your rank **${TargetCurrentRank.Name}**\n\nDetails of your suspension:`)
                 .addFields(
-                    { name: "Username", value: Username, inline: false },
-                    { name: "Reason", value: Reason, inline: false },
-                    { name: "Duration", value: FullDuration, inline: false },
-                    { name: "Appeal", value: "[Join Administration Server](https://discord.gg/ZSJuzdVAee)", inline: false }
+                    { name: "Username", value: Username },
+                    { name: "Reason", value: Reason },
+                    { name: "Duration", value: FullDuration },
+                    { name: "Appeal", value: "[Join Administration Server](https://discord.gg/ZSJuzdVAee)" }
                 );
 
             const LogEmbed = new EmbedBuilder()
@@ -115,10 +115,10 @@ module.exports = {
                 .addFields(
                     { name: "Username", value: Username, inline: true },
                     { name: "Suspended By", value: `<@${Interaction.user.id}>`, inline: true },
-                    { name: "Reason", value: Reason, inline: false },
-                    { name: "Duration", value: FullDuration, inline: true }
+                    { name: "Reason", value: Reason },
+                    { name: "Duration", value: FullDuration }
                 )
-                .setTimestamp(new Date());
+                .setTimestamp();
 
             let TargetDiscordId = DiscordIdOption || Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === UserId);
             if (TargetDiscordId) {
@@ -129,9 +129,9 @@ module.exports = {
                     await Member.roles.add(DiscordRoleId).catch(() => {});
                     try { await Member.send({ embeds: [UserEmbed] }); } catch {}
                 } else {
-                    try { 
+                    try {
                         const TargetUser = await Interaction.client.users.fetch(TargetDiscordId);
-                        await TargetUser.send({ embeds: [UserEmbed] }).catch(() => {}); 
+                        await TargetUser.send({ embeds: [UserEmbed] }).catch(() => {});
                     } catch {}
                 }
             }
@@ -146,8 +146,9 @@ module.exports = {
                 let RankedBack = "No";
                 try {
                     await SetRank(GroupId, UserId, Db.Suspensions[UserId].OldRankId, 0, GuildId, Interaction.client);
+                    await new Promise(r => setTimeout(r, 5000));
                     const AfterRank = await GetCurrentRank(GroupId, UserId);
-                    if (String(AfterRank.Rank).trim() === String(Db.Suspensions[UserId].OldRankId).trim()) RankedBack = "Yes";
+                    if (Number(AfterRank.Rank) === Number(Db.Suspensions[UserId].OldRankId)) RankedBack = "Yes";
                 } catch {
                     RankedBack = "No";
                 }
@@ -157,13 +158,13 @@ module.exports = {
                     .setColor(0x00ff00)
                     .setDescription(`${Username}'s suspension has ended`)
                     .addFields(
-                        { name: "Rank Suspended From", value: Db.Suspensions[UserId].OldRankName, inline: false },
-                        { name: "Reason for Suspension", value: Reason, inline: false },
-                        { name: "Date Suspended On", value: `${FormatDate(new Date(Db.Suspensions[UserId].IssuedAt))}`, inline: false },
-                        { name: "Duration", value: FullDuration, inline: false },
-                        { name: "Ranked Back to Previous Position", value: RankedBack, inline: false }
+                        { name: "Rank Suspended From", value: Db.Suspensions[UserId].OldRankName },
+                        { name: "Reason for Suspension", value: Reason },
+                        { name: "Date Suspended On", value: FormatDate(new Date(Db.Suspensions[UserId].IssuedAt)) },
+                        { name: "Duration", value: FullDuration },
+                        { name: "Ranked Back to Previous Position", value: RankedBack }
                     )
-                    .setTimestamp(new Date());
+                    .setTimestamp();
 
                 if (LogChannel?.isTextBased()) await LogChannel.send({ embeds: [EndEmbed] });
             }, DurationMs);
