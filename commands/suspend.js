@@ -133,16 +133,16 @@ module.exports = {
 
                 let RankedBack = "No";
                 try { 
-                    await SetRank(GroupId, UserId, TargetCurrentRank.Name, Interaction.user.id, GuildId, Interaction.client); 
+                    await SetRank(GroupId, UserId, Db.Suspensions[UserId].OldRank, 0, GuildId, Interaction.client); 
                     RankedBack = "Yes"; 
-                } catch {}
+                } catch (e) {}
 
                 const EndEmbed = new EmbedBuilder()
                     .setTitle("Suspension Ended")
                     .setColor(0x00ff00)
                     .setDescription(`${Username}'s suspension has ended`)
                     .addFields(
-                        { name: "Rank Suspended From", value: TargetCurrentRank.Name, inline: false },
+                        { name: "Rank Suspended From", value: Db.Suspensions[UserId].OldRank, inline: false },
                         { name: "Reason for Suspension", value: Reason, inline: false },
                         { name: "Date Suspended On", value: new Date(Db.Suspensions[UserId].IssuedAt).toLocaleDateString(), inline: false },
                         { name: "Duration", value: FullDuration, inline: false },
