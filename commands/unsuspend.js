@@ -55,14 +55,12 @@ module.exports = {
                 : 'N/A';
 
             const userEmbed = new EmbedBuilder()
-                .setTitle("YOUR SUSPENSION HAS ENDED EARLY")
+                .setTitle("YOUR SUSPENSION HAS ENDED")
                 .setColor(0x00ff00)
-                .setDescription(`Dear, **${username}**, your suspension which was issued on ${new Date(suspension.issuedAt).toLocaleDateString()} has ended early\n\nBelow are the details of your suspension:`)
-                .addFields(
-                    { name: "Username", value: username, inline: true },
-                    { name: "Reason", value: reason, inline: false },
-                    { name: "Duration", value: durationStr, inline: true },
-                    { name: "Appeal", value: "[Join Administration Server](https://discord.gg/ZSJuzdVAee)", inline: false }
+                .setDescription(
+                    `Dear, <@${interaction.user.id}> your suspension has ended.\n\n` +
+                    `You have been ranked to your original role and may run **/getrole**.\n\n` +
+                    `If you have not been ranked please open a ticket in the [Administration](https://discord.gg/ZSJuzdVAee) server.`
                 );
 
             const logEmbed = new EmbedBuilder()
