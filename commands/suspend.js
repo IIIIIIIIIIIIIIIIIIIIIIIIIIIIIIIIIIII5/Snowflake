@@ -148,7 +148,12 @@ module.exports = {
                     await SetRank(GroupId, UserId, Db.Suspensions[UserId].OldRankId, 0, GuildId, Interaction.client);
                     await new Promise(r => setTimeout(r, 5000));
                     const AfterRank = await GetCurrentRank(GroupId, UserId);
-                    if (Number(AfterRank.Rank) === Number(Db.Suspensions[UserId].OldRankId)) RankedBack = "Yes";
+                    if (
+                        String(AfterRank.Name).toLowerCase() === String(Db.Suspensions[UserId].OldRankName).toLowerCase() ||
+                        Number(AfterRank.Rank) === Number(Db.Suspensions[UserId].OldRankId)
+                    ) {
+                        RankedBack = "Yes";
+                    }
                 } catch {
                     RankedBack = "No";
                 }
