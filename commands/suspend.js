@@ -31,6 +31,17 @@ function FormatDuration(Ms) {
     return Result.join(', ') || '0 seconds';
 }
 
+function FormatDate(DateObj) {
+    const Day = DateObj.getDate();
+    const Month = DateObj.toLocaleString('default', { month: 'long' });
+    const Year = DateObj.getFullYear();
+    const Hours = DateObj.getHours() % 12 || 12;
+    const Minutes = DateObj.getMinutes().toString().padStart(2, '0');
+    const AmPm = DateObj.getHours() >= 12 ? 'PM' : 'AM';
+    const Suffix = Day % 10 === 1 && Day !== 11 ? 'st' : Day % 10 === 2 && Day !== 12 ? 'nd' : Day % 10 === 3 && Day !== 13 ? 'rd' : 'th';
+    return `On ${Day}${Suffix} ${Month}, ${Year} at ${Hours}:${Minutes} ${AmPm}`;
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('suspend')
@@ -132,10 +143,11 @@ module.exports = {
                 await SaveJsonBin(Db);
 
                 let RankedBack = "No";
-                try { 
-                    await SetRank(GroupId, UserId, Db.Suspensions[UserId].OldRank, 0, GuildId, Interaction.client); 
-                    RankedBack = "Yes"; 
-                } catch (e) {}
+                try {
+                    await SetRank(GroupId, UserId, Db.Suspensions[UserId].OldRank, 0, GuildId, Interaction.client);
+                    const AfterRank = await GetCurrentRank(GroupId, UserId);
+                    if (AfterRank.Name === Db.Suspensions[UserId].OldRank) RankedBack = "Yes";
+                } catch {}
 
                 const EndEmbed = new EmbedBuilder()
                     .setTitle("Suspension Ended")
@@ -144,18 +156,16 @@ module.exports = {
                     .addFields(
                         { name: "Rank Suspended From", value: Db.Suspensions[UserId].OldRank, inline: false },
                         { name: "Reason for Suspension", value: Reason, inline: false },
-                        { name: "Date Suspended On", value: new Date(Db.Suspensions[UserId].IssuedAt).toLocaleDateString(), inline: false },
+                        { name: "Date Suspended On", value: FormatDate(new Date(Db.Suspensions[UserId].IssuedAt)), inline: false },
                         { name: "Duration", value: FullDuration, inline: false },
                         { name: "Ranked Back to Previous Position", value: RankedBack, inline: false }
                     )
                     .setTimestamp(new Date());
 
                 if (LogChannel?.isTextBased()) await LogChannel.send({ embeds: [EndEmbed] });
-
             }, DurationMs);
 
             await Interaction.editReply({ content: `Successfully suspended ${Username}. DM sent to the user.` });
-
         } catch (Err) {
             return Interaction.editReply({ content: `Error: ${Err.message}` });
         }
