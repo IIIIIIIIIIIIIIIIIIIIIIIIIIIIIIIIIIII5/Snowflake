@@ -42,7 +42,7 @@ function FormatDate(DateObj) {
     return `On ${Day}${Suffix} ${Month}, ${Year} at ${Hours}:${Minutes} ${AmPm}`;
 }
 
-async function TrySetRank(GroupId, UserId, RankId, GuildId, Client) {
+async function AttSetRank(GroupId, UserId, RankId, GuildId, Client) {
     try {
         await SetRank(GroupId, UserId, RankId, 0, GuildId, Client);
         await new Promise(r => setTimeout(r, 4000));
