@@ -107,7 +107,7 @@ module.exports = {
                 if (Member) {
                     const OldRoles = Member.roles.cache.map(r => r.id).filter(id => id !== interaction.guild.id);
                     if (OldRoles.length) await Member.roles.remove(OldRoles).catch(() => {});
-                    await Member.roles.add(DISCORD_ROLE_ID).catch(() => {});
+                    await Member.roles.add(DiscordRoleId).catch(() => {});
                     try { await Member.send({ embeds: [UserEmbed] }); } catch {}
                 } else {
                     try {
