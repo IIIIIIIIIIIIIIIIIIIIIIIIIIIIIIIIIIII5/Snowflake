@@ -120,7 +120,7 @@ module.exports = {
                 }
             }
 
-            const logChannel = await interaction.client.channels.fetch('1424381038393556992').catch(() => null);
+            const logChannel = await interaction.client.channels.fetch('1433025723932741694').catch(() => null);
             if (logChannel?.isTextBased()) await logChannel.send({ embeds: [logEmbed] });
 
             await interaction.editReply({ content: `Successfully suspended ${username}. DM sent to the user.` });
