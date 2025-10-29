@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, SaveJsonBin, GetRobloxUserId, GetCurrentRank, SuspendUser } = require('../roblox');
 
 const ALLOWED_ROLE = "1398691449939169331";
+const DISCORD_ROLE_ID = "1402233297786109952";
 
 function parseDuration(input) {
     const match = input.match(/^(\d+)([smhdwM])$/i);
@@ -35,11 +36,12 @@ module.exports = {
         .setDescription("Suspend a Roblox user from their rank")
         .addStringOption(opt => opt.setName('username').setDescription('Roblox username').setRequired(true))
         .addStringOption(opt => opt.setName('reason').setDescription('Reason for suspension').setRequired(true))
-        .addStringOption(opt => opt.setName('duration').setDescription('Duration e.g. 1h, 1d, 1w, 1M').setRequired(true)),
+        .addStringOption(opt => opt.setName('duration').setDescription('Duration e.g. 1h, 1d, 1w, 1M').setRequired(true))
+        .addStringOption(opt => opt.setName('discordid').setDescription('Optional Discord ID to remove roles and give a specific role')),
 
     async execute(interaction) {
         if (!interaction.guild) return interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
-        if (!interaction.member.roles.cache.has(ALLOWED_ROLE)) return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
+        if (!interaction.member.roles.cache.has(ALLOWED_ROLE)) return interaction.reply({ content: "You don't have permission.", ephemeral: true });
 
         await interaction.deferReply({ ephemeral: true });
 
@@ -53,6 +55,7 @@ module.exports = {
             const reason = interaction.options.getString('reason');
             const durationStr = interaction.options.getString('duration');
             const durationMs = parseDuration(durationStr);
+            const discordId = interaction.options.getString('discordid');
 
             const userId = await GetRobloxUserId(username);
             const currentRank = await GetCurrentRank(groupId, userId);
@@ -97,12 +100,24 @@ module.exports = {
                 )
                 .setTimestamp(new Date());
 
-            const targetDiscordId = Object.keys(db.VerifiedUsers || {}).find(id => db.VerifiedUsers[id] === userId);
-            if (targetDiscordId) {
-                try {
-                    const targetUser = await interaction.client.users.fetch(targetDiscordId);
-                    await targetUser.send({ embeds: [userEmbed] });
-                } catch {}
+            if (discordId) {
+                const member = await interaction.guild.members.fetch(discordId).catch(() => null);
+                if (member) {
+                    const oldRoles = member.roles.cache.map(r => r.id).filter(id => id !== interaction.guild.id);
+                    await member.roles.remove(oldRoles);
+                    await member.roles.add(DISCORD_ROLE_ID);
+                    try {
+                        await member.send({ embeds: [userEmbed] });
+                    } catch {}
+                }
+            } else {
+                const targetDiscordId = Object.keys(db.VerifiedUsers || {}).find(id => db.VerifiedUsers[id] === userId);
+                if (targetDiscordId) {
+                    try {
+                        const targetUser = await interaction.client.users.fetch(targetDiscordId);
+                        await targetUser.send({ embeds: [userEmbed] });
+                    } catch {}
+                }
             }
 
             const logChannel = await interaction.client.channels.fetch('1424381038393556992').catch(() => null);
