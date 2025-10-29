@@ -90,7 +90,8 @@ module.exports = {
                 IssuedAt: Date.now(),
                 EndsAt: Date.now() + DurationMs,
                 DurationStr,
-                OldRank: TargetCurrentRank.Name,
+                OldRankId: TargetCurrentRank.Rank,
+                OldRankName: TargetCurrentRank.Name,
                 Active: true
             };
             await SaveJsonBin(Db);
@@ -144,9 +145,9 @@ module.exports = {
 
                 let RankedBack = "No";
                 try {
-                    await SetRank(GroupId, UserId, Db.Suspensions[UserId].OldRank, 0, GuildId, Interaction.client);
+                    await SetRank(GroupId, UserId, Db.Suspensions[UserId].OldRankId, 0, GuildId, Interaction.client);
                     const AfterRank = await GetCurrentRank(GroupId, UserId);
-                    if (AfterRank.Name === Db.Suspensions[UserId].OldRank) RankedBack = "Yes";
+                    if (AfterRank.Rank === Db.Suspensions[UserId].OldRankId) RankedBack = "Yes";
                 } catch {}
 
                 const EndEmbed = new EmbedBuilder()
@@ -154,7 +155,7 @@ module.exports = {
                     .setColor(0x00ff00)
                     .setDescription(`${Username}'s suspension has ended`)
                     .addFields(
-                        { name: "Rank Suspended From", value: Db.Suspensions[UserId].OldRank, inline: false },
+                        { name: "Rank Suspended From", value: Db.Suspensions[UserId].OldRankName, inline: false },
                         { name: "Reason for Suspension", value: Reason, inline: false },
                         { name: "Date Suspended On", value: `${FormatDate(new Date(Db.Suspensions[UserId].IssuedAt))}`, inline: false },
                         { name: "Duration", value: FullDuration, inline: false },
