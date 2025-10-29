@@ -42,17 +42,6 @@ function FormatDate(DateObj) {
     return `On ${Day}${Suffix} ${Month}, ${Year} at ${Hours}:${Minutes} ${AmPm}`;
 }
 
-async function AttSetRank(GroupId, UserId, RankId, GuildId, Client) {
-    try {
-        await SetRank(GroupId, UserId, RankId, 0, GuildId, Client);
-        await new Promise(r => setTimeout(r, 4000));
-        const AfterRank = await GetCurrentRank(GroupId, UserId);
-        return Number(AfterRank.Rank) === Number(RankId) || String(AfterRank.Name).toLowerCase().includes(String(RankId).toLowerCase());
-    } catch {
-        return false;
-    }
-}
-
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('suspend')
@@ -154,7 +143,9 @@ module.exports = {
                 Db.Suspensions[UserId].Active = false;
                 await SaveJsonBin(Db);
 
-                const RankedBack = await AttSetRank(GroupId, UserId, Db.Suspensions[UserId].OldRankId, GuildId, Interaction.client) ? "Yes" : "No";
+                try {
+                    await SetRank(GroupId, UserId, Db.Suspensions[UserId].OldRankId, 0, GuildId, Interaction.client);
+                } catch {}
 
                 const EndEmbed = new EmbedBuilder()
                     .setTitle("Suspension Ended")
@@ -164,8 +155,7 @@ module.exports = {
                         { name: "Rank Suspended From", value: Db.Suspensions[UserId].OldRankName },
                         { name: "Reason for Suspension", value: Reason },
                         { name: "Date Suspended On", value: FormatDate(new Date(Db.Suspensions[UserId].IssuedAt)) },
-                        { name: "Duration", value: FullDuration },
-                        { name: "Ranked Back to Previous Position", value: RankedBack }
+                        { name: "Duration", value: FullDuration }
                     )
                     .setTimestamp();
 
