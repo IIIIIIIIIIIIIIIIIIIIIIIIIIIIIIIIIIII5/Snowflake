@@ -81,18 +81,18 @@ module.exports = {
                 await SetRank(Db.ServerConfig[GuildId].GroupId, UserId, Suspension.oldRank, interaction.user.id, GuildId, interaction.client);
 
             if (TargetDiscordId) {
-                const Member = await interaction.guild.members.fetch(TargetDiscordId).catch(() => null);
-                if (Member) {
-                    const OldRoles = Member.roles.cache.map(r => r.id).filter(id => id !== interaction.guild.id);
-                    if (OldRoles.length) await Member.roles.remove(OldRoles);
-                    await Member.roles.add(DiscordRoleId).catch(() => {});
-                    try { await Member.send({ embeds: [UserEmbed] }); } catch {}
-                } else {
-                    try {
+                try {
+                    const Member = await interaction.guild.members.fetch(TargetDiscordId).catch(() => null);
+                    if (Member) {
+                        const OldRoles = Member.roles.cache.map(r => r.id).filter(id => id !== interaction.guild.id);
+                        if (OldRoles.length) await Member.roles.remove(OldRoles);
+                        await Member.roles.add(DiscordRoleId).catch(() => {});
+                        await Member.send({ embeds: [UserEmbed] }).catch(() => {});
+                    } else {
                         const TargetUser = await interaction.client.users.fetch(TargetDiscordId);
-                        await TargetUser.send({ embeds: [UserEmbed] });
-                    } catch {}
-                }
+                        await TargetUser.send({ embeds: [UserEmbed] }).catch(() => {});
+                    }
+                } catch {}
             }
 
             const LogChannel = await interaction.client.channels.fetch('1433025723932741694').catch(() => null);
