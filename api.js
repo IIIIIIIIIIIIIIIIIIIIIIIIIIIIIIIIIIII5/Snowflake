@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const Roblox = require('./roblox');
 
 const app = express();
@@ -14,12 +15,35 @@ function CheckAuth(req, res, next) {
 
 app.post('/api/verify', CheckAuth, async (req, res) => {
   try {
-    const { discordUsername, robloxUsername, code } = req.body;
-    if (!discordUsername || !robloxUsername || !code) return res.status(400).json({ error: 'Missing fields' });
+    const { discordUsername, robloxUsername } = req.body;
+    if (!discordUsername || !robloxUsername) return res.status(400).json({ error: 'Missing fields' });
 
+    const code = 'VERIFY-' + crypto.randomBytes(3).toString('hex').toUpperCase();
     const robloxId = await Roblox.GetRobloxUserId(robloxUsername);
+
     Roblox.startVerification(discordUsername, robloxId, code);
-    return res.json({ success: true, message: 'Verification started', robloxId });
+    return res.json({ success: true, code, robloxId });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/verify/submit', CheckAuth, async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ error: 'Missing verification code' });
+
+    const entry = Object.entries(Roblox.Verifications).find(([discordUsername, v]) => v.Code === code);
+    if (!entry) return res.status(400).json({ error: 'Invalid or expired verification code' });
+
+    const [discordUsername, verification] = entry;
+    const db = await Roblox.GetJsonBin();
+    db.VerifiedUsers = db.VerifiedUsers || {};
+    db.VerifiedUsers[discordUsername] = verification.RobloxUserId;
+    await Roblox.SaveJsonBin(db);
+    delete Roblox.Verifications[discordUsername];
+
+    return res.json({ success: true, robloxId: verification.RobloxUserId });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -36,7 +60,7 @@ app.post('/api/verify/force', CheckAuth, async (req, res) => {
     db.VerifiedUsers[discordUsername] = robloxId;
     await Roblox.SaveJsonBin(db);
 
-    return res.json({ success: true, message: 'Force verified', robloxId });
+    return res.json({ success: true, robloxId });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -45,8 +69,7 @@ app.post('/api/verify/force', CheckAuth, async (req, res) => {
 app.post('/api/setrank', CheckAuth, async (req, res) => {
   try {
     const { groupId, userId, newRankName, issuerDiscordId, guildId } = req.body;
-    if (!groupId || !userId || !newRankName || !issuerDiscordId || !guildId)
-      return res.status(400).json({ error: 'Missing fields' });
+    if (!groupId || !userId || !newRankName || !issuerDiscordId || !guildId) return res.status(400).json({ error: 'Missing fields' });
 
     if (!global.ClientBot) return res.status(500).json({ error: 'Discord client not ready' });
 
@@ -59,7 +82,7 @@ app.post('/api/setrank', CheckAuth, async (req, res) => {
 
 function StartApi() {
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => console.log(`API running on port ${PORT}`));
+  app.listen(PORT);
 }
 
 module.exports = { app, StartApi };
