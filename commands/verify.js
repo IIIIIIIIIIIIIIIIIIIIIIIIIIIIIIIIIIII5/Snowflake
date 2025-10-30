@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const crypto = require('crypto');
 const { GetRobloxUserId, startVerification, isUserVerified } = require('../roblox');
 
@@ -24,15 +24,20 @@ module.exports = {
     const code = 'VERIFY-' + crypto.randomBytes(3).toString('hex').toUpperCase();
     startVerification(interaction.user.id, userId, code);
 
-    const button = new ButtonBuilder()
-      .setCustomId('done_verification')
-      .setLabel('Done')
-      .setStyle(ButtonStyle.Primary);
-    const row = new ActionRowBuilder().addComponents(button);
+    try {
+      await interaction.user.send(
+        `Join the Roblox game and enter the code displayed below:\n**Your verification code:** ${code}`
+      );
 
-    return interaction.editReply({
-      content: `Put this code in your Roblox profile description:\n${code}\nThen click the Done button when finished.`,
-      components: [row]
-    });
+      return interaction.editReply({
+        content: 'I have sent you a DM with instructions to verify your Roblox account.',
+        ephemeral: true
+      });
+    } catch (err) {
+      return interaction.editReply({
+        content: 'I could not DM you. Please make sure your DMs are open and try again.',
+        ephemeral: true
+      });
+    }
   }
 };
