@@ -9,6 +9,10 @@ module.exports = {
 
   async execute(interaction, client) {
     await interaction.deferReply({ ephemeral: true });
+    if (interaction.user.id !== interaction.guild.ownerId) {
+      return interaction.editReply({ content: 'Only the server owner can use this command.' });
+    }
+
     const groupId = interaction.options.getInteger('groupid');
 
     const db = await GetJsonBin();
