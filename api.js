@@ -14,11 +14,11 @@ function CheckAuth(req, res, next) {
 
 app.post('/api/verify', CheckAuth, async (req, res) => {
   try {
-    const { discordId, robloxUsername, code } = req.body;
-    if (!discordId || !robloxUsername || !code) return res.status(400).json({ error: 'Missing fields' });
+    const { discordUsername, robloxUsername, code } = req.body;
+    if (!discordUsername || !robloxUsername || !code) return res.status(400).json({ error: 'Missing fields' });
 
     const robloxId = await Roblox.GetRobloxUserId(robloxUsername);
-    Roblox.startVerification(discordId, robloxId, code);
+    Roblox.startVerification(discordUsername, robloxId, code);
     return res.json({ success: true, message: 'Verification started', robloxId });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -27,13 +27,13 @@ app.post('/api/verify', CheckAuth, async (req, res) => {
 
 app.post('/api/verify/force', CheckAuth, async (req, res) => {
   try {
-    const { discordId, robloxUsername } = req.body;
-    if (!discordId || !robloxUsername) return res.status(400).json({ error: 'Missing fields' });
+    const { discordUsername, robloxUsername } = req.body;
+    if (!discordUsername || !robloxUsername) return res.status(400).json({ error: 'Missing fields' });
 
     const robloxId = await Roblox.GetRobloxUserId(robloxUsername);
     const db = await Roblox.GetJsonBin();
     db.VerifiedUsers = db.VerifiedUsers || {};
-    db.VerifiedUsers[discordId] = robloxId;
+    db.VerifiedUsers[discordUsername] = robloxId;
     await Roblox.SaveJsonBin(db);
 
     return res.json({ success: true, message: 'Force verified', robloxId });
@@ -59,20 +59,32 @@ app.post('/api/setrank', CheckAuth, async (req, res) => {
 
 app.post('/api/verify/submit', CheckAuth, async (req, res) => {
   try {
-    const { discordId, code } = req.body;
-    if (!discordId || !code) return res.status(400).json({ error: 'Missing fields' });
+    const { discordUsername, code } = req.body;
+    if (!discordUsername || !code) return res.status(400).json({ error: 'Missing fields' });
 
-    const verification = Roblox.Verifications[discordId];
-    if (!verification) return res.status(400).json({ error: 'No pending verification for this user' });
+    if (!global.ClientBot) return res.status(500).json({ error: 'Discord client not ready' });
 
+    let userId;
+    for (const [, guild] of global.ClientBot.guilds.cache) {
+      const member = guild.members.cache.find(m => `${m.user.username}#${m.user.discriminator}` === discordUsername);
+      if (member) {
+        userId = member.id;
+        break;
+      }
+    }
+
+    if (!userId) return res.status(404).json({ error: 'Discord user not found' });
+
+    const verification = Roblox.Verifications[userId];
+    if (!verification) return res.status(400).json({ error: 'No pending verification' });
     if (verification.Code !== code) return res.status(400).json({ error: 'Invalid code' });
 
     const db = await Roblox.GetJsonBin();
     db.VerifiedUsers = db.VerifiedUsers || {};
-    db.VerifiedUsers[discordId] = verification.RobloxUserId;
+    db.VerifiedUsers[userId] = verification.RobloxUserId;
     await Roblox.SaveJsonBin(db);
 
-    delete Roblox.Verifications[discordId];
+    delete Roblox.Verifications[userId];
     return res.json({ success: true, message: 'Verification complete', robloxId: verification.RobloxUserId });
   } catch (err) {
     return res.status(500).json({ error: err.message });
