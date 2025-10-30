@@ -59,32 +59,21 @@ app.post('/api/setrank', CheckAuth, async (req, res) => {
 
 app.post('/api/verify/submit', CheckAuth, async (req, res) => {
   try {
-    const { discordUsername, code } = req.body;
-    if (!discordUsername || !code) return res.status(400).json({ error: 'Missing fields' });
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ error: 'Missing verification code' });
 
-    if (!global.ClientBot) return res.status(500).json({ error: 'Discord client not ready' });
+    const verificationEntry = Object.entries(Roblox.Verifications).find(([discordId, v]) => v.Code === code);
+    if (!verificationEntry) return res.status(400).json({ error: 'Invalid or expired verification code' });
 
-    let userId;
-    for (const [, guild] of global.ClientBot.guilds.cache) {
-      const member = guild.members.cache.find(m => `${m.user.username}#${m.user.discriminator}` === discordUsername);
-      if (member) {
-        userId = member.id;
-        break;
-      }
-    }
-
-    if (!userId) return res.status(404).json({ error: 'Discord user not found' });
-
-    const verification = Roblox.Verifications[userId];
-    if (!verification) return res.status(400).json({ error: 'No pending verification' });
-    if (verification.Code !== code) return res.status(400).json({ error: 'Invalid code' });
+    const [discordId, verification] = verificationEntry;
 
     const db = await Roblox.GetJsonBin();
     db.VerifiedUsers = db.VerifiedUsers || {};
-    db.VerifiedUsers[userId] = verification.RobloxUserId;
+    db.VerifiedUsers[discordId] = verification.RobloxUserId;
     await Roblox.SaveJsonBin(db);
 
-    delete Roblox.Verifications[userId];
+    delete Roblox.Verifications[discordId];
+
     return res.json({ success: true, message: 'Verification complete', robloxId: verification.RobloxUserId });
   } catch (err) {
     return res.status(500).json({ error: err.message });
