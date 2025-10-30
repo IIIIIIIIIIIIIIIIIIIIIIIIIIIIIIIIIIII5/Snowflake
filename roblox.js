@@ -157,11 +157,6 @@ async function GetRobloxUserId(username) {
   return res.data.data[0].id;
 }
 
-async function isUserVerified(discordId) {
-  const data = await GetJsonBin();
-  return !!(data.VerifiedUsers && data.VerifiedUsers[discordId]);
-}
-
 async function GetRobloxUserInfo(userId) {
   const res = await axios.get(`https://users.roblox.com/v1/users/${userId}`);
   return res.data;
@@ -281,6 +276,5 @@ module.exports = {
   PendingApprovals,
   startVerification,
   HandleVerificationButton,
-  SuspendUser,
-  isUserVerified
+  SuspendUser
 };
