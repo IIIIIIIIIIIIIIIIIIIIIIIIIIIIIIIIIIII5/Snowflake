@@ -1,5 +1,4 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, InteractionType } = require('discord.js');
-
 const fetch = require('node-fetch');
 
 const API_URL = process.env.VERIFY_API_URL;
@@ -13,23 +12,31 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
-    const username = interaction.options.getString('username');
+    const robloxUsername = interaction.options.getString('username');
+
+    const res = await fetch(`${API_URL}/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
+      body: JSON.stringify({ discordUsername: interaction.user.username, robloxUsername })
+    });
+    const data = await res.json();
+    if (!data.success) return interaction.editReply({ content: 'Failed to generate code', ephemeral: true });
+
+    const code = data.code;
 
     const button = new ButtonBuilder()
-      .setCustomId('start_verification')
-      .setLabel('Start Verification')
+      .setCustomId('submit_code')
+      .setLabel('Enter Code')
       .setStyle(ButtonStyle.Primary);
-
     const row = new ActionRowBuilder().addComponents(button);
 
     await interaction.editReply({
-      content: `Click the button below to start verification for **${username}**. Join the [Roblox game](${process.env.VERIFY_GAME_URL}) to see your code.`,
+      content: `Join the [Roblox game](${process.env.VERIFY_GAME_URL}) to see your code.`,
       components: [row],
       ephemeral: true
     });
 
-    const filter = i => i.customId === 'start_verification' && i.user.id === interaction.user.id;
-
+    const filter = i => i.customId === 'submit_code' && i.user.id === interaction.user.id;
     const collector = interaction.channel.createMessageComponentCollector({ filter, time: 5 * 60 * 1000, max: 1 });
 
     collector.on('collect', async btnInteraction => {
@@ -45,36 +52,24 @@ module.exports = {
               .setRequired(true)
           )
         );
-
       await btnInteraction.showModal(modal);
     });
 
     const modalFilter = i => i.type === InteractionType.ModalSubmit && i.customId === 'submit_verification_code' && i.user.id === interaction.user.id;
-
     const modalCollector = interaction.channel.createMessageComponentCollector({ filter: modalFilter, time: 5 * 60 * 1000 });
 
     modalCollector.on('collect', async modalInteraction => {
-      const code = modalInteraction.fields.getTextInputValue('verification_code');
+      const enteredCode = modalInteraction.fields.getTextInputValue('verification_code');
 
-      try {
-        const response = await fetch(`${API_URL}/verify/submit`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${API_KEY}`
-          },
-          body: JSON.stringify({ code })
-        });
+      const submitRes = await fetch(`${API_URL}/verify/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
+        body: JSON.stringify({ code: enteredCode })
+      });
+      const submitData = await submitRes.json();
 
-        const data = await response.json();
-        if (data.success) {
-          return modalInteraction.reply({ content: `Verified! Linked to Roblox ID: ${data.robloxId}`, ephemeral: true });
-        } else {
-          return modalInteraction.reply({ content: `Invalid code. Please try again.`, ephemeral: true });
-        }
-      } catch (err) {
-        return modalInteraction.reply({ content: `An error occurred. Please try again later.`, ephemeral: true });
-      }
+      if (submitData.success) return modalInteraction.reply({ content: `Verified! Linked Roblox ID: ${submitData.robloxId}`, ephemeral: true });
+      return modalInteraction.reply({ content: 'Invalid code. Please try again.', ephemeral: true });
     });
   }
 };
