@@ -57,6 +57,28 @@ app.post('/api/setrank', CheckAuth, async (req, res) => {
   }
 });
 
+app.post('/api/verify/submit', CheckAuth, async (req, res) => {
+  try {
+    const { discordId, code } = req.body;
+    if (!discordId || !code) return res.status(400).json({ error: 'Missing fields' });
+
+    const verification = Roblox.Verifications[discordId];
+    if (!verification) return res.status(400).json({ error: 'No pending verification for this user' });
+
+    if (verification.Code !== code) return res.status(400).json({ error: 'Invalid code' });
+
+    const db = await Roblox.GetJsonBin();
+    db.VerifiedUsers = db.VerifiedUsers || {};
+    db.VerifiedUsers[discordId] = verification.RobloxUserId;
+    await Roblox.SaveJsonBin(db);
+
+    delete Roblox.Verifications[discordId];
+    return res.json({ success: true, message: 'Verification complete', robloxId: verification.RobloxUserId });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 function StartApi() {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => console.log(`API running on port ${PORT}`));
