@@ -1,18 +1,14 @@
 const { SlashCommandBuilder } = require('discord.js');
+const { startVerification, GetJsonBin, SaveJsonBin } = require('../roblox');
 const crypto = require('crypto');
-const { GetRobloxUserId, startVerification, GetJsonBin, SaveJsonBin } = require('../roblox');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('reverify')
-    .setDescription('Switch your linked Roblox account')
-    .addStringOption(opt => opt.setName('username').setDescription('Your new Roblox username').setRequired(true)),
+    .setDescription('Switch your linked Roblox account'),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
-
-    const username = interaction.options.getString('username');
-    const userId = await GetRobloxUserId(username);
 
     const dbData = await GetJsonBin();
     dbData.VerifiedUsers = dbData.VerifiedUsers || {};
@@ -20,22 +16,11 @@ module.exports = {
     await SaveJsonBin(dbData);
 
     const code = 'VERIFY-' + crypto.randomBytes(3).toString('hex').toUpperCase();
-    startVerification(interaction.user.id, userId, code);
+    startVerification(interaction.user.id, null, code);
 
-    try {
-      await interaction.user.send(
-        `Join the Roblox game and enter the verification code displayed below:\nYour new verification code: ${code}`
-      );
-
-      return interaction.editReply({
-        content: 'I have sent you a DM with your new verification code.',
-        ephemeral: true
-      });
-    } catch (err) {
-      return interaction.editReply({
-        content: 'I could not DM you. Please make sure your DMs are open and try again.',
-        ephemeral: true
-      });
-    }
+    return interaction.editReply({
+      content: "Join the Roblox game. The game will generate a new code for you. Once you see it, enter it in Discord to complete verification.",
+      ephemeral: true
+    });
   }
 };
