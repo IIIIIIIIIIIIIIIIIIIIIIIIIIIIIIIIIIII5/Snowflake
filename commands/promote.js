@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('discord.js');
 const { GetJsonBin, GetRobloxUserId, GetCurrentRank, FetchRoles, SetRank } = require('../roblox');
 
 const ALLOWED_ROLE = '1423332095001890908';
+const SFPLeadershipRole = '1386369108408406096';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -10,7 +11,7 @@ module.exports = {
     .addStringOption(opt => opt.setName('username').setDescription('Roblox username').setRequired(true)),
 
   async execute(interaction) {
-    if (!interaction.member.roles.cache.has(ALLOWED_ROLE))
+    if (!interaction.member.roles.cache.has(ALLOWED_ROLE) && !interaction.member.roles.cache.has(SFPLeadershipRole))
       return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
 
     await interaction.deferReply({ ephemeral: true });
