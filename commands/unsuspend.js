@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, SaveJsonBin, GetRobloxUserId, SetRank } = require('../roblox');
 
 const AllowedRole = "1398691449939169331";
+const SFPLeadershipRole = "1386369108408406096";
 const DiscordRoleId = "1402233297786109952";
 
 function FormatDuration(ms) {
@@ -31,7 +32,7 @@ module.exports = {
 
     async execute(interaction) {
         const GuildId = interaction.guild.id;
-        if (!interaction.member.roles.cache.has(AllowedRole))
+        if (!interaction.member.roles.cache.has(AllowedRole) && !interaction.member.roles.cache.has(SFPLeadershipRole))
             return interaction.reply({ content: "You don't have permission.", ephemeral: true });
 
         await interaction.deferReply({ ephemeral: true });
