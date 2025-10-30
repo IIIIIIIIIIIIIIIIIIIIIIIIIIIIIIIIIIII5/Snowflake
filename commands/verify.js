@@ -14,7 +14,7 @@ module.exports = {
     const alreadyVerified = await isUserVerified(interaction.user.id);
     if (alreadyVerified) {
       return interaction.editReply(
-        "You're already verified. If you want to switch your account, use `/reverify`."
+        "You're already verified. If you want to switch your account, use /reverify."
       );
     }
 
@@ -26,7 +26,7 @@ module.exports = {
 
     try {
       await interaction.user.send(
-        `Join the Roblox game and enter the code displayed below:\n**Your verification code:** ${code}`
+        `Join the Roblox game and enter the code displayed below along with your Discord username:\nYour verification code: ${code}`
       );
 
       return interaction.editReply({
