@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, SaveJsonBin, GetRobloxUserId, GetCurrentRank, SuspendUser, SetRank } = require('../roblox');
 
 const AllowedRole = "1398691449939169331";
+const SFPLeadershipRole = "1386369108408406096";
 const DiscordRoleId = "1402233297786109952";
 const SuspensionLogChannelId = "1433025723932741694";
 
@@ -53,7 +54,7 @@ module.exports = {
 
     async execute(Interaction) {
         if (!Interaction.guild) return Interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
-        if (!Interaction.member.roles.cache.has(AllowedRole)) return Interaction.reply({ content: "You don't have permission.", ephemeral: true });
+        if (!Interaction.member.roles.cache.has(AllowedRole) && !Interaction.member.roles.cache.has(SFPLeadershipRole)) return Interaction.reply({ content: "You don't have permission.", ephemeral: true });
 
         await Interaction.deferReply({ ephemeral: true });
 
