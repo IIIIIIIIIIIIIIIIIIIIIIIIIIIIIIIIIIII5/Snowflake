@@ -1,6 +1,9 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, SaveJsonBin } = require('../roblox');
 
+const SFPLeadershipRole = '1386369108408406096';
+const allowedRoleId = '1424007337210937445';
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('host')
@@ -10,12 +13,11 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
+    const memberRole = interaction.member.roles.resolve(allowedRoleId);
+    if (!memberRole && !interaction.member.roles.cache.has(SFPLeadershipRole))
+      return interaction.editReply({ content: 'You do not have permission to host a training.' });
 
     const db = await GetJsonBin();
-    const allowedRoleId = '1424007337210937445';
-    const memberRole = interaction.member.roles.resolve(allowedRoleId);
-    if (!memberRole) return interaction.editReply({ content: 'You do not have permission to host a training.' });
-
     const host = interaction.user;
     const cohost = interaction.options.getUser('cohost');
     const supervisor = interaction.options.getUser('supervisor');
