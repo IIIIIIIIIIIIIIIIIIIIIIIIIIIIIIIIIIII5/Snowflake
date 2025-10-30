@@ -102,6 +102,30 @@ function startVerification(discordId, robloxUserId, code) {
   Verifications[discordId] = { RobloxUserId: robloxUserId, Code: code };
 }
 
+async function HandleVerificationButton(interaction) {
+  await interaction.deferReply({ ephemeral: true });
+  const data = Verifications[interaction.user.id];
+  if (!data) return interaction.editReply({ content: "You haven't started verification yet." });
+
+  try {
+    const desc = await GetRobloxDescription(data.RobloxUserId);
+    if (!desc.includes(data.Code))
+      return interaction.editReply({ content: "Code not found in your profile. Make sure you added it and try again." });
+
+    const dbData = await GetJsonBin();
+    dbData.VerifiedUsers = dbData.VerifiedUsers || {};
+    dbData.VerifiedUsers[interaction.user.id] = data.RobloxUserId;
+
+    await SaveJsonBin(dbData);
+    delete Verifications[interaction.user.id];
+
+    return interaction.editReply({ content: `Verified! Linked to Roblox ID ${data.RobloxUserId}` });
+  } catch (err) {
+    console.error('Verification failed:', err);
+    return interaction.editReply({ content: "An error occurred during verification." });
+  }
+}
+
 async function SuspendUser(groupId, userId, issuerDiscordId, guildId, client = global.ClientBot, durationMs = 0) {
     const dbData = await GetJsonBin();
 
@@ -244,5 +268,6 @@ module.exports = {
   SuspendUser,
   Verifications,
   startVerification,
+  HandleVerificationButton,
   LoadActiveSuspensions
 };
