@@ -24,7 +24,7 @@ module.exports = {
 
     try {
       await interaction.user.send(
-        `Join the Roblox game and enter the code displayed below:\n**Your new verification code:** ${code}`
+        `Join the Roblox game and enter the code displayed below along with your Discord username:\nYour new verification code: ${code}`
       );
 
       return interaction.editReply({
