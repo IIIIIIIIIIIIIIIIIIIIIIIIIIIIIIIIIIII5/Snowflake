@@ -266,7 +266,7 @@ function ScheduleAutoUnsuspend(UserId, SuspensionRecord, Client) {
       delete ScheduledTimers[UserId];
     }, Remaining);
   } catch (err) {
-    console.error('scheduleAutoUnsuspend error:', err);
+    console.error('AutoUnsuspend error:', err);
   }
 }
 
