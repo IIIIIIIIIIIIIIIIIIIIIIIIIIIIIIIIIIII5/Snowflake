@@ -1,24 +1,22 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const axios = require("axios");
 const { GetJsonBin, GetRobloxUserInfo, GetCurrentRank, FetchRoles } = require("../roblox");
 
 const BIN_ID = process.env.SNOWFLAKE_MODERATION_BIN_ID;
 const API_KEY = process.env.SNOWFLAKE_JSONBIN_API_KEY;
 
 async function GetModerationData() {
-  const res = await axios.get(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+  const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
     headers: { "X-Master-Key": API_KEY }
   });
-  return res.data.record;
+  const data = await res.json();
+  return data.record || [];
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("profile")
     .setDescription("View your training and group statistics.")
-    .addUserOption(opt =>
-      opt.setName("user").setDescription("The Discord user to view.").setRequired(false)
-    ),
+    .addUserOption(opt => opt.setName("user").setDescription("The Discord user to view.").setRequired(false)),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: false });
@@ -26,16 +24,18 @@ module.exports = {
     const db = await GetJsonBin();
     const moderationData = await GetModerationData();
     const target = interaction.options.getUser("user") || interaction.user;
+
     const trainings = db.Trainings?.[target.id] || { hosted: {}, cohosted: {}, supervised: {} };
     const monthKey = new Date().toISOString().slice(0, 7);
 
-    const getStats = type => {
+    const getStats = (type) => {
       const data = trainings[type] || {};
       if (data.lastMonth !== monthKey) {
         data[monthKey] = 0;
         data.lastMonth = monthKey;
       }
-      return { monthly: data[monthKey] || 0, total: data.total || 0 };
+      if (!("total" in data)) data.total = 0;
+      return { monthly: data[monthKey] || 0, total: data.total };
     };
 
     const hosted = getStats("hosted");
@@ -44,21 +44,27 @@ module.exports = {
 
     const robloxId = db.VerifiedUsers?.[target.id];
     let username = "Not Verified";
-    let url, avatarUrl;
+    let url = null;
+    let avatarUrl = target.displayAvatarURL({ size: 128 });
 
     if (robloxId) {
-      const info = await GetRobloxUserInfo(robloxId);
-      username = info.name;
-      url = `https://www.roblox.com/users/${robloxId}/profile`;
-      const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=420x420&format=Png&isCircular=false`);
-      const thumbData = await thumbRes.json();
-      avatarUrl = thumbData?.data?.[0]?.imageUrl;
+      try {
+        const name = await GetRobloxUserInfo(robloxId);
+        username = name || "Unknown User";
+        url = `https://www.roblox.com/users/${robloxId}/profile`;
+
+        const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=420x420&format=Png&isCircular=false`);
+        const thumbData = await thumbRes.json();
+        avatarUrl = thumbData?.data?.[0]?.imageUrl || avatarUrl;
+      } catch {
+        username = "Unknown User";
+      }
     }
 
     const hostingEmbed = new EmbedBuilder()
       .setTitle(`${username}'s Hosting Stats`)
       .setColor(0x1abc9c)
-      .setThumbnail(avatarUrl || target.displayAvatarURL({ size: 128 }))
+      .setThumbnail(avatarUrl)
       .addFields(
         { name: "Trainings Hosted (Monthly)", value: `${hosted.monthly}`, inline: true },
         { name: "Trainings Co-Hosted (Monthly)", value: `${cohosted.monthly}`, inline: true },
@@ -107,17 +113,17 @@ module.exports = {
             warnings = warnCount > 0 ? String(warnCount) : "None";
 
             const lastAction = userModeration[userModeration.length - 1];
-            if (lastAction) lastPunishment = lastAction.timestamp === "Unknown" ? "Unknown" : lastAction.timestamp;
+            if (lastAction) lastPunishment = lastAction.timestamp || "Nil";
           }
 
           groupEmbed = new EmbedBuilder()
             .setTitle(`${username}'s Group Stats`)
             .setColor(0x5865f2)
-            .setThumbnail(avatarUrl || target.displayAvatarURL({ size: 128 }))
+            .setThumbnail(avatarUrl)
             .addFields(
               { name: "Group Rank", value: groupRank, inline: false },
               { name: "Warnings", value: warnings, inline: false },
-              { name: "Last Punishment", value: lastPunishment || "Nil", inline: false }
+              { name: "Last Punishment", value: lastPunishment, inline: false }
             );
         }
 
@@ -128,7 +134,8 @@ module.exports = {
     collector.on("end", async () => {
       try {
         await interaction.editReply({ components: [] });
-      } catch {}
+      } catch
+      {}
     });
   }
 };
