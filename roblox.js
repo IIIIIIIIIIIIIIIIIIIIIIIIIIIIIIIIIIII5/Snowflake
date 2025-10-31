@@ -251,7 +251,7 @@ async function SuspendUser(GroupId, UserId, IssuerDiscordId, GuildId, Client = g
 
 const ScheduledTimers = {};
 
-function scheduleAutoUnsuspend(UserId, SuspensionRecord, Client) {
+function ScheduleAutoUnsuspend(UserId, SuspensionRecord, Client) {
   try {
     const Now = Date.now();
     if (!SuspensionRecord || !SuspensionRecord.EndsAt) return;
@@ -334,7 +334,7 @@ async function LoadActiveSuspensions(Client = global.ClientBot) {
       const Suspension = Data.Suspensions[UserId];
       if (!Suspension || !Suspension.Active) continue;
       if (!Suspension.EndsAt) continue;
-      scheduleAutoUnsuspend(UserId, Suspension, Client);
+      ScheduleAutoUnsuspend(UserId, Suspension, Client);
     }
   } catch (err) {
     console.error('LoadActiveSuspensions error:', err);
