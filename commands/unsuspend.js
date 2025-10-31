@@ -2,16 +2,17 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, SaveJsonBin, GetRobloxUserId, SetRank } = require('../roblox');
 
 const AllowedRole = "1398691449939169331";
-const SFPLeadershipRole = "1386369108408406096";
+const SfpLeadershipRole = "1386369108408406096";
 const DiscordRoleId = "1402233297786109952";
+const SuspensionLogChannelId = "1433025723932741694";
 
-function FormatDuration(ms) {
-    const Seconds = Math.floor(ms / 1000) % 60;
-    const Minutes = Math.floor(ms / (60 * 1000)) % 60;
-    const Hours = Math.floor(ms / (60 * 60 * 1000)) % 24;
-    const Days = Math.floor(ms / (24 * 60 * 60 * 1000)) % 7;
-    const Weeks = Math.floor(ms / (7 * 24 * 60 * 60 * 1000)) % 4;
-    const Months = Math.floor(ms / (30 * 24 * 60 * 60 * 1000));
+function FormatDuration(Ms) {
+    const Seconds = Math.floor(Ms / 1000) % 60;
+    const Minutes = Math.floor(Ms / (60 * 1000)) % 60;
+    const Hours = Math.floor(Ms / (60 * 60 * 1000)) % 24;
+    const Days = Math.floor(Ms / (24 * 60 * 60 * 1000)) % 7;
+    const Weeks = Math.floor(Ms / (7 * 24 * 60 * 60 * 1000)) % 4;
+    const Months = Math.floor(Ms / (30 * 24 * 60 * 60 * 1000));
     let Result = [];
     if (Months) Result.push(`${Months} month${Months > 1 ? 's' : ''}`);
     if (Weeks) Result.push(`${Weeks} week${Weeks > 1 ? 's' : ''}`);
@@ -22,17 +23,28 @@ function FormatDuration(ms) {
     return Result.join(', ') || '0 seconds';
 }
 
+function FormatDate(DateObj) {
+    const Day = DateObj.getDate();
+    const Month = DateObj.toLocaleString('default', { month: 'long' });
+    const Year = DateObj.getFullYear();
+    const Hours = DateObj.getHours() % 12 || 12;
+    const Minutes = DateObj.getMinutes().toString().padStart(2, '0');
+    const AmPm = DateObj.getHours() >= 12 ? 'PM' : 'AM';
+    const Suffix = Day % 10 === 1 && Day !== 11 ? 'st' : Day % 10 === 2 && Day !== 12 ? 'nd' : Day % 10 === 3 && Day !== 13 ? 'rd' : 'th';
+    return `On ${Day}${Suffix} ${Month}, ${Year} at ${Hours}:${Minutes} ${AmPm}`;
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('unsuspend')
-        .setDescription("Remove a user's suspension")
+        .setDescription('Remove a user\'s suspension')
         .addStringOption(opt => opt.setName('username').setDescription('Roblox username to unsuspend').setRequired(true))
         .addStringOption(opt => opt.setName('reason').setDescription('Reason for ending the suspension').setRequired(true))
-        .addStringOption(opt => opt.setName('discordid').setDescription('Optional Discord ID to remove roles and give a specific role')),
+        .addStringOption(opt => opt.setName('discordid').setDescription('Optional Discord ID to DM / role-manage')),
 
     async execute(interaction) {
         const GuildId = interaction.guild.id;
-        if (!interaction.member.roles.cache.has(AllowedRole) && !interaction.member.roles.cache.has(SFPLeadershipRole))
+        if (!interaction.member.roles.cache.has(AllowedRole) && !interaction.member.roles.cache.has(SfpLeadershipRole))
             return interaction.reply({ content: "You don't have permission.", ephemeral: true });
 
         await interaction.deferReply({ ephemeral: true });
@@ -48,68 +60,71 @@ module.exports = {
             const UserId = await GetRobloxUserId(Username);
 
             const Suspension = Db.Suspensions?.[UserId];
-            if (!Suspension || !Suspension.active)
+            if (!Suspension || !Suspension.Active)
                 return interaction.editReply({ content: `${Username} is not currently suspended.` });
 
-            Suspension.active = false;
+            Suspension.Active = false;
             await SaveJsonBin(Db);
 
-            const DurationStr = Suspension.issuedAt && Suspension.endsAt
-                ? FormatDuration(Suspension.endsAt - Suspension.issuedAt)
-                : 'N/A';
+            const DurationStr = Suspension.IssuedAt && Suspension.EndsAt ? FormatDuration(Suspension.EndsAt - Suspension.IssuedAt) : 'N/A';
 
-            let TargetDiscordId = DiscordIdOption;
-            if (!TargetDiscordId) {
-                TargetDiscordId = Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === UserId);
-            }
+            const TargetDiscordId = DiscordIdOption || Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === UserId);
 
             const UserEmbed = new EmbedBuilder()
-                .setTitle("YOUR SUSPENSION HAS ENDED EARLY")
+                .setTitle('YOUR SUSPENSION HAS ENDED EARLY')
                 .setColor(0x00ff00)
-                .setDescription(
-                    `Dear, <@${TargetDiscordId}>, your suspension has ended early.\n\n` +
-                    `You have been ranked to your original role and may run **/getrole**.\n\n` +
-                    `If you have not been ranked please open a ticket in the [Administration](https://discord.gg/ZSJuzdVAee) server.`
-                );
+                .setDescription(`Dear, <@${TargetDiscordId}>, your suspension has ended early.\n\nYou have been ranked to your original role and may run **/getrole**.\n\nIf you have not been ranked please open a ticket in the [Administration](https://discord.gg/ZSJuzdVAee) server.`);
 
             const LogEmbed = new EmbedBuilder()
-                .setTitle("User Unsuspended")
+                .setTitle('User Unsuspended')
                 .setColor(0x00ff00)
                 .addFields(
-                    { name: "Username", value: Username, inline: true },
-                    { name: "Unsuspended By", value: `<@${interaction.user.id}>`, inline: true },
-                    { name: "Reason", value: Reason, inline: false },
-                    { name: "Duration", value: DurationStr, inline: true }
+                    { name: 'Username', value: Username, inline: true },
+                    { name: 'Unsuspended By', value: `<@${interaction.user.id}>`, inline: true },
+                    { name: 'Reason', value: Reason, inline: false },
+                    { name: 'Duration', value: DurationStr, inline: true }
                 )
                 .setTimestamp(new Date());
 
-            if (Suspension.oldRank)
-                await SetRank(Db.ServerConfig[GuildId].GroupId, UserId, Suspension.oldRank, interaction.user.id, GuildId, interaction.client);
+            try {
+                await SetRank(Db.ServerConfig[GuildId].GroupId, UserId, Suspension.OldRankName || Suspension.OldRankValue, 'SYSTEM', GuildId, interaction.client);
+            } catch (err) {}
 
             if (TargetDiscordId) {
-                try {
-                    let Member = null;
-                    if (interaction.guild.members.cache.has(TargetDiscordId)) {
-                        Member = await interaction.guild.members.fetch(TargetDiscordId).catch(() => null);
-                    }
-                    if (Member) {
-                        const OldRoles = Member.roles.cache.map(r => r.id).filter(id => id !== interaction.guild.id);
-                        if (OldRoles.length) await Member.roles.remove(OldRoles);
-                        await Member.roles.add(DiscordRoleId).catch(() => {});
-                        await Member.send({ embeds: [UserEmbed] }).catch(() => {});
-                    } else {
-                        const TargetUser = await interaction.client.users.fetch(TargetDiscordId).catch(() => null);
-                        if (TargetUser) await TargetUser.send({ embeds: [UserEmbed] }).catch(() => {});
-                    }
-                } catch {}
+                const Member = await interaction.guild.members.fetch(TargetDiscordId).catch(() => null);
+                if (Member) {
+                    const OldRoles = Member.roles.cache.map(r => r.id).filter(id => id !== interaction.guild.id);
+                    if (OldRoles.length) await Member.roles.remove(OldRoles).catch(() => {});
+                    await Member.roles.add(DiscordRoleId).catch(() => {});
+                    try { await Member.send({ embeds: [UserEmbed] }); } catch {}
+                } else {
+                    try {
+                        const TargetUser = await interaction.client.users.fetch(TargetDiscordId);
+                        await TargetUser.send({ embeds: [UserEmbed] }).catch(() => {});
+                    } catch {}
+                }
             }
 
-            const LogChannel = await interaction.client.channels.fetch('1433025723932741694').catch(() => null);
-            if (LogChannel?.isTextBased())
-                await LogChannel.send({ embeds: [LogEmbed] });
+            const LogChannel = await interaction.client.channels.fetch(SuspensionLogChannelId).catch(() => null);
+            if (LogChannel?.isTextBased()) await LogChannel.send({ embeds: [LogEmbed] });
+
+            try {
+                const EndEmbed = new EmbedBuilder()
+                    .setTitle('Suspension Ended')
+                    .setColor(0x00ff00)
+                    .setDescription(`${Username}'s suspension has ended`)
+                    .addFields(
+                        { name: 'Rank Suspended From', value: Suspension.OldRankName || String(Suspension.OldRankValue), inline: false },
+                        { name: 'Reason for Suspension', value: Suspension.Reason || Reason || 'N/A', inline: false },
+                        { name: 'Date Suspended On', value: FormatDate(new Date(Suspension.IssuedAt)), inline: false },
+                        { name: 'Duration', value: DurationStr, inline: false },
+                        { name: 'Has user been ranked back to their previous position', value: 'Yes', inline: false }
+                    )
+                    .setTimestamp(new Date());
+                if (LogChannel?.isTextBased()) await LogChannel.send({ embeds: [EndEmbed] });
+            } catch (err) {}
 
             await interaction.editReply({ content: `Successfully unsuspended ${Username}. DM sent to the user.` });
-
         } catch (Err) {
             return interaction.editReply({ content: `Error: ${Err.message}` });
         }
