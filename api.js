@@ -44,13 +44,13 @@ app.post('/api/verify/force', CheckAuth, async (req, res) => {
 
 app.post('/api/setrank', CheckAuth, async (req, res) => {
   try {
-    const { groupId, userId, newRankName, issuerDiscordId, guildId } = req.body;
-    if (!groupId || !userId || !newRankName || !issuerDiscordId || !guildId)
+    const { groupId, userId, newRankName, discordId, guildId } = req.body;
+    if (!groupId || !userId || !newRankName || !discordId || !guildId)
       return res.status(400).json({ error: 'Missing fields' });
 
     if (!global.ClientBot) return res.status(500).json({ error: 'Discord client not ready' });
 
-    await Roblox.SetRank(groupId, userId, newRankName, issuerDiscordId, guildId, global.ClientBot);
+    await Roblox.SetRank(groupId, userId, newRankName, discordId, guildId, global.ClientBot);
     return res.json({ success: true, message: `Rank updated to ${newRankName}` });
   } catch (err) {
     return res.status(500).json({ error: err.message });
