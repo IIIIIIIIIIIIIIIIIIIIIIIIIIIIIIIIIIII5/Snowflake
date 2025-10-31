@@ -11,14 +11,7 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    let alreadyVerified = false;
-    try {
-      alreadyVerified = await Promise.race([
-        isUserVerified(interaction.user.id),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
-      ]);
-    } catch {}
-
+    const alreadyVerified = await isUserVerified(interaction.user.id);
     if (alreadyVerified) {
       return interaction.editReply(
         "You're already verified. If you want to switch your account, use `/reverify`."
