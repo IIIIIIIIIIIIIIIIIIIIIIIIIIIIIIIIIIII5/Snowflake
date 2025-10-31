@@ -226,7 +226,7 @@ async function SuspendUser(GroupId, UserId, IssuerDiscordId, GuildId, Client = g
 
   await SaveJsonBin(DbData);
 
-  if (DurationMs > 0) scheduleAutoUnsuspend(UserId, DbData.Suspensions[UserId], Client);
+  if (DurationMs > 0) ScheduleAutoUnsuspend(UserId, DbData.Suspensions[UserId], Client);
 
   try {
     const Guild = Client?.guilds ? await Client.guilds.fetch(GuildId).catch(() => null) : null;
