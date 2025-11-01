@@ -38,7 +38,7 @@ module.exports = {
         .addStringOption(opt => opt.setName('username').setDescription('Roblox username').setRequired(true))
         .addStringOption(opt => opt.setName('reason').setDescription('Reason for suspension').setRequired(true))
         .addStringOption(opt => opt.setName('duration').setDescription('Duration e.g. 1h, 1d, 1w, 1M').setRequired(true))
-        .addStringOption(opt => opt.setName('discordid').setDescription('Optional Discord ID to remove roles and give a specific role')),
+        .addStringOption(opt => opt.setName('discordid').setDescription('Optional Discord ID')),
 
     async execute(Interaction) {
         if (!Interaction.guild) return Interaction.reply({ content: 'This command can only be used in a server.', ephemeral: true });
@@ -54,8 +54,7 @@ module.exports = {
 
             const Username = Interaction.options.getString('username');
             const Reason = Interaction.options.getString('reason');
-            const DurationStr = Interaction.options.getString('duration');
-            const DurationMs = ParseDuration(DurationStr);
+            const DurationMs = ParseDuration(Interaction.options.getString('duration'));
             const DiscordIdOption = Interaction.options.getString('discordid');
 
             const UserId = await GetRobloxUserId(Username);
@@ -78,7 +77,7 @@ module.exports = {
                 IssuedBy: Interaction.user.id,
                 IssuedAt: Date.now(),
                 EndsAt: DurationMs > 0 ? Date.now() + DurationMs : null,
-                DurationStr,
+                DurationStr: Interaction.options.getString('duration'),
                 OldRankName: TargetCurrentRank.Name,
                 OldRankValue: TargetCurrentRank.Rank,
                 Active: true
@@ -90,7 +89,7 @@ module.exports = {
             const UserEmbed = new EmbedBuilder()
                 .setTitle('YOU HAVE BEEN SUSPENDED')
                 .setColor(0xff0000)
-                .setDescription(`Dear, **${Username}**, you have been suspended from Snowflake Penitentiary from your rank **${TargetCurrentRank.Name}**\n\nBelow are the details of your suspension:`)
+                .setDescription(`Dear, **${Username}**, you have been suspended from your rank **${TargetCurrentRank.Name}**`)
                 .addFields(
                     { name: 'Username', value: Username, inline: false },
                     { name: 'Reason', value: Reason, inline: false },
