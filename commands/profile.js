@@ -115,22 +115,18 @@ module.exports = {
             if (lastAction?.IssuedAt) lastPunishment = new Date(lastAction.IssuedAt).toLocaleString('en-GB');
           }
 
-          const userCerts = Array.isArray(db.Certifications?.[target.id]) ? db.Certifications[target.id] : [];
-          const certCounts = {};
-          userCerts.forEach(c => certCounts[c] = (certCounts[c] || 0) + 1);
-          const certDisplay = Object.keys(certCounts).length > 0
-            ? Object.entries(certCounts).map(([cert, count]) => `${count}x ${cert}`).join(", ")
-            : "None";
+          const userCerts = db.Certifications?.[target.id] || [];
+          const certDisplay = userCerts.length > 0 ? userCerts.join(", ") : "None";
 
           groupEmbed = new EmbedBuilder()
             .setTitle(`${username}'s Group Stats`)
             .setColor(0x5865f2)
             .setThumbnail(avatarUrl)
             .addFields(
-              { name: "Group Rank", value: groupRank, inline: false },
-              { name: "Warnings", value: warnings, inline: false },
-              { name: "Last Punishment", value: lastPunishment, inline: false },
-              { name: "Certifications", value: certDisplay, inline: false }
+              { name: "Group Rank", value: groupRank, inline: true },
+              { name: "Warnings", value: warnings, inline: true },
+              { name: "Last Punishment", value: lastPunishment, inline: true },
+              { name: "Certifications", value: certDisplay, inline: true }
             );
         }
 
