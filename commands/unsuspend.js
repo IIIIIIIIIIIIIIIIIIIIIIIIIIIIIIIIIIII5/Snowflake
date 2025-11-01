@@ -63,6 +63,9 @@ module.exports = {
             if (!Suspension || !Suspension.Active)
                 return interaction.editReply({ content: `${Username} is not currently suspended.` });
 
+            if (Suspension.EndsAt && Date.now() < Suspension.EndsAt)
+                return interaction.editReply({ content: `${Username} is still within their suspension period.` });
+
             Suspension.Active = false;
             await SaveJsonBin(Db);
 
@@ -71,9 +74,9 @@ module.exports = {
             const TargetDiscordId = DiscordIdOption || Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === UserId);
 
             const UserEmbed = new EmbedBuilder()
-                .setTitle('YOUR SUSPENSION HAS ENDED EARLY')
+                .setTitle('YOUR SUSPENSION HAS ENDED')
                 .setColor(0x00ff00)
-                .setDescription(`Dear, <@${TargetDiscordId}>, your suspension has ended early.\n\nYou have been ranked to your original role and may run **/getrole**.\n\nIf you have not been ranked please open a ticket in the [Administration](https://discord.gg/ZSJuzdVAee) server.`);
+                .setDescription(`Dear, <@${TargetDiscordId}>, your suspension has ended early. You have been ranked back to your original role.`);
 
             const LogEmbed = new EmbedBuilder()
                 .setTitle('User Unsuspended')
@@ -88,7 +91,7 @@ module.exports = {
 
             try {
                 await SetRank(Db.ServerConfig[GuildId].GroupId, UserId, Suspension.OldRankName || Suspension.OldRankValue, 'SYSTEM', GuildId, interaction.client);
-            } catch (err) {}
+            } catch {}
 
             if (TargetDiscordId) {
                 const Member = await interaction.guild.members.fetch(TargetDiscordId).catch(() => null);
@@ -107,22 +110,6 @@ module.exports = {
 
             const LogChannel = await interaction.client.channels.fetch(SuspensionLogChannelId).catch(() => null);
             if (LogChannel?.isTextBased()) await LogChannel.send({ embeds: [LogEmbed] });
-
-            try {
-                const EndEmbed = new EmbedBuilder()
-                    .setTitle('Suspension Ended')
-                    .setColor(0x00ff00)
-                    .setDescription(`${Username}'s suspension has ended`)
-                    .addFields(
-                        { name: 'Rank Suspended From', value: Suspension.OldRankName || String(Suspension.OldRankValue), inline: false },
-                        { name: 'Reason for Suspension', value: Suspension.Reason || Reason || 'N/A', inline: false },
-                        { name: 'Date Suspended On', value: FormatDate(new Date(Suspension.IssuedAt)), inline: false },
-                        { name: 'Duration', value: DurationStr, inline: false },
-                        { name: 'Has user been ranked back to their previous position', value: 'Yes', inline: false }
-                    )
-                    .setTimestamp(new Date());
-                if (LogChannel?.isTextBased()) await LogChannel.send({ embeds: [EndEmbed] });
-            } catch (err) {}
 
             await interaction.editReply({ content: `Successfully unsuspended ${Username}. DM sent to the user.` });
         } catch (Err) {
