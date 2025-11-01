@@ -15,6 +15,15 @@ if (!admin.apps.length) {
 const Db = admin.firestore();
 const Verifications = {};
 const PendingApprovals = {};
+const ScheduledTimers = {};
+const MaxTimeout = 2_147_483_647;
+const PredefinedDurations = {
+  '12h': 12 * 60 * 60 * 1000,
+  '1d': 24 * 60 * 60 * 1000,
+  '3d': 3 * 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '1M': 30 * 24 * 60 * 60 * 1000
+};
 
 async function GetJsonBin() {
   try {
@@ -88,7 +97,6 @@ async function GetRobloxDescription(UserId) {
 
 async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Client = global.ClientBot) {
   const Roles = await FetchRoles(GroupId);
-
   let RoleInfo = null;
   if (typeof RankOrId === 'number' || /^\d+$/.test(String(RankOrId))) {
     const RankNum = Number(RankOrId);
@@ -98,49 +106,34 @@ async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Clie
   } else {
     RoleInfo = Roles[String(RankOrId).toLowerCase()];
   }
-
   if (!RoleInfo) throw new Error('Invalid rank specified: ' + RankOrId);
-
   if (IssuerDiscordId !== 'SYSTEM') {
     const DbData = await GetJsonBin();
     const IssuerRobloxId = DbData.VerifiedUsers?.[IssuerDiscordId];
     if (!IssuerRobloxId) throw new Error('You must verify first.');
-
     const IssuerRank = await GetCurrentRank(GroupId, IssuerRobloxId);
     const Target = await GetCurrentRank(GroupId, UserId);
-
     if (String(UserId) === String(IssuerRobloxId)) throw new Error('You cannot change your own rank.');
     if (RoleInfo.Rank >= IssuerRank.Rank) throw new Error('Cannot assign a rank equal or higher than yours.');
     if (Target.Rank >= IssuerRank.Rank) throw new Error('Cannot change rank of a user higher or equal to you.');
   }
-
   const Cookie = await GetRobloxCookie(GuildId);
-  const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
   let Xsrf = await GetXsrfToken(GuildId);
-
+  const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
   try {
     await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
-      headers: {
-        Cookie: `.ROBLOSECURITY=${Cookie}`,
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': Xsrf
-      }
+      headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, 'Content-Type': 'application/json', 'X-CSRF-TOKEN': Xsrf }
     });
   } catch (Err) {
     if (Err.response?.status === 403 && Err.response?.headers['x-csrf-token']) {
       Xsrf = Err.response.headers['x-csrf-token'];
       await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
-        headers: {
-          Cookie: `.ROBLOSECURITY=${Cookie}`,
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': Xsrf
-        }
+        headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, 'Content-Type': 'application/json', 'X-CSRF-TOKEN': Xsrf }
       });
     } else {
       throw new Error('Request failed: ' + (Err.response?.data?.errors?.[0]?.message || Err.message));
     }
   }
-
   const Data = await GetJsonBin();
   if (!Data.RankChanges || !Array.isArray(Data.RankChanges)) Data.RankChanges = [];
   Data.RankChanges.push({
@@ -152,49 +145,26 @@ async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Clie
     GuildId
   });
   await SaveJsonBin(Data);
-
-  try {
-    const Username = await GetRobloxUsername(UserId);
-    const Guild = Client?.guilds ? await Client.guilds.fetch(GuildId).catch(() => null) : null;
-    const LogChannel = Guild?.channels?.cache?.get('1424381038393556992');
-    if (LogChannel) {
-      const Embed = {
-        color: 0x2f3136,
-        title: 'Rank Updated',
-        fields: [
-          { name: 'Action By:', value: `${IssuerDiscordId === 'SYSTEM' ? 'SYSTEM' : `<@${IssuerDiscordId}>`}`, inline: true },
-          { name: 'Action On:', value: Username, inline: true },
-          { name: 'Action:', value: 'Set Rank', inline: true },
-          { name: 'New Rank:', value: `${RoleInfo.Name}`, inline: false }
-        ],
-        timestamp: new Date()
-      };
-      await LogChannel.send({ embeds: [Embed] });
-    }
-  } catch (err) {
-    console.error('SetRank logging error:', err.message);
-  }
 }
 
-async function SuspendUser(GroupId, UserId, IssuerDiscordId, GuildId, Client = global.ClientBot, DurationMs = 0) {
+async function SuspendUser(GroupId, UserId, IssuerDiscordId, GuildId, Client = global.ClientBot, DurationKey = '1d', Reason = null) {
   const DbData = await GetJsonBin();
   const Roles = await FetchRoles(GroupId);
   const SuspendedRole = Roles['suspended'];
   if (!SuspendedRole) throw new Error('Suspended rank not found.');
-
   const IssuerRobloxId = DbData.VerifiedUsers?.[IssuerDiscordId];
   if (!IssuerRobloxId) throw new Error('You must verify first.');
-
   const IssuerRank = await GetCurrentRank(GroupId, IssuerRobloxId);
   const TargetRank = await GetCurrentRank(GroupId, UserId);
-
   if (String(UserId) === String(IssuerRobloxId)) throw new Error('You cannot suspend yourself.');
   if (TargetRank.Rank >= IssuerRank.Rank) throw new Error('Cannot suspend a user with equal or higher rank.');
+
+  const DurationMs = PredefinedDurations[DurationKey];
+  if (DurationMs === undefined) throw new Error('Invalid suspension duration.');
 
   const Cookie = await GetRobloxCookie(GuildId);
   let Xsrf = await GetXsrfToken(GuildId);
   const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
-
   try {
     await axios.patch(Url, { roleId: SuspendedRole.RoleId }, {
       headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, 'X-CSRF-TOKEN': Xsrf, 'Content-Type': 'application/json' }
@@ -209,87 +179,55 @@ async function SuspendUser(GroupId, UserId, IssuerDiscordId, GuildId, Client = g
   }
 
   const Username = await GetRobloxUsername(UserId);
-
   DbData.Suspensions = DbData.Suspensions || {};
   DbData.Suspensions[UserId] = {
     Username,
     IssuedBy: IssuerDiscordId,
     IssuedAt: Date.now(),
-    EndsAt: DurationMs > 0 ? Date.now() + DurationMs : null,
+    EndsAt: Date.now() + DurationMs,
     GroupId,
     GuildId,
     OldRankName: TargetRank.Name,
     OldRankValue: TargetRank.Rank,
-    Reason: null,
+    Reason,
     Active: true
   };
-
   await SaveJsonBin(DbData);
-
-  if (DurationMs > 0) ScheduleAutoUnsuspend(UserId, DbData.Suspensions[UserId], Client);
-
-  try {
-    const Guild = Client?.guilds ? await Client.guilds.fetch(GuildId).catch(() => null) : null;
-    const LogChannelId = DbData.ServerConfig?.[GuildId]?.LoggingChannel || null;
-    const LogChannel = Guild?.channels?.cache?.get(LogChannelId) || null;
-    if (LogChannel) {
-      const Embed = new EmbedBuilder()
-        .setTitle('User Suspended')
-        .setColor(0xff0000)
-        .addFields(
-          { name: 'Username', value: Username, inline: true },
-          { name: 'Suspended By', value: `<@${IssuerDiscordId}>`, inline: true },
-          { name: 'Date', value: new Date().toISOString().split('T')[0], inline: true }
-        )
-        .setTimestamp();
-      await LogChannel.send({ embeds: [Embed] });
-    }
-  } catch (err) {
-    console.error('SuspendUser log error:', err.message);
-  }
+  ScheduleAutoUnsuspend(UserId, DbData.Suspensions[UserId], Client);
 }
 
-const ScheduledTimers = {};
-
 function ScheduleAutoUnsuspend(UserId, SuspensionRecord, Client) {
-  try {
-    const Now = Date.now();
-    if (!SuspensionRecord || !SuspensionRecord.EndsAt) return;
-    const Remaining = SuspensionRecord.EndsAt - Now;
-    if (Remaining <= 0) {
-      setImmediate(() => autoUnsuspend(UserId, Client));
-      return;
-    }
-    if (ScheduledTimers[UserId]) clearTimeout(ScheduledTimers[UserId]);
-    ScheduledTimers[UserId] = setTimeout(() => {
-      autoUnsuspend(UserId, Client).catch(err => console.error('autoUnsuspend error:', err));
+  if (!SuspensionRecord || !SuspensionRecord.EndsAt) return;
+  const Remaining = SuspensionRecord.EndsAt - Date.now();
+  if (Remaining <= 0) return autoUnsuspend(UserId, Client);
+  let TimeoutDuration = Remaining;
+  if (TimeoutDuration > MaxTimeout) TimeoutDuration = MaxTimeout;
+  if (ScheduledTimers[UserId]) clearTimeout(ScheduledTimers[UserId]);
+  ScheduledTimers[UserId] = setTimeout(async () => {
+    const NewRemaining = SuspensionRecord.EndsAt - Date.now();
+    if (NewRemaining > MaxTimeout) {
+      ScheduleAutoUnsuspend(UserId, SuspensionRecord, Client);
+    } else {
+      await autoUnsuspend(UserId, Client);
       delete ScheduledTimers[UserId];
-    }, Remaining);
-  } catch (err) {
-    console.error('AutoUnsuspend error:', err);
-  }
+    }
+  }, TimeoutDuration);
 }
 
 async function autoUnsuspend(UserId, Client = global.ClientBot) {
   const Data = await GetJsonBin();
   const Suspension = Data.Suspensions?.[UserId];
   if (!Suspension || !Suspension.Active) return;
-
   if (Suspension.EndsAt && Date.now() < Suspension.EndsAt) return;
-
   Suspension.Active = false;
   await SaveJsonBin(Data);
-
   const GroupId = Suspension.GroupId;
   const GuildId = Suspension.GuildId;
   let RankedBack = false;
   try {
     await SetRank(GroupId, UserId, Suspension.OldRankName || Suspension.OldRankValue, 'SYSTEM', GuildId, Client);
     RankedBack = true;
-  } catch (err) {
-    RankedBack = false;
-  }
-
+  } catch {}
   try {
     const TargetDiscordId = Object.keys(Data.VerifiedUsers || {}).find(id => Data.VerifiedUsers[id] === UserId);
     if (TargetDiscordId) {
@@ -298,35 +236,30 @@ async function autoUnsuspend(UserId, Client = global.ClientBot) {
         const Embed = new EmbedBuilder()
           .setTitle('YOUR SUSPENSION HAS ENDED')
           .setColor(0x00ff00)
-          .setDescription(`Dear, <@${TargetDiscordId}> your suspension has ended you have been ranked to your original role you may run /getrole.\n\nIf you have not been ranked please open a ticket in the [Administration](https://discord.gg/ZSJuzdVAee) server.`);
+          .setDescription(`Dear, <@${TargetDiscordId}>, your suspension has ended. You have been restored to your previous role.`);
         await User.send({ embeds: [Embed] }).catch(() => {});
       }
     }
-  } catch (err) {
-    console.error('autoUnsuspend DM error:', err.message);
-  }
-
+  } catch {}
   try {
     const Guild = Client?.guilds ? await Client.guilds.fetch(GuildId).catch(() => null) : null;
-    const LogChannelId = (await GetJsonBin()).ServerConfig?.[GuildId]?.SuspensionLogChannel || Data.ServerConfig?.[GuildId]?.LoggingChannel || '1433025723932741694';
+    const LogChannelId = Data.ServerConfig?.[GuildId]?.SuspensionLogChannel || '1433025723932741694';
     const LogChannel = Guild?.channels?.cache?.get(LogChannelId) || null;
-
-    const EndEmbed = new EmbedBuilder()
-      .setTitle('Suspension Ended')
-      .setColor(0x00ff00)
-      .setDescription(`${Suspension.Username}'s suspension has ended`)
-      .addFields(
-        { name: 'Rank suspended from', value: Suspension.OldRankName || String(Suspension.OldRankValue), inline: false },
-        { name: 'Reason for suspension', value: Suspension.Reason || 'N/A', inline: false },
-        { name: 'Date suspended on', value: new Date(Suspension.IssuedAt).toLocaleString('en-GB'), inline: false },
-        { name: 'Duration', value: Suspension.EndsAt ? `${Math.max(0, Math.floor((Suspension.EndsAt - Suspension.IssuedAt) / 1000))}s` : 'N/A', inline: false },
-        { name: 'Has user been ranked back to their previous position', value: RankedBack ? 'Yes' : 'No', inline: false }
-      )
-      .setTimestamp();
-    if (LogChannel?.isTextBased()) await LogChannel.send({ embeds: [EndEmbed] });
-  } catch (err) {
-    console.error('autoUnsuspend log error:', err.message);
-  }
+    if (LogChannel) {
+      const EndEmbed = new EmbedBuilder()
+        .setTitle('Suspension Ended')
+        .setColor(0x00ff00)
+        .addFields(
+          { name: 'Username', value: Suspension.Username, inline: true },
+          { name: 'Rank suspended from', value: Suspension.OldRankName || String(Suspension.OldRankValue), inline: false },
+          { name: 'Reason', value: Suspension.Reason || 'N/A', inline: false },
+          { name: 'Suspension Duration', value: Suspension.EndsAt ? `${Math.max(0, Math.floor((Suspension.EndsAt - Suspension.IssuedAt)/1000))}s` : 'Permanent', inline: false },
+          { name: 'Rank restored', value: RankedBack ? 'Yes' : 'No', inline: false }
+        )
+        .setTimestamp();
+      if (LogChannel?.isTextBased()) await LogChannel.send({ embeds: [EndEmbed] });
+    }
+  } catch {}
 }
 
 async function LoadActiveSuspensions(Client = global.ClientBot) {
@@ -334,13 +267,10 @@ async function LoadActiveSuspensions(Client = global.ClientBot) {
     const Data = await GetJsonBin();
     for (const UserId of Object.keys(Data.Suspensions || {})) {
       const Suspension = Data.Suspensions[UserId];
-      if (!Suspension || !Suspension.Active) continue;
-      if (!Suspension.EndsAt) continue;
+      if (!Suspension || !Suspension.Active || !Suspension.EndsAt) continue;
       ScheduleAutoUnsuspend(UserId, Suspension, Client);
     }
-  } catch (err) {
-    console.error('LoadActiveSuspensions error:', err);
-  }
+  } catch {}
 }
 
 function StartVerification(DiscordId, RobloxUserId, Code) {
@@ -351,21 +281,16 @@ async function HandleVerificationButton(Interaction) {
   await Interaction.deferReply({ ephemeral: true });
   const Data = Verifications[Interaction.user.id];
   if (!Data) return Interaction.editReply({ content: "You haven't started verification yet." });
-
   try {
     const Desc = await GetRobloxDescription(Data.RobloxUserId);
-    if (!Desc.includes(Data.Code)) return Interaction.editReply({ content: "Code not found in your profile. Make sure you added it and try again." });
-
+    if (!Desc.includes(Data.Code)) return Interaction.editReply({ content: "Code not found in your profile." });
     const DbData = await GetJsonBin();
     DbData.VerifiedUsers = DbData.VerifiedUsers || {};
     DbData.VerifiedUsers[Interaction.user.id] = Data.RobloxUserId;
-
     await SaveJsonBin(DbData);
     delete Verifications[Interaction.user.id];
-
     return Interaction.editReply({ content: `Verified! Linked to Roblox ID ${Data.RobloxUserId}` });
-  } catch (Err) {
-    console.error('HandleVerificationButton error:', Err);
+  } catch {
     return Interaction.editReply({ content: "An error occurred during verification." });
   }
 }
@@ -386,5 +311,6 @@ module.exports = {
   StartVerification,
   HandleVerificationButton,
   SuspendUser,
-  LoadActiveSuspensions
+  LoadActiveSuspensions,
+  PredefinedDurations
 };
