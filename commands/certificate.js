@@ -22,7 +22,7 @@ module.exports = {
           opt.setName("user").setDescription("The user to modify.").setRequired(true)
         )
         .addStringOption(opt =>
-          opt.setName("type")
+          opt.setName("Certificate Type")
             .setDescription("Select a certificate to add")
             .setRequired(true)
             .addChoices(...AvailableCertificates.map(c => ({ name: c, value: c })))
