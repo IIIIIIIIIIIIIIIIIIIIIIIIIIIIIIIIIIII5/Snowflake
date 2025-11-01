@@ -112,12 +112,14 @@ module.exports = {
             warnings = warnCount > 0 ? String(warnCount) : "None";
 
             const lastAction = userModeration[userModeration.length - 1];
-            if (lastAction) lastPunishment = lastAction.timestamp || "Nil";
+            if (lastAction?.IssuedAt) lastPunishment = new Date(lastAction.IssuedAt).toLocaleString('en-GB');
           }
 
-          const certifications = db.Certifications?.[target.id] || {};
-          const certDisplay = Object.entries(certifications).length > 0
-            ? Object.entries(certifications).map(([cert, count]) => `${count}x ${cert}`).join(", ")
+          const userCerts = db.Certifications?.[target.id] || [];
+          const certCounts = {};
+          userCerts.forEach(c => certCounts[c] = (certCounts[c] || 0) + 1);
+          const certDisplay = Object.keys(certCounts).length > 0
+            ? Object.entries(certCounts).map(([cert, count]) => `${count}x ${cert}`).join(", ")
             : "None";
 
           groupEmbed = new EmbedBuilder()
