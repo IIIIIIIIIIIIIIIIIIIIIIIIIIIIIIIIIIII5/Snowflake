@@ -44,14 +44,12 @@ module.exports = {
 
     const robloxId = db.VerifiedUsers?.[target.id];
     let username = "Not Verified";
-    let url = null;
     let avatarUrl = target.displayAvatarURL({ size: 128 });
 
     if (robloxId) {
       try {
         const name = await GetRobloxUserInfo(robloxId);
         username = name || "Unknown User";
-        url = `https://www.roblox.com/users/${robloxId}/profile`;
 
         const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=420x420&format=Png&isCircular=false`);
         const thumbData = await thumbRes.json();
@@ -92,6 +90,7 @@ module.exports = {
 
       if (btn.customId === `show_group_${target.id}`) {
         let groupEmbed;
+
         if (!robloxId) {
           groupEmbed = new EmbedBuilder()
             .setTitle(`${username}'s Group Stats`)
@@ -116,14 +115,17 @@ module.exports = {
             if (lastAction) lastPunishment = lastAction.timestamp || "Nil";
           }
 
+          const certifications = db.Certifications?.[target.id] || [];
+
           groupEmbed = new EmbedBuilder()
             .setTitle(`${username}'s Group Stats`)
             .setColor(0x5865f2)
             .setThumbnail(avatarUrl)
             .addFields(
-              { name: "Group Rank", value: groupRank, inline: false },
-              { name: "Warnings", value: warnings, inline: false },
-              { name: "Last Punishment", value: lastPunishment, inline: false }
+              { name: "Group Rank", value: groupRank, inline: true },
+              { name: "Warnings", value: warnings, inline: true },
+              { name: "Last Punishment", value: lastPunishment, inline: true },
+              { name: "Certifications", value: certifications.length > 0 ? certifications.join(", ") : "None", inline: true }
             );
         }
 
@@ -134,8 +136,7 @@ module.exports = {
     collector.on("end", async () => {
       try {
         await interaction.editReply({ components: [] });
-      } catch
-      {}
+      } catch {}
     });
   }
 };
