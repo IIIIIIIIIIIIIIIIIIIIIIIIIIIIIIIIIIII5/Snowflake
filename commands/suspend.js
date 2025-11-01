@@ -72,16 +72,17 @@ module.exports = {
             Db.Suspensions = Db.Suspensions || {};
             Db.Suspensions[UserId] = {
                 Username,
-                GuildId,
-                Reason,
                 IssuedBy: Interaction.user.id,
                 IssuedAt: Date.now(),
                 EndsAt: DurationMs > 0 ? Date.now() + DurationMs : null,
-                DurationStr: Interaction.options.getString('duration'),
+                GroupId,
+                GuildId,
                 OldRankName: TargetCurrentRank.Name,
                 OldRankValue: TargetCurrentRank.Rank,
+                Reason,
                 Active: true
             };
+
             await SaveJsonBin(Db);
 
             const FullDuration = FormatDuration(DurationMs);
