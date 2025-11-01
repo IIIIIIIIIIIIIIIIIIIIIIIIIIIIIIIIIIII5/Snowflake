@@ -119,7 +119,7 @@ module.exports = {
           const certCounts = {};
           userCerts.forEach(c => certCounts[c] = (certCounts[c] || 0) + 1);
           const certDisplay = Object.keys(certCounts).length > 0
-            ? Object.entries(certCounts).map(([cert, count]) => `${count}x ${cert}`).join(", ")
+            ? Object.entries(certCounts).map(([cert, count]) => `${cert}`).join(", ")
             : "None";
 
           groupEmbed = new EmbedBuilder()
