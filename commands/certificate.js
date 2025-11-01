@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require("discord.js");
 const { GetJsonBin, SaveJsonBin } = require("../roblox");
 
 const Roles = [
@@ -6,6 +6,8 @@ const Roles = [
   "1431333433539563531",
   "1423226365498494996"
 ];
+
+const AvailableCertificates = ["Certified Host"];
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -20,33 +22,76 @@ module.exports = {
         )
         .addStringOption(opt =>
           opt.setName("type")
-            .setDescription("Certification type")
+            .setDescription("Select a certificate to add")
             .setRequired(true)
+            .addChoices(...AvailableCertificates.map(c => ({ name: c, value: c })))
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName("remove")
+        .setDescription("Remove a certification from a user.")
+        .addUserOption(opt =>
+          opt.setName("user").setDescription("The user to modify.").setRequired(true)
         )
     ),
 
-  async execute(interaction) {
-    if (!interaction.member.roles.cache.some(r => Roles.includes(r.id)))
-      return interaction.reply({ content: "You do not have permission to use this command.", ephemeral: true });
+  async execute(Interaction) {
+    if (!Interaction.member.roles.cache.some(r => Roles.includes(r.id))) {
+      return Interaction.reply({ content: "You do not have permission to use this command.", ephemeral: true });
+    }
 
-    const sub = interaction.options.getSubcommand();
+    const Sub = Interaction.options.getSubcommand();
+    const Db = await GetJsonBin();
+    if (!Db.Certifications) Db.Certifications = {};
 
-    if (sub === "add") {
-      const target = interaction.options.getUser("user");
-      const type = interaction.options.getString("type");
+    if (Sub === "add") {
+      const Target = Interaction.options.getUser("user");
+      const Type = Interaction.options.getString("type");
 
-      const db = await GetJsonBin();
+      if (!Db.Certifications[Target.id]) Db.Certifications[Target.id] = [];
 
-      if (!db.Certifications) db.Certifications = {};
-      if (!db.Certifications[target.id]) db.Certifications[target.id] = [];
+      if (Db.Certifications[Target.id].includes(Type)) {
+        return Interaction.reply({ content: `${Target.username} already has ${Type}.`, ephemeral: true });
+      }
 
-      if (db.Certifications[target.id].includes(type))
-        return interaction.reply({ content: `${target.username} already has ${type}.`, ephemeral: true });
+      Db.Certifications[Target.id].push(Type);
+      await SaveJsonBin(Db);
 
-      db.Certifications[target.id].push(type);
-      await SaveJsonBin(db);
+      return Interaction.reply({ content: `Added ${Type} to ${Target}.` });
+    }
 
-      return interaction.reply({ content: `Added ${type} to ${target}.` });
+    if (Sub === "remove") {
+      const Target = Interaction.options.getUser("user");
+      const UserCerts = Db.Certifications[Target.id] || [];
+
+      if (UserCerts.length === 0) {
+        return Interaction.reply({ content: `${Target.username} has no certificates.`, ephemeral: true });
+      }
+
+      const Select = new StringSelectMenuBuilder()
+        .setCustomId(`RemoveCert_${Target.id}`)
+        .setPlaceholder("Select a certificate to remove")
+        .addOptions(UserCerts.map(c => ({ label: c, value: c })));
+
+      const Row = new ActionRowBuilder().addComponents(Select);
+
+      await Interaction.reply({ content: `Select a certificate to remove from ${Target}:`, components: [Row], ephemeral: true });
+
+      const Collector = Interaction.channel.createMessageComponentCollector({ time: 60000, filter: i => i.user.id === Interaction.user.id });
+
+      Collector.on("collect", async i => {
+        const CertToRemove = i.values[0];
+        Db.Certifications[Target.id] = Db.Certifications[Target.id].filter(c => c !== CertToRemove);
+        await SaveJsonBin(Db);
+        await i.update({ content: `Removed ${CertToRemove} from ${Target}.`, components: [], ephemeral: true });
+      });
+
+      Collector.on("end", async Collected => {
+        if (Collected.size === 0) {
+          try { await Interaction.editReply({ content: "No certificate was selected.", components: [], ephemeral: true }); } catch {}
+        }
+      });
     }
   }
 };
