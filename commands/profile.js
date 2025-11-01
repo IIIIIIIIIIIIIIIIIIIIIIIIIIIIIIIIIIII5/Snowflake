@@ -115,7 +115,7 @@ module.exports = {
             if (lastAction?.IssuedAt) lastPunishment = new Date(lastAction.IssuedAt).toLocaleString('en-GB');
           }
 
-          const userCerts = db.Certifications?.[target.id] || [];
+          const userCerts = Array.isArray(db.Certifications?.[target.id]) ? db.Certifications[target.id] : [];
           const certCounts = {};
           userCerts.forEach(c => certCounts[c] = (certCounts[c] || 0) + 1);
           const certDisplay = Object.keys(certCounts).length > 0
