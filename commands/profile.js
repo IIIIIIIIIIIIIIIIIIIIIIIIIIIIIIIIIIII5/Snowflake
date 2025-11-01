@@ -127,10 +127,10 @@ module.exports = {
             .setColor(0x5865f2)
             .setThumbnail(avatarUrl)
             .addFields(
-              { name: "Group Rank", value: groupRank, inline: true },
-              { name: "Warnings", value: warnings, inline: true },
-              { name: "Last Punishment", value: lastPunishment, inline: true },
-              { name: "Certifications", value: certDisplay, inline: true }
+              { name: "Group Rank", value: groupRank, inline: false },
+              { name: "Warnings", value: warnings, inline: false },
+              { name: "Last Punishment", value: lastPunishment, inline: false },
+              { name: "Certifications", value: certDisplay, inline: false }
             );
         }
 
