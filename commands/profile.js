@@ -98,7 +98,7 @@ module.exports = {
             .setDescription("This user is not verified with Roblox.");
         } else {
           const serverConfig = db.ServerConfig?.[interaction.guild.id];
-          let groupRank = "Unknown", warnings = "None", lastPunishment = "Nil";
+          let groupRank = "Unknown", warnings = "None", lastPunishment = "No punishments found";
 
           if (serverConfig?.GroupId) {
             const roles = await FetchRoles(serverConfig.GroupId);
