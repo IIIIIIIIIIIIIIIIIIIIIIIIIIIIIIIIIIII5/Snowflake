@@ -1,71 +1,98 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { logAction } from '../utils/logAction.js';
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require("discord.js");
+const { GetJsonBin, SaveJsonBin } = require("../roblox");
 
-const AllowedRoles = ['1398691449939169331','1386369108408406096','1418979785165766717'];
-const LogChannelId = '1419190262697033758';
+const Roles = [
+  "1386369108408406096",
+  "1431333433539563531",
+  "1423226365498494996",
+  "1418979785165766717"
+];
 
-export default {
+module.exports = {
   data: new SlashCommandBuilder()
-    .setName('ban')
-    .setDescription('Ban a user from the server.')
-    .addUserOption(option => option.setName('target').setDescription('User to ban').setRequired(true))
-    .addStringOption(option => 
-      option.setName('appealable')
-        .setDescription('Can this punishment be appealed?')
-        .setRequired(true)
-        .addChoices(
-          { name: 'Yes', value: 'Yes' },
-          { name: 'No', value: 'No' }
+    .setName("certificate")
+    .setDescription("Manage user certifications.")
+    .addSubcommand(sub =>
+      sub
+        .setName("add")
+        .setDescription("Add a certification to a user.")
+        .addUserOption(opt =>
+          opt.setName("user").setDescription("The user to modify.").setRequired(true)
+        )
+        .addStringOption(opt =>
+          opt.setName("type")
+            .setDescription("Select a certificate to add")
+            .setRequired(true)
+            .addChoices(
+              { name: "Certified Host", value: "Certified Host" }
+            )
         )
     )
-    .addStringOption(option => option.setName('reason').setDescription('Reason for the ban').setRequired(false)),
+    .addSubcommand(sub =>
+      sub
+        .setName("remove")
+        .setDescription("Remove a certification from a user.")
+        .addUserOption(opt =>
+          opt.setName("user").setDescription("The user to modify.").setRequired(true)
+        )
+    ),
 
   async execute(Interaction) {
-    if(!Interaction.member.roles.cache.some(r => AllowedRoles.includes(r.id)))
-      return Interaction.reply({ content:'You do not have permission.', ephemeral:true });
+    if (!Interaction.member.roles.cache.some(r => Roles.includes(r.id))) {
+      return Interaction.reply({ content: "You do not have permission to use this command.", ephemeral: true });
+    }
 
-    const Member = Interaction.options.getMember('target');
-    const Appealable = Interaction.options.getString('appealable') || 'Yes';
-    const Reason = Interaction.options.getString('reason') || 'No reason provided.';
+    const Sub = Interaction.options.getSubcommand();
+    const Db = await GetJsonBin();
+    if (!Db.Certifications) Db.Certifications = {};
 
-    if(!Member) return Interaction.reply({ content:'User not found', ephemeral:true });
-    if(!Member.bannable) return Interaction.reply({ content:'I cannot ban this user.', ephemeral:true });
+    if (Sub === "add") {
+      const Target = Interaction.options.getUser("user");
+      const Type = Interaction.options.getString("type");
 
-    let DmDescription = `You have been **banned** from **Snowflake Penitentiary Communications Server**, for ${Reason}.`;
-    if (Appealable === 'Yes') DmDescription += `\n\nIf you feel this punishment has been delivered to you unfairly then join our Administration Server to appeal your punishment.`;
+      if (!Db.Certifications[Target.id]) Db.Certifications[Target.id] = [];
 
-    const DmEmbed = new EmbedBuilder()
-      .setTitle('PUNISHMENT RECEIVED')
-      .setDescription(DmDescription)
-      .setColor(0xFF0000)
-      .setTimestamp();
+      if (Db.Certifications[Target.id].includes(Type)) {
+        return Interaction.reply({ content: `${Target.username} already has ${Type}.`, ephemeral: true });
+      }
 
-    try { await Member.send({ embeds:[DmEmbed] }); } catch {}
+      Db.Certifications[Target.id].push(Type);
+      await SaveJsonBin(Db);
 
-    await Member.ban({ reason: Reason });
+      return Interaction.reply({ content: `Added ${Type} to ${Target}.` });
+    }
 
-    const PublicEmbed = new EmbedBuilder()
-      .setDescription(`<@${Member.id}> has been banned. Reason: ${Reason}`)
-      .setColor(0xFF0000)
-      .setTimestamp()
-      .setFooter({ text:`Banned by ${Interaction.user.tag}` });
+    if (Sub === "remove") {
+      const Target = Interaction.options.getUser("user");
+      const UserCerts = Db.Certifications[Target.id] || [];
 
-    await Interaction.reply({ embeds:[PublicEmbed] });
+      if (UserCerts.length === 0) {
+        return Interaction.reply({ content: `${Target.username} has no certificates.`, ephemeral: true });
+      }
 
-    const PunishmentId = await logAction({ type:'ban', user:Member.id, moderator:Interaction.user.id, reason: Reason, appealable: Appealable });
+      const Select = new StringSelectMenuBuilder()
+        .setCustomId(`RemoveCert_${Target.id}`)
+        .setPlaceholder("Select a certificate to remove")
+        .addOptions(UserCerts.map(c => ({ label: c, value: c })));
 
-    const LogEmbed = new EmbedBuilder()
-      .setTitle(`Ban Issued - ${Member.user.tag}`)
-      .addFields(
-        { name:'Reason', value:Reason },
-        { name:'Appealable', value:Appealable },
-        { name:'Issued by', value:`<@${Interaction.user.id}>` },
-        { name:'Time', value:new Date().toLocaleString('en-US',{ dateStyle:'full', timeStyle:'short' }) }
-      )
-      .setFooter({ text:`Case ${PunishmentId}` })
-      .setColor(0xFF0000);
+      const Row = new ActionRowBuilder().addComponents(Select);
 
-    const LogChannel = await Interaction.client.channels.fetch(LogChannelId);
-    await LogChannel.send({ embeds:[LogEmbed] });
+      await Interaction.reply({ content: `Select a certificate to remove from ${Target}:`, components: [Row], ephemeral: true });
+
+      const Collector = Interaction.channel.createMessageComponentCollector({ time: 60000, filter: i => i.user.id === Interaction.user.id });
+
+      Collector.on("collect", async i => {
+        const CertToRemove = i.values[0];
+        Db.Certifications[Target.id] = Db.Certifications[Target.id].filter(c => c !== CertToRemove);
+        await SaveJsonBin(Db);
+        await i.update({ content: `Removed ${CertToRemove} from ${Target}.`, components: [], ephemeral: true });
+      });
+
+      Collector.on("end", async Collected => {
+        if (Collected.size === 0) {
+          try { await Interaction.editReply({ content: "No certificate was selected.", components: [], ephemeral: true }); } catch {}
+        }
+      });
+    }
   }
 };
