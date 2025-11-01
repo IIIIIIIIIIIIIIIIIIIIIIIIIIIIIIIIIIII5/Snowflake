@@ -275,6 +275,8 @@ async function autoUnsuspend(UserId, Client = global.ClientBot) {
   const Suspension = Data.Suspensions?.[UserId];
   if (!Suspension || !Suspension.Active) return;
 
+  if (Suspension.EndsAt && Date.now() < Suspension.EndsAt) return;
+
   Suspension.Active = false;
   await SaveJsonBin(Data);
 
