@@ -4,7 +4,8 @@ const { GetJsonBin, SaveJsonBin } = require("../roblox");
 const Roles = [
   "1386369108408406096",
   "1431333433539563531",
-  "1423226365498494996"
+  "1423226365498494996",
+  "1418979785165766717"
 ];
 
 const AvailableCertificates = ["Certified Host"];
