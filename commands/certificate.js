@@ -8,8 +8,6 @@ const Roles = [
   "1418979785165766717"
 ];
 
-const AvailableCertificates = ["Certified Host"];
-
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("certificate")
@@ -22,10 +20,12 @@ module.exports = {
           opt.setName("user").setDescription("The user to modify.").setRequired(true)
         )
         .addStringOption(opt =>
-          opt.setName("Certificate Type")
+          opt.setName("type")
             .setDescription("Select a certificate to add")
             .setRequired(true)
-            .addChoices(...AvailableCertificates.map(c => ({ name: c, value: c })))
+            .addChoices(
+              { name: "Certified Host", value: "Certified Host" }
+            )
         )
     )
     .addSubcommand(sub =>
