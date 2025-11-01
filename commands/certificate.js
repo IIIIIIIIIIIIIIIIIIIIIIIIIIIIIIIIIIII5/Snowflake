@@ -52,14 +52,14 @@ module.exports = {
 
       if (!Db.Certifications[Target.id]) Db.Certifications[Target.id] = [];
 
-      if (Db.Certifications[Target.id].includes(Type)) {
-        return Interaction.reply({ content: `${Target.username} already has ${Type}.`, ephemeral: true });
+      if (Type === "Certified Host" && Db.Certifications[Target.id].includes("Certified Host")) {
+        return Interaction.reply({ content: `${Target.username} already has Certified Host.`, ephemeral: true });
       }
 
       Db.Certifications[Target.id].push(Type);
       await SaveJsonBin(Db);
 
-      return Interaction.reply({ content: `Added ${Type} to ${Target}.` });
+      return Interaction.reply({ content: `Added ${Type} to ${Target.username}.`, ephemeral: true });
     }
 
     if (Sub === "remove") {
@@ -77,7 +77,7 @@ module.exports = {
 
       const Row = new ActionRowBuilder().addComponents(Select);
 
-      await Interaction.reply({ content: `Select a certificate to remove from ${Target}:`, components: [Row], ephemeral: true });
+      await Interaction.reply({ content: `Select a certificate to remove from ${Target.username}:`, components: [Row], ephemeral: true });
 
       const Collector = Interaction.channel.createMessageComponentCollector({ time: 60000, filter: i => i.user.id === Interaction.user.id });
 
@@ -85,7 +85,7 @@ module.exports = {
         const CertToRemove = i.values[0];
         Db.Certifications[Target.id] = Db.Certifications[Target.id].filter(c => c !== CertToRemove);
         await SaveJsonBin(Db);
-        await i.update({ content: `Removed ${CertToRemove} from ${Target}.`, components: [], ephemeral: true });
+        await i.update({ content: `Removed ${CertToRemove} from ${Target.username}.`, components: [], ephemeral: true });
       });
 
       Collector.on("end", async Collected => {
