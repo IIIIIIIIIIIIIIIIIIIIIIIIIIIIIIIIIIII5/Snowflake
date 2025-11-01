@@ -23,17 +23,6 @@ function FormatDuration(Ms) {
     return Result.join(', ') || '0 seconds';
 }
 
-function FormatDate(DateObj) {
-    const Day = DateObj.getDate();
-    const Month = DateObj.toLocaleString('default', { month: 'long' });
-    const Year = DateObj.getFullYear();
-    const Hours = DateObj.getHours() % 12 || 12;
-    const Minutes = DateObj.getMinutes().toString().padStart(2, '0');
-    const AmPm = DateObj.getHours() >= 12 ? 'PM' : 'AM';
-    const Suffix = Day % 10 === 1 && Day !== 11 ? 'st' : Day % 10 === 2 && Day !== 12 ? 'nd' : Day % 10 === 3 && Day !== 13 ? 'rd' : 'th';
-    return `On ${Day}${Suffix} ${Month}, ${Year} at ${Hours}:${Minutes} ${AmPm}`;
-}
-
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('unsuspend')
@@ -43,14 +32,16 @@ module.exports = {
         .addStringOption(opt => opt.setName('discordid').setDescription('Optional Discord ID to DM / role-manage')),
 
     async execute(interaction) {
-        const GuildId = interaction.guild.id;
-        if (!interaction.member.roles.cache.has(AllowedRole) && !interaction.member.roles.cache.has(SfpLeadershipRole))
+        if (!interaction.member.roles.cache.has(AllowedRole) && !interaction.member.roles.cache.has(SfpLeadershipRole)) {
             return interaction.reply({ content: "You don't have permission.", ephemeral: true });
+        }
 
         await interaction.deferReply({ ephemeral: true });
 
         try {
             const Db = await GetJsonBin();
+            const GuildId = interaction.guild.id;
+
             if (!Db.ServerConfig?.[GuildId]?.GroupId)
                 return interaction.editReply({ content: "Group ID not set. Run /config first." });
 
@@ -63,20 +54,21 @@ module.exports = {
             if (!Suspension || !Suspension.Active)
                 return interaction.editReply({ content: `${Username} is not currently suspended.` });
 
-            if (Suspension.EndsAt && Date.now() < Suspension.EndsAt)
+            const EndsAt = Suspension.EndsAt ? Number(Suspension.EndsAt) : null;
+
+            if (EndsAt && Date.now() < EndsAt)
                 return interaction.editReply({ content: `${Username} is still within their suspension period.` });
 
             Suspension.Active = false;
             await SaveJsonBin(Db);
 
-            const DurationStr = Suspension.IssuedAt && Suspension.EndsAt ? FormatDuration(Suspension.EndsAt - Suspension.IssuedAt) : 'N/A';
-
+            const DurationStr = Suspension.IssuedAt && EndsAt ? FormatDuration(EndsAt - Suspension.IssuedAt) : 'N/A';
             const TargetDiscordId = DiscordIdOption || Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === UserId);
 
             const UserEmbed = new EmbedBuilder()
                 .setTitle('YOUR SUSPENSION HAS ENDED')
                 .setColor(0x00ff00)
-                .setDescription(`Dear, <@${TargetDiscordId}>, your suspension has ended early. You have been ranked back to your original role.`);
+                .setDescription(`Dear, <@${TargetDiscordId}>, your suspension has ended. You have been ranked back to your original role.`);
 
             const LogEmbed = new EmbedBuilder()
                 .setTitle('User Unsuspended')
