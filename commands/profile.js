@@ -115,7 +115,10 @@ module.exports = {
             if (lastAction) lastPunishment = lastAction.timestamp || "Nil";
           }
 
-          const certifications = db.Certifications?.[target.id] || [];
+          const certifications = db.Certifications?.[target.id] || {};
+          const certDisplay = Object.entries(certifications).length > 0
+            ? Object.entries(certifications).map(([cert, count]) => `${count}x ${cert}`).join(", ")
+            : "None";
 
           groupEmbed = new EmbedBuilder()
             .setTitle(`${username}'s Group Stats`)
@@ -125,7 +128,7 @@ module.exports = {
               { name: "Group Rank", value: groupRank, inline: true },
               { name: "Warnings", value: warnings, inline: true },
               { name: "Last Punishment", value: lastPunishment, inline: true },
-              { name: "Certifications", value: certifications.length > 0 ? certifications.join(", ") : "None", inline: true }
+              { name: "Certifications", value: certDisplay, inline: true }
             );
         }
 
