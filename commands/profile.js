@@ -115,12 +115,8 @@ module.exports = {
             if (lastAction?.IssuedAt) lastPunishment = new Date(lastAction.IssuedAt).toLocaleString('en-GB');
           }
 
-          const userCerts = Array.isArray(db.Certifications?.[target.id]) ? db.Certifications[target.id] : [];
-          const certCounts = {};
-          userCerts.forEach(c => certCounts[c] = (certCounts[c] || 0) + 1);
-          const certDisplay = Object.keys(certCounts).length > 0
-            ? Object.entries(certCounts).map(([cert, count]) => `${cert}`).join(", ")
-            : "None";
+          const userCerts = db.Certifications?.[target.id] || [];
+          const certDisplay = userCerts.length > 0 ? userCerts.join(", ") : "None";
 
           groupEmbed = new EmbedBuilder()
             .setTitle(`${username}'s Group Stats`)
@@ -139,9 +135,7 @@ module.exports = {
     });
 
     collector.on("end", async () => {
-      try {
-        await interaction.editReply({ components: [] });
-      } catch {}
+      try { await interaction.editReply({ components: [] }); } catch {}
     });
   }
 };
