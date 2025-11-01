@@ -5,39 +5,54 @@ const AllowedRole = "1398691449939169331";
 const DiscordRoleId = "1402233297786109952";
 const SuspensionLogChannelId = "1433025723932741694";
 
-function ParseDuration(Input) {
-    const Match = Input.match(/^(\d+)([smhdwM])$/i);
-    if (!Match) throw new Error("Invalid duration format");
-    const Value = parseInt(Match[1]);
-    const Unit = Match[2];
-    const Multipliers = { s: 1000, m: 60000, h: 3600000, d: 86400000, w: 604800000, M: 2592000000 };
-    return Value * Multipliers[Unit];
-}
+const DurationOptions = {
+    '12 hours': 12 * 60 * 60 * 1000,
+    '1 day': 24 * 60 * 60 * 1000,
+    '3 days': 3 * 24 * 60 * 60 * 1000,
+    '7 days': 7 * 24 * 60 * 60 * 1000,
+    '1 month': 30 * 24 * 60 * 60 * 1000
+};
 
-function FormatDuration(Ms) {
-    const Seconds = Math.floor(Ms / 1000) % 60;
-    const Minutes = Math.floor(Ms / (60 * 1000)) % 60;
-    const Hours = Math.floor(Ms / (60 * 60 * 1000)) % 24;
-    const Days = Math.floor(Ms / (24 * 60 * 60 * 1000)) % 7;
-    const Weeks = Math.floor(Ms / (7 * 24 * 60 * 60 * 1000)) % 4;
-    const Months = Math.floor(Ms / (30 * 24 * 60 * 60 * 1000));
-    let Result = [];
-    if (Months) Result.push(`${Months} month${Months > 1 ? 's' : ''}`);
-    if (Weeks) Result.push(`${Weeks} week${Weeks > 1 ? 's' : ''}`);
-    if (Days) Result.push(`${Days} day${Days > 1 ? 's' : ''}`);
-    if (Hours) Result.push(`${Hours} hour${Hours > 1 ? 's' : ''}`);
-    if (Minutes) Result.push(`${Minutes} minute${Minutes > 1 ? 's' : ''}`);
-    if (Seconds) Result.push(`${Seconds} second${Seconds > 1 ? 's' : ''}`);
-    return Result.join(', ') || '0 seconds';
+function FormatDuration(ms) {
+    let remaining = ms;
+    const days = Math.floor(remaining / (24 * 60 * 60 * 1000));
+    remaining -= days * 24 * 60 * 60 * 1000;
+    const hours = Math.floor(remaining / (60 * 60 * 1000));
+    remaining -= hours * 60 * 60 * 1000;
+    const minutes = Math.floor(remaining / (60 * 1000));
+    remaining -= minutes * 60 * 1000;
+    const seconds = Math.floor(remaining / 1000);
+    let result = [];
+    if (days) result.push(`${days} day${days > 1 ? 's' : ''}`);
+    if (hours) result.push(`${hours} hour${hours > 1 ? 's' : ''}`);
+    if (minutes) result.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
+    if (seconds) result.push(`${seconds} second${seconds > 1 ? 's' : ''}`);
+    return result.join(', ') || '0 seconds';
 }
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('suspend')
         .setDescription('Suspend a Roblox user from their rank')
-        .addStringOption(opt => opt.setName('username').setDescription('Roblox username').setRequired(true))
-        .addStringOption(opt => opt.setName('reason').setDescription('Reason for suspension').setRequired(true))
-        .addStringOption(opt => opt.setName('duration').setDescription('Duration e.g. 1h, 1d, 1w, 1M').setRequired(true))
+        .addStringOption(opt => 
+            opt.setName('username')
+               .setDescription('Roblox username')
+               .setRequired(true))
+        .addStringOption(opt => 
+            opt.setName('reason')
+               .setDescription('Reason for suspension')
+               .setRequired(true))
+        .addStringOption(opt => 
+            opt.setName('duration')
+               .setDescription('Duration of suspension')
+               .setRequired(true)
+               .addChoices(
+                   { name: '12 hours', value: '12 hours' },
+                   { name: '1 day', value: '1 day' },
+                   { name: '3 days', value: '3 days' },
+                   { name: '7 days', value: '7 days' },
+                   { name: '1 month', value: '1 month' }
+               ))
         .addStringOption(opt => opt.setName('discordid').setDescription('Optional Discord ID')),
 
     async execute(Interaction) {
@@ -54,8 +69,11 @@ module.exports = {
 
             const Username = Interaction.options.getString('username');
             const Reason = Interaction.options.getString('reason');
-            const DurationMs = ParseDuration(Interaction.options.getString('duration'));
+            const DurationKey = Interaction.options.getString('duration');
+            const DurationMs = DurationOptions[DurationKey];
             const DiscordIdOption = Interaction.options.getString('discordid');
+
+            if (!DurationMs) return Interaction.editReply({ content: 'Invalid duration selected.', ephemeral: true });
 
             const UserId = await GetRobloxUserId(Username);
             const TargetCurrentRank = await GetCurrentRank(GroupId, UserId);
@@ -67,7 +85,7 @@ module.exports = {
                 if (TargetCurrentRank.Rank >= IssuerRank.Rank) return Interaction.editReply({ content: 'You cannot suspend a user with equal or higher rank.', ephemeral: true });
             }
 
-            await SuspendUser(GroupId, UserId, Interaction.user.id, GuildId, Interaction.client, DurationMs);
+            await SuspendUser(GroupId, UserId, Interaction.user.id, GuildId, Interaction.client, DurationMs, Reason);
 
             Db.Suspensions = Db.Suspensions || {};
             Db.Suspensions[UserId] = {
@@ -128,7 +146,7 @@ module.exports = {
             const LogChannel = await Interaction.client.channels.fetch(SuspensionLogChannelId).catch(() => null);
             if (LogChannel?.isTextBased()) await LogChannel.send({ embeds: [LogEmbed] });
 
-            await Interaction.editReply({ content: `Successfully suspended ${Username}. DM sent to the user.` });
+            await Interaction.editReply({ content: `Successfully suspended ${Username} for ${DurationKey}. DM sent to the user.` });
         } catch (Err) {
             return Interaction.editReply({ content: `Error: ${Err.message}` });
         }
