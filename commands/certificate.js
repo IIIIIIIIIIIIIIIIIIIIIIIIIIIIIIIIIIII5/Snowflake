@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { GetJsonBin, WriteJsonBin } = require("../roblox");
+const { GetJsonBin, SaveJsonBin } = require("../roblox");
 
 const Roles = [
   "1386369108408406096",
@@ -44,7 +44,7 @@ module.exports = {
         return interaction.reply({ content: `${target.username} already has ${type}.`, ephemeral: true });
 
       db.Certifications[target.id].push(type);
-      await WriteJsonBin(db);
+      await SaveJsonBin(db);
 
       return interaction.reply({ content: `Added ${type} to ${target}.` });
     }
