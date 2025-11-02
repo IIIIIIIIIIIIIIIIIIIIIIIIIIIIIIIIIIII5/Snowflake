@@ -57,7 +57,8 @@ module.exports = {
       const Type = Interaction.options.getString("type");
 
       if (!Db.Certifications[Target.id]) Db.Certifications[Target.id] = [];
-      if (Db.Certifications[Target.id].includes(Type)) {
+
+      if (Type === "Certified Host" && Db.Certifications[Target.id].includes(Type)) {
         return Interaction.reply({
           content: `${Target.username} already has ${Type}.`,
           ephemeral: true
