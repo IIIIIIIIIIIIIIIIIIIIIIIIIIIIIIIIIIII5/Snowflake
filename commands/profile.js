@@ -18,17 +18,17 @@ function FormatCertifications(certArray) {
   const Counts = {};
 
   for (const Cert of certArray) {
-    if (Cert === "Certified Host") continue;
-    if (!Counts[Cert]) Counts[Cert] = 0;
-    Counts[Cert]++;
+    if (Cert !== "Certified Host") {
+      Counts[Cert] = (Counts[Cert] || 0) + 1;
+    }
   }
 
+  const Added = new Set();
   for (const Cert of certArray) {
-    if (Cert === "Certified Host") continue;
-    if (Counts[Cert] !== undefined) {
+    if (Cert !== "Certified Host" && !Added.has(Cert)) {
       const Count = Counts[Cert];
       Result.push(Count > 1 ? `${Cert} x${Count}` : Cert);
-      delete Counts[Cert];
+      Added.add(Cert);
     }
   }
 
@@ -136,11 +136,11 @@ module.exports = {
             warnings = warnCount > 0 ? String(warnCount) : "None";
 
             const lastAction = userModeration[userModeration.length - 1];
-            if (lastAction?.IssuedAt) lastPunishment = new Date(lastAction.IssuedAt).toLocaleString('en-GB');
+            if (lastAction?.timestamp) lastPunishment = new Date(lastAction.timestamp).toLocaleString('en-GB');
           }
 
           const userCerts = db.Certifications?.[target.id] || [];
-          const certDisplay = FormatCertifications(userCerts).join(", ");
+          const certDisplay = FormatCertifications(userCerts).join("\n");
 
           const DepartmentsList = [
             { Name: "Facility Staffing Commission", Id: 7918467 },
