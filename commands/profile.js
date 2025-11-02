@@ -118,6 +118,38 @@ module.exports = {
           const userCerts = db.Certifications?.[target.id] || [];
           const certDisplay = userCerts.length > 0 ? userCerts.join(", ") : "None";
 
+          const departmentGroups = [
+            { name: "Facility Staffing Commission", id: 7918467 },
+            { name: "Community Management", id: 8565254 },
+            { name: "Moderation Team", id: 7010801 },
+            { name: "Operations Management", id: 9765582 }
+          ];
+
+          async function isInGroup(groupId) {
+            try {
+              const rank = await GetCurrentRank(groupId, robloxId);
+              return rank ? rank.Rank : null;
+            } catch {
+              return null;
+            }
+          }
+
+          let departments = [];
+
+          for (const dept of departmentGroups) {
+            const rank = await isInGroup(dept.id);
+            if (!rank) continue;
+
+            if (dept.name === "Operations Management") {
+              if (rank >= 201) departments.push("Operations Management");
+              continue;
+            }
+
+            departments.push(dept.name);
+          }
+
+          if (departments.length === 0) departments = ["None"];
+
           groupEmbed = new EmbedBuilder()
             .setTitle(`${username}'s Group Stats`)
             .setColor(0x5865f2)
@@ -126,7 +158,8 @@ module.exports = {
               { name: "Group Rank", value: groupRank, inline: false },
               { name: "Warnings", value: warnings, inline: false },
               { name: "Last Punishment", value: lastPunishment, inline: false },
-              { name: "Certifications", value: certDisplay, inline: false }
+              { name: "Certifications", value: certDisplay, inline: false },
+              { name: "Departments", value: departments.join(", "), inline: false }
             );
         }
 
