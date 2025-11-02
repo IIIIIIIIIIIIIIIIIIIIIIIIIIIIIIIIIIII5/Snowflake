@@ -20,12 +20,11 @@ module.exports = {
           opt.setName("user").setDescription("The user to modify.").setRequired(true)
         )
         .addStringOption(opt =>
-          opt.setName("type")
+          opt
+            .setName("type")
             .setDescription("Select a certificate to add")
             .setRequired(true)
-            .addChoices(
-              { name: "Certified Host", value: "Certified Host" }
-            )
+            .addChoices({ name: "Certified Host", value: "Certified Host" })
         )
     )
     .addSubcommand(sub =>
@@ -39,7 +38,10 @@ module.exports = {
 
   async execute(Interaction) {
     if (!Interaction.member.roles.cache.some(r => Roles.includes(r.id))) {
-      return Interaction.reply({ content: "You do not have permission to use this command.", ephemeral: true });
+      return Interaction.reply({
+        content: "You do not have permission to use this command.",
+        ephemeral: true
+      });
     }
 
     const Sub = Interaction.options.getSubcommand();
@@ -51,15 +53,24 @@ module.exports = {
       const Type = Interaction.options.getString("type");
 
       if (!Db.Certifications[Target.id]) Db.Certifications[Target.id] = [];
-
-      if (Type === "Certified Host" && Db.Certifications[Target.id].includes("Certified Host")) {
-        return Interaction.reply({ content: `${Target.username} already has Certified Host.`, ephemeral: true });
+      if (Db.Certifications[Target.id].includes(Type)) {
+        return Interaction.reply({
+          content: `${Target.username} already has ${Type}.`,
+          ephemeral: true
+        });
       }
 
       Db.Certifications[Target.id].push(Type);
       await SaveJsonBin(Db);
 
-      return Interaction.reply({ content: `Added ${Type} to ${Target.username}.`, ephemeral: true });
+      try {
+        await Target.send(`Hello ${Target.username}, a new certification has been granted to you: **${Type}**.`);
+      } catch {}
+
+      return Interaction.reply({
+        content: `Added ${Type} to ${Target.username}.`,
+        ephemeral: true
+      });
     }
 
     if (Sub === "remove") {
@@ -67,7 +78,10 @@ module.exports = {
       const UserCerts = Db.Certifications[Target.id] || [];
 
       if (UserCerts.length === 0) {
-        return Interaction.reply({ content: `${Target.username} has no certificates.`, ephemeral: true });
+        return Interaction.reply({
+          content: `${Target.username} has no certificates.`,
+          ephemeral: true
+        });
       }
 
       const Select = new StringSelectMenuBuilder()
@@ -77,20 +91,42 @@ module.exports = {
 
       const Row = new ActionRowBuilder().addComponents(Select);
 
-      await Interaction.reply({ content: `Select a certificate to remove from ${Target.username}:`, components: [Row], ephemeral: true });
+      await Interaction.reply({
+        content: `Select a certificate to remove from ${Target.username}:`,
+        components: [Row],
+        ephemeral: true
+      });
 
-      const Collector = Interaction.channel.createMessageComponentCollector({ time: 60000, filter: i => i.user.id === Interaction.user.id });
+      const Collector = Interaction.channel.createMessageComponentCollector({
+        time: 60000,
+        filter: i => i.user.id === Interaction.user.id
+      });
 
       Collector.on("collect", async i => {
         const CertToRemove = i.values[0];
         Db.Certifications[Target.id] = Db.Certifications[Target.id].filter(c => c !== CertToRemove);
         await SaveJsonBin(Db);
-        await i.update({ content: `Removed ${CertToRemove} from ${Target.username}.`, components: [], ephemeral: true });
+
+        try {
+          await Target.send(`Hello ${Target.username}, the following certification has been removed from your account: **${CertToRemove}**.`);
+        } catch {}
+
+        await i.update({
+          content: `Removed ${CertToRemove} from ${Target.username}.`,
+          components: [],
+          ephemeral: true
+        });
       });
 
       Collector.on("end", async Collected => {
         if (Collected.size === 0) {
-          try { await Interaction.editReply({ content: "No certificate was selected.", components: [], ephemeral: true }); } catch {}
+          try {
+            await Interaction.editReply({
+              content: "No certificate was selected.",
+              components: [],
+              ephemeral: true
+            });
+          } catch {}
         }
       });
     }
