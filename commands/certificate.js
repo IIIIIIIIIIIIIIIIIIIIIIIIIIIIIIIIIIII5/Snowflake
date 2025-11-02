@@ -24,7 +24,11 @@ module.exports = {
             .setName("type")
             .setDescription("Select a certificate to add")
             .setRequired(true)
-            .addChoices({ name: "Certified Host", value: "Certified Host" })
+            .addChoices(
+              { name: "Certified Host", value: "Certified Host" },
+              { name: "Staff of the Week", value: "Staff of the Week"},
+              { name: "Staff of the Month", value: "Staff of the Month"}
+            )
         )
     )
     .addSubcommand(sub =>
