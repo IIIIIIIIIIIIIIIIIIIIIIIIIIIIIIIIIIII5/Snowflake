@@ -118,23 +118,23 @@ module.exports = {
           const userCerts = db.Certifications?.[target.id] || [];
           const certDisplay = userCerts.length > 0 ? userCerts.join(", ") : "None";
 
-          const departmentGroups = [
-            { name: "Facility Staffing Commission", id: 7918467 },
-            { name: "Community Management", id: 8565254 },
-            { name: "Moderation Team", id: 7010801 },
-            { name: "Operations Management", id: 9765582 }
+          const DepartmentsList = [
+            { Name: "Facility Staffing Commission", Id: 7918467 },
+            { Name: "Community Management", Id: 8565254 },
+            { Name: "Moderation Team", Id: 7010801 },
+            { Name: "Operations Management", Id: 9765582 }
           ];
 
-          async function getRankId(groupId) {
+          async function GetRankId(gid) {
             try {
-              const rankObj = await GetCurrentRank(groupId, robloxId);
-              if (!rankObj) return null;
-
+              const r = await GetCurrentRank(gid, robloxId);
               return (
-                rankObj.Rank ||
-                rankObj.Id ||
-                rankObj.rank ||
-                rankObj.role?.rank ||
+                r?.rank ||
+                r?.Rank ||
+                r?.Id ||
+                r?.id ||
+                r?.role?.rank ||
+                r?.role?.id ||
                 null
               );
             } catch {
@@ -142,21 +142,21 @@ module.exports = {
             }
           }
 
-          let departments = [];
+          let Departments = [];
 
-          for (const dept of departmentGroups) {
-            const rankId = await getRankId(dept.id);
-            if (!rankId) continue;
+          for (const Dept of DepartmentsList) {
+            const RankId = await GetRankId(Dept.Id);
+            if (!RankId) continue;
 
-            if (dept.name === "Operations Management") {
-              if (rankId >= 201) departments.push("Operations Management");
+            if (Dept.Name === "Operations Management") {
+              if (RankId >= 201) Departments.push("Operations Management");
               continue;
             }
 
-            departments.push(dept.name);
+            Departments.push(Dept.Name);
           }
 
-          if (departments.length === 0) departments = ["None"];
+          if (Departments.length === 0) Departments = ["None"];
 
           groupEmbed = new EmbedBuilder()
             .setTitle(`${username}'s Group Stats`)
@@ -167,7 +167,7 @@ module.exports = {
               { name: "Warnings", value: warnings, inline: false },
               { name: "Last Punishment", value: lastPunishment, inline: false },
               { name: "Certifications", value: certDisplay, inline: false },
-              { name: "Departments", value: departments.join(", "), inline: false }
+              { name: "Departments", value: Departments.join(", "), inline: false }
             );
         }
 
