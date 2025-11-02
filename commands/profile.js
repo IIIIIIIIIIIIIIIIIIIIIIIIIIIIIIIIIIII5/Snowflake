@@ -125,10 +125,18 @@ module.exports = {
             { name: "Operations Management", id: 9765582 }
           ];
 
-          async function isInGroup(groupId) {
+          async function getRankId(groupId) {
             try {
-              const rank = await GetCurrentRank(groupId, robloxId);
-              return rank ? rank.Rank : null;
+              const rankObj = await GetCurrentRank(groupId, robloxId);
+              if (!rankObj) return null;
+
+              return (
+                rankObj.Rank ||
+                rankObj.Id ||
+                rankObj.rank ||
+                rankObj.role?.rank ||
+                null
+              );
             } catch {
               return null;
             }
@@ -137,11 +145,11 @@ module.exports = {
           let departments = [];
 
           for (const dept of departmentGroups) {
-            const rank = await isInGroup(dept.id);
-            if (!rank) continue;
+            const rankId = await getRankId(dept.id);
+            if (!rankId) continue;
 
             if (dept.name === "Operations Management") {
-              if (rank >= 201) departments.push("Operations Management");
+              if (rankId >= 201) departments.push("Operations Management");
               continue;
             }
 
