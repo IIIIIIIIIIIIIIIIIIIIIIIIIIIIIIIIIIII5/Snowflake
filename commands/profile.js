@@ -12,6 +12,30 @@ async function GetModerationData() {
   return data.record || [];
 }
 
+function FormatCertifications(certArray) {
+  if (!certArray || certArray.length === 0) return ["None"];
+  const Result = [];
+  const Counts = {};
+
+  for (const Cert of certArray) {
+    if (Cert === "Certified Host") continue;
+    if (!Counts[Cert]) Counts[Cert] = 0;
+    Counts[Cert]++;
+  }
+
+  for (const Cert of certArray) {
+    if (Cert === "Certified Host") continue;
+    if (Counts[Cert] !== undefined) {
+      const Count = Counts[Cert];
+      Result.push(Count > 1 ? `${Cert} x${Count}` : Cert);
+      delete Counts[Cert];
+    }
+  }
+
+  if (certArray.includes("Certified Host")) Result.push("Certified Host");
+  return Result;
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("profile")
@@ -116,7 +140,7 @@ module.exports = {
           }
 
           const userCerts = db.Certifications?.[target.id] || [];
-          const certDisplay = userCerts.length > 0 ? userCerts.join(", ") : "None";
+          const certDisplay = FormatCertifications(userCerts).join(", ");
 
           const DepartmentsList = [
             { Name: "Facility Staffing Commission", Id: 7918467 },
