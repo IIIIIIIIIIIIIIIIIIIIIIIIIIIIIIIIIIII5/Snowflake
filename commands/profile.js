@@ -128,19 +128,10 @@ module.exports = {
           async function GetRankId(gid) {
             try {
               const r = await GetCurrentRank(gid, robloxId);
-              if (r == null) return null;
+              if (!r) return null;
               if (typeof r === "number") return r;
               if (typeof r === "string" && /^\d+$/.test(r)) return Number(r);
-
-              return (
-                (typeof r.rank === "number" ? r.rank : (typeof r.rank === "string" && /^\d+$/.test(r.rank) ? Number(r.rank) : null)) ||
-                (typeof r.Rank === "number" ? r.Rank : (typeof r.Rank === "string" && /^\d+$/.test(r.Rank) ? Number(r.Rank) : null)) ||
-                (typeof r.Id === "number" ? r.Id : (typeof r.Id === "string" && /^\d+$/.test(r.Id) ? Number(r.Id) : null)) ||
-                (typeof r.id === "number" ? r.id : (typeof r.id === "string" && /^\d+$/.test(r.id) ? Number(r.id) : null)) ||
-                (r.role && (typeof r.role.rank === "number" ? r.role.rank : (typeof r.role.rank === "string" && /^\d+$/.test(r.role.rank) ? Number(r.role.rank) : null))) ||
-                (r.Role && (typeof r.Role.Rank === "number" ? r.Role.Rank : (typeof r.Role.Rank === "string" && /^\d+$/.test(r.Role.Rank) ? Number(r.Role.Rank) : null))) ||
-                null
-              );
+              return r.Role?.Rank || r.role?.Rank || r.role?.rank || r.Rank || r.rank || r.Id || r.id || null;
             } catch {
               return null;
             }
