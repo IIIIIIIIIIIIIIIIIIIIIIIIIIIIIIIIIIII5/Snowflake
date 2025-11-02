@@ -8,6 +8,27 @@ const Roles = [
   "1418979785165766717"
 ];
 
+function FormatCertificates(certArray) {
+  if (!certArray || certArray.length === 0) return ["None"];
+  const Result = [];
+  const Counts = {};
+  for (const Cert of certArray) {
+    if (Cert === "Certified Host") continue;
+    if (!Counts[Cert]) Counts[Cert] = 0;
+    Counts[Cert]++;
+  }
+  for (const Cert of certArray) {
+    if (Cert === "Certified Host") continue;
+    if (Counts[Cert] !== undefined) {
+      const Count = Counts[Cert];
+      Result.push(Count > 1 ? `${Cert} x${Count}` : Cert);
+      delete Counts[Cert];
+    }
+  }
+  if (certArray.includes("Certified Host")) Result.push("Certified Host");
+  return Result;
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("certificate")
@@ -26,8 +47,8 @@ module.exports = {
             .setRequired(true)
             .addChoices(
               { name: "Certified Host", value: "Certified Host" },
-              { name: "Staff of the Week", value: "Staff of the Week"},
-              { name: "Staff of the Month", value: "Staff of the Month"}
+              { name: "Staff of the Week", value: "Staff of the Week" },
+              { name: "Staff of the Month", value: "Staff of the Month" }
             )
         )
     )
@@ -42,51 +63,37 @@ module.exports = {
 
   async execute(Interaction) {
     if (!Interaction.member.roles.cache.some(r => Roles.includes(r.id))) {
-      return Interaction.reply({
-        content: "You do not have permission to use this command.",
-        ephemeral: true
-      });
+      return Interaction.reply({ content: "You do not have permission to use this command.", ephemeral: true });
     }
 
     const Sub = Interaction.options.getSubcommand();
     const Db = await GetJsonBin();
     if (!Db.Certifications) Db.Certifications = {};
 
-    if (Sub === "add") {
+    if (Sub === "Add") {
       const Target = Interaction.options.getUser("user");
       const Type = Interaction.options.getString("type");
 
       if (!Db.Certifications[Target.id]) Db.Certifications[Target.id] = [];
 
       if (Type === "Certified Host" && Db.Certifications[Target.id].includes(Type)) {
-        return Interaction.reply({
-          content: `${Target.username} already has ${Type}.`,
-          ephemeral: true
-        });
+        return Interaction.reply({ content: `${Target.username} already has ${Type}.`, ephemeral: true });
       }
 
       Db.Certifications[Target.id].push(Type);
       await SaveJsonBin(Db);
 
-      try {
-        await Target.send(`Hello ${Target.username}, a new certification has been granted to you: **${Type}**.`);
-      } catch {}
+      try { await Target.send(`Hello ${Target.username}, a new certification has been granted to you: **${Type}**.`); } catch {}
 
-      return Interaction.reply({
-        content: `Added ${Type} to ${Target.username}.`,
-        ephemeral: true
-      });
+      return Interaction.reply({ content: `Added ${Type} to ${Target.username}.`, ephemeral: true });
     }
 
-    if (Sub === "remove") {
+    if (Sub === "Remove") {
       const Target = Interaction.options.getUser("user");
       const UserCerts = Db.Certifications[Target.id] || [];
 
       if (UserCerts.length === 0) {
-        return Interaction.reply({
-          content: `${Target.username} has no certificates.`,
-          ephemeral: true
-        });
+        return Interaction.reply({ content: `${Target.username} has no certificates.`, ephemeral: true });
       }
 
       const Select = new StringSelectMenuBuilder()
@@ -96,42 +103,23 @@ module.exports = {
 
       const Row = new ActionRowBuilder().addComponents(Select);
 
-      await Interaction.reply({
-        content: `Select a certificate to remove from ${Target.username}:`,
-        components: [Row],
-        ephemeral: true
-      });
+      await Interaction.reply({ content: `Select a certificate to remove from ${Target.username}:`, components: [Row], ephemeral: true });
 
-      const Collector = Interaction.channel.createMessageComponentCollector({
-        time: 60000,
-        filter: i => i.user.id === Interaction.user.id
-      });
+      const Collector = Interaction.channel.createMessageComponentCollector({ time: 60000, filter: i => i.user.id === Interaction.user.id });
 
       Collector.on("collect", async i => {
         const CertToRemove = i.values[0];
         Db.Certifications[Target.id] = Db.Certifications[Target.id].filter(c => c !== CertToRemove);
         await SaveJsonBin(Db);
 
-        try {
-          await Target.send(`Hello ${Target.username}, the following certification has been removed from your account: **${CertToRemove}**.`);
-        } catch {}
+        try { await Target.send(`Hello ${Target.username}, the following certification has been removed from your account: **${CertToRemove}**.`); } catch {}
 
-        await i.update({
-          content: `Removed ${CertToRemove} from ${Target.username}.`,
-          components: [],
-          ephemeral: true
-        });
+        await i.update({ content: `Removed ${CertToRemove} from ${Target.username}.`, components: [], ephemeral: true });
       });
 
       Collector.on("end", async Collected => {
         if (Collected.size === 0) {
-          try {
-            await Interaction.editReply({
-              content: "No certificate was selected.",
-              components: [],
-              ephemeral: true
-            });
-          } catch {}
+          try { await Interaction.editReply({ content: "No certificate was selected.", components: [], ephemeral: true }); } catch {}
         }
       });
     }
