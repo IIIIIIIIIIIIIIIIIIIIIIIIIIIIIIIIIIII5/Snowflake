@@ -27,7 +27,7 @@ function FormatCertifications(certArray) {
   for (const Cert of certArray) {
     if (Cert !== "Certified Host" && !Added.has(Cert)) {
       const Count = Counts[Cert];
-      Result.push(Count > 1 ? `${Cert} x${Count}` : Cert);
+      Result.push(Count > 1 ? `${Cert} **x${Count}**` : Cert);
       Added.add(Cert);
     }
   }
@@ -48,6 +48,15 @@ module.exports = {
     const db = await GetJsonBin();
     const moderationData = await GetModerationData();
     const target = interaction.options.getUser("user") || interaction.user;
+
+    if (target.id === "1167121753672257576") {
+      const specialEmbed = new EmbedBuilder()
+        .setTitle("ayo ur a stalker")
+        .setDescription("didn't ask you to check my profile")
+        .setColor(0xff0000)
+        .setTimestamp();
+      return interaction.editReply({ embeds: [specialEmbed] });
+    }
 
     const trainings = db.Trainings?.[target.id] || { hosted: {}, cohosted: {}, supervised: {} };
     const monthKey = new Date().toISOString().slice(0, 7);
