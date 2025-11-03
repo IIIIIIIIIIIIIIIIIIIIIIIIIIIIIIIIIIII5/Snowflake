@@ -31,6 +31,7 @@ module.exports = {
       if (index === -1 || index === roles.length - 1) throw new Error('Cannot promote further');
       const newRole = roles[index + 1];
       await SetRank(groupId, userId, newRole.Name, interaction.user.id, guildId);
+      await SendRankLog(guildId, interaction.client, interaction.user.id, userId, "Promote", newRole.Name);
       return interaction.editReply({ content: `Promoted ${username} to ${newRole.Name}` });
     } catch (err) {
       return interaction.editReply({ content: `Error: ${err.message}` });
