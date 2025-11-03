@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { GetJsonBin, GetRobloxUserId, SetRank } = require('../roblox');
+const { GetJsonBin, GetRobloxUserId, SetRank, SendRankLog } = require('../roblox');
 
 const ALLOWED_ROLE = '1423332095001890908';
 const SFPLeadershipRole = '1386369108408406096';
@@ -28,6 +28,7 @@ module.exports = {
 
     try {
       await SetRank(groupId, userId, rankName, interaction.user.id, guildId);
+      await SendRankLog(guildId, interaction.client, interaction.user.id, userId, "Set Rank", rankName);
       return interaction.editReply({ content: `Set ${username} to rank ${rankName}` });
     } catch (err) {
       return interaction.editReply({ content: `Error: ${err.message}` });
