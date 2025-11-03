@@ -133,7 +133,7 @@ async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Clie
     RoleInfo = Roles[String(RankOrId).toLowerCase()];
   }
   if (!RoleInfo) throw new Error('Invalid rank specified: ' + RankOrId);
-  if (!IssuerDiscordId.toUpperCase().includes('SYSTEM') {
+  if (!IssuerDiscordId.toUpperCase().includes('SYSTEM')) {
     const DbData = await GetJsonBin();
     const IssuerRobloxId = DbData.VerifiedUsers?.[IssuerDiscordId];
     if (!IssuerRobloxId) throw new Error('You must verify first.');
