@@ -98,7 +98,7 @@ async function GetRobloxDescription(UserId) {
 async function SendRankLog(GuildId, Client, ActionBy, TargetRobloxId, Action, NewRank) {
   try {
     const Data = await GetJsonBin();
-    const LogChannelId = Data.ServerConfig?.[GuildId]?.RankLogChannel || Data.ServerConfig?.[GuildId]?.RankLog || '1433025723932741694';
+    const LogChannelId = '1424381038393556992';
     const Guild = await (Client?.guilds ? Client.guilds.fetch(GuildId).catch(() => null) : null);
     if (!Guild) return;
     const Channel = Guild.channels.cache.get(LogChannelId) || null;
@@ -133,7 +133,7 @@ async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Clie
     RoleInfo = Roles[String(RankOrId).toLowerCase()];
   }
   if (!RoleInfo) throw new Error('Invalid rank specified: ' + RankOrId);
-  if (IssuerDiscordId !== 'SYSTEM') {
+  if (!IssuerDiscordId.toUpperCase().includes('SYSTEM') {
     const DbData = await GetJsonBin();
     const IssuerRobloxId = DbData.VerifiedUsers?.[IssuerDiscordId];
     if (!IssuerRobloxId) throw new Error('You must verify first.');
@@ -274,7 +274,7 @@ async function autoUnsuspend(UserId, Client = global.ClientBot) {
   } catch {}
   try {
     const Guild = Client?.guilds ? await Client.guilds.fetch(GuildId).catch(() => null) : null;
-    const LogChannelId = Data.ServerConfig?.[GuildId]?.SuspensionLogChannel || '1433025723932741694';
+    const LogChannelId = '1433025723932741694';
     const LogChannel = Guild?.channels?.cache?.get(LogChannelId) || null;
     if (LogChannel) {
       const EndEmbed = new EmbedBuilder()
