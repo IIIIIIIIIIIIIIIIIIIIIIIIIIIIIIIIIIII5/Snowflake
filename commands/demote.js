@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { GetJsonBin, GetRobloxUserId, GetCurrentRank, FetchRoles, SetRank } = require('../roblox');
+const { GetJsonBin, GetRobloxUserId, GetCurrentRank, FetchRoles, SetRank, SendRankLog } = require('../roblox');
 
 const ALLOWED_ROLE = '1423332095001890908';
 const SFPLeadershipRole = '1386369108408406096';
@@ -31,6 +31,7 @@ module.exports = {
       if (index <= 0) throw new Error('Cannot demote further');
       const newRole = roles[index - 1];
       await SetRank(groupId, userId, newRole.Name, interaction.user.id, guildId);
+      await SendRankLog(guildId, interaction.client, interaction.user.id, userId, "Demote", newRole.Name);
       return interaction.editReply({ content: `Demoted ${username} to ${newRole.Name}` });
     } catch (err) {
       return interaction.editReply({ content: `Error: ${err.message}` });
