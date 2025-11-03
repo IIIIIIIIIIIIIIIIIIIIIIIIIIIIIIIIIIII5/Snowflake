@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { GetJsonBin, GetRobloxUserId, GetCurrentRank, FetchRoles, SetRank } = require('../roblox');
+const { GetJsonBin, GetRobloxUserId, GetCurrentRank, FetchRoles, SetRank, SendRankLog } = require('../roblox');
 
 const ALLOWED_ROLE = '1423332095001890908';
 const SFPLeadershipRole = '1386369108408406096';
