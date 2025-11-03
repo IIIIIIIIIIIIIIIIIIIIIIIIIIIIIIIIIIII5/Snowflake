@@ -95,6 +95,32 @@ async function GetRobloxDescription(UserId) {
   return Res.data.description || '';
 }
 
+async function SendRankLog(GuildId, Client, ActionBy, TargetRobloxId, Action, NewRank) {
+  try {
+    const Data = await GetJsonBin();
+    const LogChannelId = Data.ServerConfig?.[GuildId]?.RankLogChannel || Data.ServerConfig?.[GuildId]?.RankLog || '1433025723932741694';
+    const Guild = await (Client?.guilds ? Client.guilds.fetch(GuildId).catch(() => null) : null);
+    if (!Guild) return;
+    const Channel = Guild.channels.cache.get(LogChannelId) || null;
+    if (!Channel || !Channel.isTextBased()) return;
+    const Username = await GetRobloxUsername(TargetRobloxId).catch(() => 'Unknown');
+    const FieldActionBy = ActionBy === 'SYSTEM' ? 'SYSTEM' : `<@${ActionBy}>`;
+    const Embed = new EmbedBuilder()
+      .setTitle('Rank Updated')
+      .setColor(0x2b2d31)
+      .addFields(
+        { name: 'Action By:', value: FieldActionBy, inline: true },
+        { name: 'Action On:', value: Username, inline: true },
+        { name: 'Action:', value: Action, inline: true },
+        { name: 'New Rank:', value: NewRank, inline: false }
+      )
+      .setTimestamp();
+    await Channel.send({ embeds: [Embed] }).catch(() => {});
+  } catch (err) {
+    console.error('SendRankLog error:', err);
+  }
+}
+
 async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Client = global.ClientBot) {
   const Roles = await FetchRoles(GroupId);
   let RoleInfo = null;
@@ -145,6 +171,11 @@ async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Clie
     GuildId
   });
   await SaveJsonBin(Data);
+  try {
+    const ActionLabel = 'Set Rank';
+    const ActionBy = IssuerDiscordId === 'SYSTEM' ? 'SYSTEM' : IssuerDiscordId;
+    await SendRankLog(GuildId, Client, ActionBy, UserId, ActionLabel, RoleInfo.Name);
+  } catch {}
 }
 
 async function SuspendUser(GroupId, UserId, IssuerDiscordId, GuildId, Client = global.ClientBot, DurationKey = '1d', Reason = null) {
@@ -312,5 +343,6 @@ module.exports = {
   HandleVerificationButton,
   SuspendUser,
   LoadActiveSuspensions,
-  PredefinedDurations
+  PredefinedDurations,
+  SendRankLog
 };
