@@ -171,11 +171,6 @@ async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Clie
     GuildId
   });
   await SaveJsonBin(Data);
-  try {
-    const ActionLabel = 'Set Rank';
-    const ActionBy = IssuerDiscordId === 'SYSTEM' ? 'SYSTEM' : IssuerDiscordId;
-    await SendRankLog(GuildId, Client, ActionBy, UserId, ActionLabel, RoleInfo.Name);
-  } catch {}
 }
 
 async function SuspendUser(GroupId, UserId, IssuerDiscordId, GuildId, Client = global.ClientBot, DurationKey = '1d', Reason = null) {
