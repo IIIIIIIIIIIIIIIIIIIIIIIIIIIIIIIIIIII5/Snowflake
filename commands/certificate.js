@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require("discord.js");
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require("discord.js");
 const { GetJsonBin, SaveJsonBin } = require("../roblox");
 
 const Roles = [
@@ -7,6 +7,27 @@ const Roles = [
   "1423226365498494996",
   "1418979785165766717"
 ];
+
+async function SendCertificationLog(Client, GuildId, ActionBy, ActionOn, Action, Certification) {
+  const ChannelId = "1433025723932741694";
+  const Guild = await Client.guilds.fetch(GuildId).catch(() => null);
+  if (!Guild) return;
+  const Channel = Guild.channels.cache.get(ChannelId);
+  if (!Channel || !Channel.isTextBased()) return;
+
+  const Embed = new EmbedBuilder()
+    .setTitle("Certification Update")
+    .setColor(0x2b2d31)
+    .addFields(
+      { name: "Action By:", value: `<@${ActionBy}>`, inline: true },
+      { name: "Action On:", value: `<@${ActionOn}>`, inline: true },
+      { name: "Action:", value: Action, inline: true },
+      { name: "Certification:", value: Certification, inline: false }
+    )
+    .setTimestamp();
+
+  await Channel.send({ embeds: [Embed] }).catch(() => {});
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -26,8 +47,8 @@ module.exports = {
             .setRequired(true)
             .addChoices(
               { name: "Certified Host", value: "Certified Host" },
-              { name: "Staff of the Week", value: "Staff of the Week"},
-              { name: "Staff of the Month", value: "Staff of the Month"}
+              { name: "Staff of the Week", value: "Staff of the Week" },
+              { name: "Staff of the Month", value: "Staff of the Month" }
             )
         )
     )
@@ -72,6 +93,8 @@ module.exports = {
         await Target.send(`Hello ${Target.username}, a new certification has been granted to you: **${Type}**.`);
       } catch {}
 
+      await SendCertificationLog(Interaction.client, Interaction.guild.id, Interaction.user.id, Target.id, "Certification Added", Type);
+
       return Interaction.reply({
         content: `Added ${Type} to ${Target.username}.`,
         ephemeral: true
@@ -115,6 +138,8 @@ module.exports = {
         try {
           await Target.send(`Hello ${Target.username}, the following certification has been removed from your account: **${CertToRemove}**.`);
         } catch {}
+
+        await SendCertificationLog(Interaction.client, Interaction.guild.id, Interaction.user.id, Target.id, "Certification Removed", CertToRemove);
 
         await i.update({
           content: `Removed ${CertToRemove} from ${Target.username}.`,
