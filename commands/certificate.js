@@ -9,7 +9,7 @@ const Roles = [
 ];
 
 async function SendCertificationLog(Client, GuildId, ActionBy, ActionOn, Action, Certification) {
-  const ChannelId = "1433025723932741694";
+  const ChannelId = "1435157510930698300";
   const Guild = await Client.guilds.fetch(GuildId).catch(() => null);
   if (!Guild) return;
   const Channel = Guild.channels.cache.get(ChannelId);
