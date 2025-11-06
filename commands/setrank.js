@@ -3,8 +3,7 @@ const { GetJsonBin, GetRobloxUserId, SetRank, SendRankLog, FetchRoles } = requir
 
 const AllowedRole = '1423332095001890908';
 const SFPLeadershipRole = '1386369108408406096';
-
-const Ranks = {};
+const RanksCache = {};
 const OneHour = 1000 * 60 * 60;
 
 module.exports = {
@@ -32,28 +31,25 @@ module.exports = {
 
       const groupId = config.GroupId;
 
-      if (!Ranks[guildId] || Date.now() - Ranks[guildId].LastUpdate > OneHour) {
+      if (!RanksCache[guildId] || Date.now() - RanksCache[guildId].lastUpdate > OneHour) {
         try {
           const rolesObj = await FetchRoles(groupId);
           let rolesList = Object.values(rolesObj || []);
           rolesList.sort((a, b) => a.Rank - b.Rank);
-          Ranks[guildId] = { List: rolesList, LastUpdate: Date.now() };
+          RanksCache[guildId] = { list: rolesList, lastUpdate: Date.now() };
         } catch {
-          Ranks[guildId] = { List: [], LastUpdate: Date.now() };
+          RanksCache[guildId] = { list: [], lastUpdate: Date.now() };
         }
       }
 
-      const focusedValue = (interaction.options.getFocused() || '').toLowerCase();
-      let options = Ranks[guildId].List || [];
+      const focused = (interaction.options.getFocused() || '').toLowerCase();
+      let roles = RanksCache[guildId].list || [];
 
-      if (focusedValue) {
-        options = options.filter(r => r.Name.toLowerCase().includes(focusedValue));
-      }
-
-      options = options.slice(0, 25);
+      let filtered = roles.filter(r => r.Name.toLowerCase().includes(focused));
+      if (!filtered.length) filtered = roles;
 
       return interaction.respond(
-        options.map(r => ({
+        filtered.slice(0, 25).map(r => ({
           name: `${r.Name} (${r.RoleId})`,
           value: String(r.RoleId)
         }))
@@ -68,6 +64,7 @@ module.exports = {
       return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
 
     await interaction.deferReply({ ephemeral: true });
+
     const db = await GetJsonBin();
     const guildId = interaction.guild.id;
     if (!db.ServerConfig?.[guildId]?.GroupId)
