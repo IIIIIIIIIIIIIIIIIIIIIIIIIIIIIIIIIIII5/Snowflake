@@ -52,6 +52,10 @@ ClientBot.once('ready', async () => {
 });
 
 ClientBot.on('interactionCreate', async interaction => {
+  if (interaction.isAutocomplete()) {
+    const command = ClientBot.Commands.get(interaction.commandName);
+    if (command?.autocomplete) return command.autocomplete(interaction);
+  }
   if (interaction.isButton() && interaction.customId === 'done_verification')
     return Roblox.HandleVerificationButton(interaction);
   if (!interaction.isChatInputCommand()) return;
