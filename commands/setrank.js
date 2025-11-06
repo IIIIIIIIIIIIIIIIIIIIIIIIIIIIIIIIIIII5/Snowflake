@@ -50,10 +50,8 @@ module.exports = {
   },
 
   async execute(interaction) {
-    if (
-      !interaction.member.roles.cache.has(ALLOWED_ROLE) &&
-      !interaction.member.roles.cache.has(SFPLeadershipRole)
-    ) return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
+    if (!interaction.member.roles.cache.has(ALLOWED_ROLE) && !interaction.member.roles.cache.has(SFPLeadershipRole))
+      return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
 
     await interaction.deferReply({ ephemeral: true });
 
@@ -67,7 +65,6 @@ module.exports = {
 
     const username = interaction.options.getString('username');
     const rankName = interaction.options.getString('rankname');
-
     const userId = await GetRobloxUserId(username);
 
     try {
