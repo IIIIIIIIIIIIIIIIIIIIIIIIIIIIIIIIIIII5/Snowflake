@@ -1,5 +1,6 @@
 const axios = require('axios');
 const admin = require('firebase-admin');
+const noblox = require("noblox.js");
 const { EmbedBuilder } = require('discord.js');
 
 if (!admin.apps.length) {
@@ -124,44 +125,58 @@ async function SendRankLog(GuildId, Client, ActionBy, TargetRobloxId, Action, Ne
 async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Client = global.ClientBot) {
   const Roles = await FetchRoles(GroupId);
   let RoleInfo = null;
+
   if (typeof RankOrId === 'number' || /^\d+$/.test(String(RankOrId))) {
     const RankNum = Number(RankOrId);
     for (const key of Object.keys(Roles)) {
-      if (Number(Roles[key].Rank) === RankNum) { RoleInfo = Roles[key]; break; }
+      if (Number(Roles[key].Rank) === RankNum) {
+        RoleInfo = Roles[key];
+        break;
+      }
     }
   } else {
     RoleInfo = Roles[String(RankOrId).toLowerCase()];
   }
-  if (!RoleInfo) throw new Error('Invalid rank specified: ' + RankOrId);
+
+  if (!RoleInfo)
+    throw new Error('Invalid rank specified: ' + RankOrId);
+
   if (!IssuerDiscordId.toUpperCase().includes('SYSTEM')) {
     const DbData = await GetJsonBin();
     const IssuerRobloxId = DbData.VerifiedUsers?.[IssuerDiscordId];
     if (!IssuerRobloxId) throw new Error('You must verify first.');
+
     const IssuerRank = await GetCurrentRank(GroupId, IssuerRobloxId);
     const Target = await GetCurrentRank(GroupId, UserId);
-    if (String(UserId) === String(IssuerRobloxId)) throw new Error('You cannot change your own rank.');
-    if (RoleInfo.Rank >= IssuerRank.Rank) throw new Error('Cannot assign a rank equal or higher than yours.');
-    if (Target.Rank >= IssuerRank.Rank) throw new Error('Cannot change rank of a user higher or equal to you.');
+
+    if (String(UserId) === String(IssuerRobloxId))
+      throw new Error('You cannot change your own rank.');
+
+    if (RoleInfo.Rank >= IssuerRank.Rank)
+      throw new Error('Cannot assign a rank equal or higher than yours.');
+
+    if (Target.Rank >= IssuerRank.Rank)
+      throw new Error('Cannot change rank of a user higher or equal to you.');
   }
-  const Cookie = await GetRobloxCookie(GuildId);
-  let Xsrf = await GetXsrfToken(GuildId);
-  const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
+
+  const cookie = await GetRobloxCookie(GuildId);
+  await noblox.setCookie(cookie);
+
+  const nobloxRoles = await noblox.getRoles(Number(GroupId));
+  const nobloxRole = nobloxRoles.find(r => r.id === RoleInfo.RoleId);
+
+  if (!nobloxRole)
+    throw new Error(`Rank not found in noblox roles: ${RoleInfo.Name}`);
+
   try {
-    await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
-      headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, 'Content-Type': 'application/json', 'X-CSRF-TOKEN': Xsrf }
-    });
-  } catch (Err) {
-    if (Err.response?.status === 403 && Err.response?.headers['x-csrf-token']) {
-      Xsrf = Err.response.headers['x-csrf-token'];
-      await axios.patch(Url, { roleId: RoleInfo.RoleId }, {
-        headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, 'Content-Type': 'application/json', 'X-CSRF-TOKEN': Xsrf }
-      });
-    } else {
-      throw new Error('Request failed: ' + (Err.response?.data?.errors?.[0]?.message || Err.message));
-    }
+    await noblox.setRank(Number(GroupId), Number(UserId), Number(nobloxRole.rank));
+  } catch (err) {
+    throw new Error("Noblox rank change failed: " + err.message);
   }
+
   const Data = await GetJsonBin();
-  if (!Data.RankChanges || !Array.isArray(Data.RankChanges)) Data.RankChanges = [];
+  if (!Array.isArray(Data.RankChanges)) Data.RankChanges = [];
+
   Data.RankChanges.push({
     GroupId,
     UserId,
@@ -170,6 +185,7 @@ async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Clie
     Timestamp: new Date().toISOString(),
     GuildId
   });
+
   await SaveJsonBin(Data);
 }
 
