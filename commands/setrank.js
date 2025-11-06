@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { GetJsonBin, GetRobloxUserId, SetRank, SendRankLog, GetGroupRanks } = require('../roblox');
+const { GetJsonBin, GetRobloxUserId, SetRank, SendRankLog, FetchRoles } = require('../roblox');
 
 const AllowedRole = '1423332095001890908';
 const SFPLeadershipRole = '1386369108408406096';
@@ -11,11 +11,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('setrank')
     .setDescription("Set a user's rank")
-    .addStringOption(opt =>
-      opt.setName('username')
-        .setDescription('Roblox username')
-        .setRequired(true)
-    )
+    .addStringOption(opt => opt.setName('username').setDescription('Roblox username').setRequired(true))
     .addStringOption(opt =>
       opt.setName('rankname')
         .setDescription('Rank name')
@@ -32,33 +28,26 @@ module.exports = {
     const groupId = config.GroupId;
 
     if (!Ranks[guildId] || (Date.now() - Ranks[guildId].LastUpdate) > OneHour) {
-      const fetched = await GetGroupRanks(groupId);
+      const roles = await FetchRoles(groupId);
       Ranks[guildId] = {
-        List: fetched.map(r => r.Name).filter(Boolean),
+        List: Object.values(roles),
         LastUpdate: Date.now()
       };
     }
 
-    const list = Ranks[guildId].List.slice(0, 25);
-
     return interaction.respond(
-      list.map(r => ({
-        name: r,
-        value: r
+      Ranks[guildId].List.slice(0, 25).map(r => ({
+        name: `${r.Name} (${r.RoleId})`,
+        value: r.Name
       }))
     );
   },
 
   async execute(interaction) {
-    if (
-      !interaction.member.roles.cache.has(AllowedRole) &&
-      !interaction.member.roles.cache.has(SFPLeadershipRole)
-    ) {
+    if (!interaction.member.roles.cache.has(AllowedRole) && !interaction.member.roles.cache.has(SFPLeadershipRole))
       return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
-    }
 
     await interaction.deferReply({ ephemeral: true });
-
     const db = await GetJsonBin();
     const guildId = interaction.guild.id;
     if (!db.ServerConfig?.[guildId]?.GroupId)
