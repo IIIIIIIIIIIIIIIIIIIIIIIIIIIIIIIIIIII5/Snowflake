@@ -1,10 +1,9 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { GetJsonBin, GetRobloxUserId, SetRank, SendRankLog, FetchRoles } = require('../roblox');
+const axios = require('axios');
+const { GetJsonBin, GetRobloxUserId, SetRank, SendRankLog } = require('../roblox');
 
 const AllowedRole = '1423332095001890908';
 const SFPLeadershipRole = '1386369108408406096';
-const RanksCache = {};
-const OneHour = 1000 * 60 * 60;
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -26,34 +25,25 @@ module.exports = {
     try {
       const db = await GetJsonBin();
       const guildId = interaction.guild.id;
-      const config = db.ServerConfig?.[guildId];
-      if (!config?.GroupId) return interaction.respond([]);
-
-      const groupId = config.GroupId;
-
-      if (!RanksCache[guildId] || Date.now() - RanksCache[guildId].lastUpdate > OneHour) {
-        try {
-          const rolesObj = await FetchRoles(groupId);
-          let rolesList = Object.values(rolesObj || []);
-          rolesList.sort((a, b) => a.Rank - b.Rank);
-          RanksCache[guildId] = { list: rolesList, lastUpdate: Date.now() };
-        } catch {
-          RanksCache[guildId] = { list: [], lastUpdate: Date.now() };
-        }
-      }
+      const groupId = db.ServerConfig?.[guildId]?.GroupId;
+      if (!groupId) return interaction.respond([]);
 
       const focused = (interaction.options.getFocused() || '').toLowerCase();
-      let roles = RanksCache[guildId].list || [];
 
-      let filtered = roles.filter(r => r.Name.toLowerCase().includes(focused));
-      if (!filtered.length) filtered = roles;
+      const res = await axios.get(`https://groups.roblox.com/v1/groups/${groupId}/roles`);
+      const roles = res.data.roles || [];
 
-      return interaction.respond(
-        filtered.slice(0, 25).map(r => ({
-          name: `${r.Name} (${r.RoleId})`,
-          value: String(r.RoleId)
-        }))
-      );
+      const filtered = roles
+        .filter(r => r.name.toLowerCase().includes(focused))
+        .sort((a, b) => a.rank - b.rank)
+        .slice(0, 25);
+
+      const options = filtered.map(r => ({
+        name: `${r.name} (${r.id})`,
+        value: String(r.id)
+      }));
+
+      return interaction.respond(options);
     } catch {
       return interaction.respond([]);
     }
@@ -67,10 +57,9 @@ module.exports = {
 
     const db = await GetJsonBin();
     const guildId = interaction.guild.id;
-    if (!db.ServerConfig?.[guildId]?.GroupId)
-      return interaction.editReply({ content: 'Group ID not set. Run /config first.' });
+    const groupId = db.ServerConfig?.[guildId]?.GroupId;
+    if (!groupId) return interaction.editReply({ content: 'Group ID not set. Run /config first.' });
 
-    const groupId = db.ServerConfig[guildId].GroupId;
     const username = interaction.options.getString('username');
     const roleId = interaction.options.getString('rankname');
     const userId = await GetRobloxUserId(username);
