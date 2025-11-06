@@ -11,7 +11,11 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('setrank')
     .setDescription("Set a user's rank")
-    .addStringOption(opt => opt.setName('username').setDescription('Roblox username').setRequired(true))
+    .addStringOption(opt =>
+      opt.setName('username')
+        .setDescription('Roblox username')
+        .setRequired(true)
+    )
     .addStringOption(opt =>
       opt.setName('rankname')
         .setDescription('Rank name')
@@ -35,8 +39,13 @@ module.exports = {
       };
     }
 
+    const focusedValue = interaction.options.getFocused().toLowerCase();
+    const filtered = Ranks[guildId].List
+      .filter(r => r.Name.toLowerCase().includes(focusedValue))
+      .slice(0, 25);
+
     return interaction.respond(
-      Ranks[guildId].List.slice(0, 25).map(r => ({
+      filtered.map(r => ({
         name: `${r.Name} (${r.RoleId})`,
         value: String(r.RoleId)
       }))
