@@ -40,12 +40,15 @@ module.exports = {
     }
 
     const focusedValue = interaction.options.getFocused().toLowerCase();
+
     const filtered = Ranks[guildId].List
       .filter(r => r.Name.toLowerCase().includes(focusedValue))
       .slice(0, 25);
 
+    const options = filtered.length ? filtered : Ranks[guildId].List.slice(0, 25);
+
     return interaction.respond(
-      filtered.map(r => ({
+      options.map(r => ({
         name: `${r.Name} (${r.RoleId})`,
         value: String(r.RoleId)
       }))
