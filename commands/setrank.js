@@ -33,15 +33,21 @@ module.exports = {
       const groupId = config.GroupId;
 
       if (!Ranks[guildId] || (Date.now() - Ranks[guildId].LastUpdate) > OneHour) {
-        const roles = await FetchRoles(groupId);
+        let roles = [];
+        try {
+          const fetchedRoles = await FetchRoles(groupId);
+          roles = Object.values(fetchedRoles || {});
+        } catch (err) {
+          console.error('FetchRoles error:', err);
+        }
         Ranks[guildId] = {
-          List: Object.values(roles),
+          List: roles,
           LastUpdate: Date.now()
         };
       }
 
       const focusedValue = (interaction.options.getFocused() || '').toLowerCase();
-      let options = Ranks[guildId].List;
+      let options = Ranks[guildId].List || [];
 
       if (focusedValue) {
         options = options.filter(r => r.Name.toLowerCase().includes(focusedValue));
@@ -55,7 +61,8 @@ module.exports = {
           value: String(r.RoleId)
         }))
       );
-    } catch {
+    } catch (err) {
+      console.error('Autocomplete general error:', err);
       return interaction.respond([]);
     }
   },
