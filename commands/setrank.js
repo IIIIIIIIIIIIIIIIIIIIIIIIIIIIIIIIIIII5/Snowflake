@@ -24,35 +24,40 @@ module.exports = {
     ),
 
   async autocomplete(interaction) {
-    const db = await GetJsonBin();
-    const guildId = interaction.guild.id;
-    const config = db.ServerConfig?.[guildId];
-    if (!config?.GroupId) return interaction.respond([]);
+    try {
+      const db = await GetJsonBin();
+      const guildId = interaction.guild.id;
+      const config = db.ServerConfig?.[guildId];
+      if (!config?.GroupId) return interaction.respond([]);
 
-    const groupId = config.GroupId;
+      const groupId = config.GroupId;
 
-    if (!Ranks[guildId] || (Date.now() - Ranks[guildId].LastUpdate) > OneHour) {
-      const roles = await FetchRoles(groupId);
-      Ranks[guildId] = {
-        List: Object.values(roles),
-        LastUpdate: Date.now()
-      };
+      if (!Ranks[guildId] || (Date.now() - Ranks[guildId].LastUpdate) > OneHour) {
+        const roles = await FetchRoles(groupId);
+        Ranks[guildId] = {
+          List: Object.values(roles),
+          LastUpdate: Date.now()
+        };
+      }
+
+      const focusedValue = (interaction.options.getFocused() || '').toLowerCase();
+      let options = Ranks[guildId].List;
+
+      if (focusedValue) {
+        options = options.filter(r => r.Name.toLowerCase().includes(focusedValue));
+      }
+
+      options = options.slice(0, 25);
+
+      return interaction.respond(
+        options.map(r => ({
+          name: `${r.Name} (${r.RoleId})`,
+          value: String(r.RoleId)
+        }))
+      );
+    } catch {
+      return interaction.respond([]);
     }
-
-    const focusedValue = interaction.options.getFocused().toLowerCase();
-
-    const filtered = Ranks[guildId].List
-      .filter(r => r.Name.toLowerCase().includes(focusedValue))
-      .slice(0, 25);
-
-    const options = filtered.length ? filtered : Ranks[guildId].List.slice(0, 25);
-
-    return interaction.respond(
-      options.map(r => ({
-        name: `${r.Name} (${r.RoleId})`,
-        value: String(r.RoleId)
-      }))
-    );
   },
 
   async execute(interaction) {
