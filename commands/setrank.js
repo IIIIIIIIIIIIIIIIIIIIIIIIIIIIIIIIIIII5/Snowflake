@@ -32,19 +32,21 @@ module.exports = {
     const groupId = config.GroupId;
 
     if (!Ranks[guildId] || (Date.now() - Ranks[guildId].LastUpdate) > OneHour) {
-      const fetchedRanks = await GetGroupRanks(groupId);
+      const fetched = await GetGroupRanks(groupId);
       Ranks[guildId] = {
-        List: fetchedRanks.map(r => r.Name),
+        List: fetched.map(r => r.Name).filter(Boolean),
         LastUpdate: Date.now()
       };
     }
 
-    const focused = interaction.options.getFocused();
-    const filtered = Ranks[guildId].List
-      .filter(r => r.toLowerCase().includes(focused.toLowerCase()))
-      .slice(0, 25);
+    const list = Ranks[guildId].List.slice(0, 25);
 
-    return interaction.respond(filtered.map(r => ({ name: r, value: r })));
+    return interaction.respond(
+      list.map(r => ({
+        name: r,
+        value: r
+      }))
+    );
   },
 
   async execute(interaction) {
