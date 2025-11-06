@@ -11,7 +11,11 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('setrank')
     .setDescription("Set a user's rank")
-    .addStringOption(opt => opt.setName('username').setDescription('Roblox username').setRequired(true))
+    .addStringOption(opt =>
+      opt.setName('username')
+        .setDescription('Roblox username')
+        .setRequired(true)
+    )
     .addStringOption(opt =>
       opt.setName('rankname')
         .setDescription('Rank name')
@@ -30,7 +34,7 @@ module.exports = {
     if (!Ranks[guildId] || (Date.now() - Ranks[guildId].LastUpdate) > OneHour) {
       const fetchedRanks = await GetGroupRanks(groupId);
       Ranks[guildId] = {
-        List: fetchedRanks.map(r => r.name),
+        List: fetchedRanks.map(r => r.Name),
         LastUpdate: Date.now()
       };
     }
@@ -44,8 +48,12 @@ module.exports = {
   },
 
   async execute(interaction) {
-    if (!interaction.member.roles.cache.has(AllowedRole) && !interaction.member.roles.cache.has(SFPLeadershipRole))
+    if (
+      !interaction.member.roles.cache.has(AllowedRole) &&
+      !interaction.member.roles.cache.has(SFPLeadershipRole)
+    ) {
       return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
+    }
 
     await interaction.deferReply({ ephemeral: true });
 
