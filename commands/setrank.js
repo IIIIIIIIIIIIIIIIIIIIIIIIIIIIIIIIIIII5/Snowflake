@@ -32,10 +32,11 @@ module.exports = {
 
       const groupId = config.GroupId;
 
-      if (!Ranks[guildId] || (Date.now() - Ranks[guildId].LastUpdate) > OneHour) {
+      if (!Ranks[guildId] || Date.now() - Ranks[guildId].LastUpdate > OneHour) {
         try {
           const rolesObj = await FetchRoles(groupId);
-          const rolesList = Object.values(rolesObj || {});
+          let rolesList = Object.values(rolesObj || []);
+          rolesList.sort((a, b) => a.Rank - b.Rank);
           Ranks[guildId] = { List: rolesList, LastUpdate: Date.now() };
         } catch {
           Ranks[guildId] = { List: [], LastUpdate: Date.now() };
