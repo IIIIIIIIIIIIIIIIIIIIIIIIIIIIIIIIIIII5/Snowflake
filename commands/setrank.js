@@ -38,7 +38,7 @@ module.exports = {
     return interaction.respond(
       Ranks[guildId].List.slice(0, 25).map(r => ({
         name: `${r.Name} (${r.RoleId})`,
-        value: r.Name
+        value: String(r.RoleId)
       }))
     );
   },
@@ -55,13 +55,13 @@ module.exports = {
 
     const groupId = db.ServerConfig[guildId].GroupId;
     const username = interaction.options.getString('username');
-    const rankName = interaction.options.getString('rankname');
+    const roleId = interaction.options.getString('rankname');
     const userId = await GetRobloxUserId(username);
 
     try {
-      await SetRank(groupId, userId, rankName, interaction.user.id, guildId);
-      await SendRankLog(guildId, interaction.client, interaction.user.id, userId, "Set Rank", rankName);
-      return interaction.editReply({ content: `Set ${username} to rank ${rankName}` });
+      await SetRank(groupId, userId, Number(roleId), interaction.user.id, guildId);
+      await SendRankLog(guildId, interaction.client, interaction.user.id, userId, "Set Rank", roleId);
+      return interaction.editReply({ content: `Set ${username} to role ID ${roleId}` });
     } catch (err) {
       return interaction.editReply({ content: `Error: ${err.message}` });
     }
