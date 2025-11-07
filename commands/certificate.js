@@ -79,7 +79,7 @@ module.exports = {
 
       if (!Db.Certifications[Target.id]) Db.Certifications[Target.id] = [];
 
-      if (Type === "Certified Host" && Db.Certifications[Target.id].includes(Type)) {
+      if (Db.Certifications[Target.id].includes(Type)) {
         return Interaction.reply({
           content: `${Target.username} already has ${Type}.`,
           ephemeral: true
@@ -113,7 +113,7 @@ module.exports = {
       }
 
       const Select = new StringSelectMenuBuilder()
-        .setCustomId(`RemoveCert_${Target.id}`)
+        .setCustomId(`RemoveCert_${Target.id}_${Interaction.id}`)
         .setPlaceholder("Select a certificate to remove")
         .addOptions(UserCerts.map(c => ({ label: c, value: c })));
 
@@ -127,10 +127,12 @@ module.exports = {
 
       const Collector = Interaction.channel.createMessageComponentCollector({
         time: 60000,
-        filter: i => i.user.id === Interaction.user.id
+        filter: i => i.user.id === Interaction.user.id && i.customId.startsWith(`RemoveCert_${Target.id}_`)
       });
 
       Collector.on("collect", async i => {
+        Collector.stop();
+
         const CertToRemove = i.values[0];
         Db.Certifications[Target.id] = Db.Certifications[Target.id].filter(c => c !== CertToRemove);
         await SaveJsonBin(Db);
@@ -161,4 +163,4 @@ module.exports = {
       });
     }
   }
-}
+};
