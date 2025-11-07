@@ -7,7 +7,7 @@ const SFPLeadershipRole = '1386369108408406096';
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('setrank')
-    .setDescription("Set a user's rank")
+    .setDescription("Set a user's Roblox rank")
     .addStringOption(opt =>
       opt.setName('username')
         .setDescription('Roblox username')
@@ -50,27 +50,35 @@ module.exports = {
   },
 
   async execute(interaction) {
-    if (!interaction.member.roles.cache.has(ALLOWED_ROLE) && !interaction.member.roles.cache.has(SFPLeadershipRole))
+    if (!interaction.member.roles.cache.has(ALLOWED_ROLE) && !interaction.member.roles.cache.has(SFPLeadershipRole)) {
       return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
+    }
 
     await interaction.deferReply({ ephemeral: true });
 
     const db = await GetJsonBin();
     const guildId = interaction.guild.id;
-
-    if (!db.ServerConfig?.[guildId]?.GroupId)
+    if (!db.ServerConfig?.[guildId]?.GroupId) {
       return interaction.editReply({ content: 'Group ID not set. Run /config first.' });
-
+    }
     const groupId = db.ServerConfig[guildId].GroupId;
 
     const username = interaction.options.getString('username');
     const rankName = interaction.options.getString('rankname');
-    const userId = await GetRobloxUserId(username);
+
+    let userId;
+    try {
+      userId = await GetRobloxUserId(username);
+    } catch {
+      return interaction.editReply({ content: `Could not find Roblox user: ${username}` });
+    }
 
     try {
       await SetRank(groupId, userId, rankName, interaction.user.id, guildId);
+
       await SendRankLog(guildId, interaction.client, interaction.user.id, userId, "Set Rank", rankName);
-      return interaction.editReply({ content: `Set ${username} to rank ${rankName}` });
+
+      return interaction.editReply({ content: `Successfully set ${username} to rank ${rankName}` });
     } catch (err) {
       return interaction.editReply({ content: `Error: ${err.message}` });
     }
