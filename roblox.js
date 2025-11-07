@@ -17,7 +17,7 @@ const Db = admin.firestore();
 const Verifications = {};
 const PendingApprovals = {};
 const ScheduledTimers = {};
-const MaxTimeout = 2_147_483_647;
+const MaxTimeout = 2147483647;
 const PredefinedDurations = {
   '12h': 12 * 60 * 60 * 1000,
   '1d': 24 * 60 * 60 * 1000,
@@ -30,8 +30,7 @@ async function GetJsonBin() {
   try {
     const Doc = await Db.collection('botData').doc('main').get();
     return Doc.exists ? Doc.data() : {};
-  } catch (Err) {
-    console.error('GetJsonBin error:', Err);
+  } catch {
     return {};
   }
 }
@@ -39,25 +38,12 @@ async function GetJsonBin() {
 async function SaveJsonBin(Data) {
   try {
     await Db.collection('botData').doc('main').set(Data, { merge: true });
-  } catch (Err) {
-    console.error('SaveJsonBin error:', Err);
-  }
+  } catch {}
 }
 
-async function GetRobloxCookie(GuildId) {
-  const Data = await GetJsonBin();
-  let cookie = null;
-
-  if (Data.CustomTokens && Data.CustomTokens[GuildId])
-    cookie = Data.CustomTokens[GuildId];
-  else
-    cookie = process.env.ROBLOSECURITY;
-
-  if (!cookie) return '';
-
-  if (cookie.startsWith('.ROBLOSECURITY='))
-    cookie = cookie.replace('.ROBLOSECURITY=', '');
-
+async function GetRobloxCookie() {
+  const cookie = process.env.ROBLOSECURITY;
+  if (!cookie) throw new Error("No ROBLOSECURITY cookie set");
   return cookie.trim();
 }
 
@@ -71,7 +57,7 @@ async function FetchRoles(GroupId) {
 }
 
 async function GetXsrfToken(GuildId) {
-  const Cookie = await GetRobloxCookie(GuildId);
+  const Cookie = await GetRobloxCookie();
   try {
     const Res = await axios.post('https://auth.roblox.com/v2/logout', {}, {
       headers: { Cookie: `.ROBLOSECURITY=${Cookie}` }
@@ -108,83 +94,53 @@ async function GetRobloxDescription(UserId) {
 }
 
 async function SendRankLog(GuildId, Client, ActionBy, TargetRobloxId, Action, NewRank) {
-  try {
-    const Data = await GetJsonBin();
-    const LogChannelId = '1424381038393556992';
-    const Guild = await (Client?.guilds ? Client.guilds.fetch(GuildId).catch(() => null) : null);
-    if (!Guild) return;
-    const Channel = Guild.channels.cache.get(LogChannelId) || null;
-    if (!Channel || !Channel.isTextBased()) return;
-    const Username = await GetRobloxUsername(TargetRobloxId).catch(() => 'Unknown');
-    const FieldActionBy = ActionBy === 'SYSTEM' ? 'SYSTEM' : `<@${ActionBy}>`;
-    const Embed = new EmbedBuilder()
-      .setTitle('Rank Updated')
-      .setColor(0x2b2d31)
-      .addFields(
-        { name: 'Action By:', value: FieldActionBy, inline: true },
-        { name: 'Action On:', value: Username, inline: true },
-        { name: 'Action:', value: Action, inline: true },
-        { name: 'New Rank:', value: NewRank, inline: false }
-      )
-      .setTimestamp();
-    await Channel.send({ embeds: [Embed] }).catch(() => {});
-  } catch (err) {
-    console.error('SendRankLog error:', err);
-  }
+  const LogChannelId = '1424381038393556992';
+  const Guild = await (Client?.guilds ? Client.guilds.fetch(GuildId).catch(() => null) : null);
+  if (!Guild) return;
+  const Channel = Guild.channels.cache.get(LogChannelId) || null;
+  if (!Channel || !Channel.isTextBased()) return;
+  const Username = await GetRobloxUsername(TargetRobloxId).catch(() => 'Unknown');
+  const FieldActionBy = ActionBy === 'SYSTEM' ? 'SYSTEM' : `<@${ActionBy}>`;
+  const Embed = new EmbedBuilder()
+    .setTitle('Rank Updated')
+    .setColor(0x2b2d31)
+    .addFields(
+      { name: 'Action By:', value: FieldActionBy, inline: true },
+      { name: 'Action On:', value: Username, inline: true },
+      { name: 'Action:', value: Action, inline: true },
+      { name: 'New Rank:', value: NewRank, inline: false }
+    )
+    .setTimestamp();
+  await Channel.send({ embeds: [Embed] }).catch(() => {});
 }
 
 async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Client = global.ClientBot) {
   const Roles = await FetchRoles(GroupId);
-  let RoleInfo = null;
-
-  if (typeof RankOrId === 'number' || /^\d+$/.test(String(RankOrId))) {
-    const RankNum = Number(RankOrId);
-    for (const key of Object.keys(Roles)) {
-      if (Number(Roles[key].Rank) === RankNum) {
-        RoleInfo = Roles[key];
-        break;
-      }
-    }
-  } else {
-    RoleInfo = Roles[String(RankOrId).toLowerCase()];
-  }
-
-  if (!RoleInfo)
-    throw new Error('Invalid rank specified: ' + RankOrId);
+  let RoleInfo = typeof RankOrId === 'number' || /^\d+$/.test(String(RankOrId))
+    ? Object.values(Roles).find(r => Number(r.Rank) === Number(RankOrId))
+    : Roles[String(RankOrId).toLowerCase()];
+  if (!RoleInfo) throw new Error('Invalid rank specified: ' + RankOrId);
 
   if (!IssuerDiscordId.toUpperCase().includes('SYSTEM')) {
     const DbData = await GetJsonBin();
     const IssuerRobloxId = DbData.VerifiedUsers?.[IssuerDiscordId];
     if (!IssuerRobloxId) throw new Error('You must verify first.');
-
     const IssuerRank = await GetCurrentRank(GroupId, IssuerRobloxId);
     const Target = await GetCurrentRank(GroupId, UserId);
-
-    if (String(UserId) === String(IssuerRobloxId))
-      throw new Error('You cannot change your own rank.');
-
-    if (RoleInfo.Rank >= IssuerRank.Rank)
-      throw new Error('Cannot assign a rank equal or higher than yours.');
-
-    if (Target.Rank >= IssuerRank.Rank)
-      throw new Error('Cannot change rank of a user higher or equal to you.');
+    if (String(UserId) === String(IssuerRobloxId)) throw new Error('Cannot change your own rank.');
+    if (RoleInfo.Rank >= IssuerRank.Rank) throw new Error('Cannot assign a rank equal or higher than yours.');
+    if (Target.Rank >= IssuerRank.Rank) throw new Error('Cannot change rank of a user higher or equal to you.');
   }
 
+  const cookie = await GetRobloxCookie();
+  await noblox.setCookie(cookie);
   const nobloxRoles = await noblox.getRoles(Number(GroupId));
   const nobloxRole = nobloxRoles.find(r => r.id === RoleInfo.RoleId);
-
-  if (!nobloxRole)
-    throw new Error(`Rank not found in noblox roles: ${RoleInfo.Name}`);
-
-  try {
-    await noblox.setRank(Number(GroupId), Number(UserId), Number(nobloxRole.rank));
-  } catch (err) {
-    throw new Error("Noblox rank change failed: " + err.message);
-  }
+  if (!nobloxRole) throw new Error(`Rank not found in noblox roles: ${RoleInfo.Name}`);
+  await noblox.setRank(Number(GroupId), Number(UserId), Number(nobloxRole.rank));
 
   const Data = await GetJsonBin();
   if (!Array.isArray(Data.RankChanges)) Data.RankChanges = [];
-
   Data.RankChanges.push({
     GroupId,
     UserId,
@@ -193,7 +149,6 @@ async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Clie
     Timestamp: new Date().toISOString(),
     GuildId
   });
-
   await SaveJsonBin(Data);
 }
 
@@ -212,7 +167,7 @@ async function SuspendUser(GroupId, UserId, IssuerDiscordId, GuildId, Client = g
   const DurationMs = PredefinedDurations[DurationKey];
   if (DurationMs === undefined) throw new Error('Invalid suspension duration.');
 
-  const Cookie = await GetRobloxCookie(GuildId);
+  const Cookie = await GetRobloxCookie();
   let Xsrf = await GetXsrfToken(GuildId);
   const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
   try {
@@ -250,17 +205,12 @@ function ScheduleAutoUnsuspend(UserId, SuspensionRecord, Client) {
   if (!SuspensionRecord || !SuspensionRecord.EndsAt) return;
   const Remaining = SuspensionRecord.EndsAt - Date.now();
   if (Remaining <= 0) return autoUnsuspend(UserId, Client);
-  let TimeoutDuration = Remaining;
-  if (TimeoutDuration > MaxTimeout) TimeoutDuration = MaxTimeout;
+  let TimeoutDuration = Remaining > MaxTimeout ? MaxTimeout : Remaining;
   if (ScheduledTimers[UserId]) clearTimeout(ScheduledTimers[UserId]);
   ScheduledTimers[UserId] = setTimeout(async () => {
     const NewRemaining = SuspensionRecord.EndsAt - Date.now();
-    if (NewRemaining > MaxTimeout) {
-      ScheduleAutoUnsuspend(UserId, SuspensionRecord, Client);
-    } else {
-      await autoUnsuspend(UserId, Client);
-      delete ScheduledTimers[UserId];
-    }
+    if (NewRemaining > MaxTimeout) ScheduleAutoUnsuspend(UserId, SuspensionRecord, Client);
+    else { await autoUnsuspend(UserId, Client); delete ScheduledTimers[UserId]; }
   }, TimeoutDuration);
 }
 
@@ -273,11 +223,7 @@ async function autoUnsuspend(UserId, Client = global.ClientBot) {
   await SaveJsonBin(Data);
   const GroupId = Suspension.GroupId;
   const GuildId = Suspension.GuildId;
-  let RankedBack = false;
-  try {
-    await SetRank(GroupId, UserId, Suspension.OldRankName || Suspension.OldRankValue, 'SYSTEM', GuildId, Client);
-    RankedBack = true;
-  } catch {}
+  try { await SetRank(GroupId, UserId, Suspension.OldRankName || Suspension.OldRankValue, 'SYSTEM', GuildId, Client); } catch {}
   try {
     const TargetDiscordId = Object.keys(Data.VerifiedUsers || {}).find(id => Data.VerifiedUsers[id] === UserId);
     if (TargetDiscordId) {
@@ -291,36 +237,15 @@ async function autoUnsuspend(UserId, Client = global.ClientBot) {
       }
     }
   } catch {}
-  try {
-    const Guild = Client?.guilds ? await Client.guilds.fetch(GuildId).catch(() => null) : null;
-    const LogChannelId = '1433025723932741694';
-    const LogChannel = Guild?.channels?.cache?.get(LogChannelId) || null;
-    if (LogChannel) {
-      const EndEmbed = new EmbedBuilder()
-        .setTitle('Suspension Ended')
-        .setColor(0x00ff00)
-        .addFields(
-          { name: 'Username', value: Suspension.Username, inline: true },
-          { name: 'Rank suspended from', value: Suspension.OldRankName || String(Suspension.OldRankValue), inline: false },
-          { name: 'Reason', value: Suspension.Reason || 'N/A', inline: false },
-          { name: 'Suspension Duration', value: Suspension.EndsAt ? `${Math.max(0, Math.floor((Suspension.EndsAt - Suspension.IssuedAt)/1000))}s` : 'Permanent', inline: false },
-          { name: 'Rank restored', value: RankedBack ? 'Yes' : 'No', inline: false }
-        )
-        .setTimestamp();
-      if (LogChannel?.isTextBased()) await LogChannel.send({ embeds: [EndEmbed] });
-    }
-  } catch {}
 }
 
 async function LoadActiveSuspensions(Client = global.ClientBot) {
-  try {
-    const Data = await GetJsonBin();
-    for (const UserId of Object.keys(Data.Suspensions || {})) {
-      const Suspension = Data.Suspensions[UserId];
-      if (!Suspension || !Suspension.Active || !Suspension.EndsAt) continue;
-      ScheduleAutoUnsuspend(UserId, Suspension, Client);
-    }
-  } catch {}
+  const Data = await GetJsonBin();
+  for (const UserId of Object.keys(Data.Suspensions || {})) {
+    const Suspension = Data.Suspensions[UserId];
+    if (!Suspension || !Suspension.Active || !Suspension.EndsAt) continue;
+    ScheduleAutoUnsuspend(UserId, Suspension, Client);
+  }
 }
 
 function StartVerification(DiscordId, RobloxUserId, Code) {
@@ -340,27 +265,8 @@ async function HandleVerificationButton(Interaction) {
     await SaveJsonBin(DbData);
     delete Verifications[Interaction.user.id];
     return Interaction.editReply({ content: `Verified! Linked to Roblox ID ${Data.RobloxUserId}` });
-  } catch {
-    return Interaction.editReply({ content: "An error occurred during verification." });
-  }
+  } catch { return Interaction.editReply({ content: "An error occurred during verification." }); }
 }
-
-async function StartNoblox() {
-  try {
-    let cookie = process.env.ROBLOSECURITY || '';
-    if (!cookie) {
-      console.error('No ROBLOSECURITY cookie found.');
-      return;
-    }
-    cookie = cookie.replace('.ROBLOSECURITY=', '').trim();
-    const me = await noblox.setCookie(cookie);
-    console.log('Noblox logged in as:', me.UserName);
-  } catch (err) {
-    console.error('Noblox login failed:', err?.message || err);
-  }
-}
-
-StartNoblox();
 
 module.exports = {
   GetJsonBin,
