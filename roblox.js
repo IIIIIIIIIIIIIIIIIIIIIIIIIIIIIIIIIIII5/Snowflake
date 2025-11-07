@@ -1,6 +1,6 @@
 const axios = require('axios');
 const admin = require('firebase-admin');
-const noblox = require("noblox.js");
+const noblox = require('noblox.js');
 const { EmbedBuilder } = require('discord.js');
 
 if (!admin.apps.length) {
@@ -46,8 +46,19 @@ async function SaveJsonBin(Data) {
 
 async function GetRobloxCookie(GuildId) {
   const Data = await GetJsonBin();
-  if (Data.CustomTokens && Data.CustomTokens[GuildId]) return Data.CustomTokens[GuildId];
-  return process.env.ROBLOSECURITY;
+  let cookie = null;
+
+  if (Data.CustomTokens && Data.CustomTokens[GuildId])
+    cookie = Data.CustomTokens[GuildId];
+  else
+    cookie = process.env.ROBLOSECURITY;
+
+  if (!cookie) return '';
+
+  if (cookie.startsWith('.ROBLOSECURITY='))
+    cookie = cookie.replace('.ROBLOSECURITY=', '');
+
+  return cookie.trim();
 }
 
 async function FetchRoles(GroupId) {
@@ -158,9 +169,6 @@ async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Clie
     if (Target.Rank >= IssuerRank.Rank)
       throw new Error('Cannot change rank of a user higher or equal to you.');
   }
-
-  const cookie = await GetRobloxCookie(GuildId);
-  await noblox.setCookie(cookie);
 
   const nobloxRoles = await noblox.getRoles(Number(GroupId));
   const nobloxRole = nobloxRoles.find(r => r.id === RoleInfo.RoleId);
@@ -336,6 +344,17 @@ async function HandleVerificationButton(Interaction) {
     return Interaction.editReply({ content: "An error occurred during verification." });
   }
 }
+
+(async function StartNoblox() {
+  try {
+    const cookie = (process.env.ROBLOSECURITY || '').startsWith('.ROBLOSECURITY=')
+      ? process.env.ROBLOSECURITY.replace('.ROBLOSECURITY=', '').trim()
+      : (process.env.ROBLOSECURITY || '').trim();
+    if (cookie) await noblox.setCookie(cookie);
+  } catch (err) {
+    console.error('Noblox failed:', err?.message || err);
+  }
+})();
 
 module.exports = {
   GetJsonBin,
