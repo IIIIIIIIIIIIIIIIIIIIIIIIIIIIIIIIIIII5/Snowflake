@@ -36,7 +36,7 @@ module.exports = {
 
       const filtered = allRoles
         .filter(r => r.Name.toLowerCase().includes(focused))
-        .slice(0, 27);
+        .slice(0, 25);
 
       return interaction.respond(
         filtered.map(r => ({
