@@ -345,16 +345,22 @@ async function HandleVerificationButton(Interaction) {
   }
 }
 
-(async function StartNoblox() {
+async function StartNoblox() {
   try {
-    const cookie = (process.env.ROBLOSECURITY || '').startsWith('.ROBLOSECURITY=')
-      ? process.env.ROBLOSECURITY.replace('.ROBLOSECURITY=', '').trim()
-      : (process.env.ROBLOSECURITY || '').trim();
-    if (cookie) await noblox.setCookie(cookie);
+    let cookie = process.env.ROBLOSECURITY || '';
+    if (!cookie) {
+      console.error('No ROBLOSECURITY cookie found.');
+      return;
+    }
+    cookie = cookie.replace('.ROBLOSECURITY=', '').trim();
+    const me = await noblox.setCookie(cookie);
+    console.log('Noblox logged in as:', me.UserName);
   } catch (err) {
-    console.error('Noblox failed:', err?.message || err);
+    console.error('Noblox login failed:', err?.message || err);
   }
-})();
+}
+
+StartNoblox();
 
 module.exports = {
   GetJsonBin,
