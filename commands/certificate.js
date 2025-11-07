@@ -1,164 +1,80 @@
-const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require("discord.js");
-const { GetJsonBin, SaveJsonBin } = require("../roblox");
+const { SlashCommandBuilder } = require('discord.js');
+const { GetJsonBin, GetRobloxUserId, SetRank, SendRankLog, FetchRoles } = require('../roblox');
 
-const Roles = [
-  "1386369108408406096",
-  "1431333433539563531",
-  "1423226365498494996",
-  "1418979785165766717"
-];
-
-async function SendCertificationLog(Client, GuildId, ActionBy, ActionOn, Action, Certification) {
-  const ChannelId = "1435157510930698300";
-  const Guild = await Client.guilds.fetch(GuildId).catch(() => null);
-  if (!Guild) return;
-  const Channel = Guild.channels.cache.get(ChannelId);
-  if (!Channel || !Channel.isTextBased()) return;
-
-  const Embed = new EmbedBuilder()
-    .setTitle("Certification Update")
-    .setColor(0x2b2d31)
-    .addFields(
-      { name: "Action By:", value: `<@${ActionBy}>`, inline: true },
-      { name: "Action On:", value: `<@${ActionOn}>`, inline: true },
-      { name: "Action:", value: Action, inline: true },
-      { name: "Certification:", value: Certification, inline: false }
-    )
-    .setTimestamp();
-
-  await Channel.send({ embeds: [Embed] }).catch(() => {});
-}
+const ALLOWED_ROLE = '1423332095001890908';
+const SFPLeadershipRole = '1386369108408406096';
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("certificate")
-    .setDescription("Manage user certifications.")
-    .addSubcommand(sub =>
-      sub
-        .setName("add")
-        .setDescription("Add a certification to a user.")
-        .addUserOption(opt =>
-          opt.setName("user").setDescription("The user to modify.").setRequired(true)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName("type")
-            .setDescription("Select a certificate to add")
-            .setRequired(true)
-            .addChoices(
-              { name: "Certified Host", value: "Certified Host" },
-              { name: "Staff of the Week", value: "Staff of the Week" },
-              { name: "Staff of the Month", value: "Staff of the Month" }
-            )
-        )
+    .setName('setrank')
+    .setDescription("Set a user's rank")
+    .addStringOption(opt =>
+      opt.setName('username')
+        .setDescription('Roblox username')
+        .setRequired(true)
     )
-    .addSubcommand(sub =>
-      sub
-        .setName("remove")
-        .setDescription("Remove a certification from a user.")
-        .addUserOption(opt =>
-          opt.setName("user").setDescription("The user to modify.").setRequired(true)
-        )
+    .addStringOption(opt =>
+      opt.setName('rankname')
+        .setDescription('Rank name')
+        .setRequired(true)
+        .setAutocomplete(true)
     ),
 
-  async execute(Interaction) {
-    if (!Interaction.member.roles.cache.some(r => Roles.includes(r.id))) {
-      return Interaction.reply({
-        content: "You do not have permission to use this command.",
-        ephemeral: true
-      });
+  async autocomplete(interaction) {
+    const focused = interaction.options.getFocused().toLowerCase();
+    const db = await GetJsonBin();
+    const guildId = interaction.guild.id;
+
+    if (!db.ServerConfig?.[guildId]?.GroupId)
+      return interaction.respond([]);
+
+    const groupId = db.ServerConfig[guildId].GroupId;
+
+    try {
+      const roles = await FetchRoles(groupId);
+      const allRoles = Object.values(roles);
+
+      const filtered = allRoles
+        .filter(r => r.Name.toLowerCase().includes(focused))
+        .slice(0, 25);
+
+      return interaction.respond(
+        filtered.map(r => ({ name: `${r.Name} (${r.Rank})`, value: r.Name }))
+      );
+    } catch {
+      return interaction.respond([]);
+    }
+  },
+
+  async execute(interaction) {
+    if (!interaction.member.roles.cache.has(ALLOWED_ROLE) && !interaction.member.roles.cache.has(SFPLeadershipRole))
+      return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
+
+    await interaction.deferReply({ ephemeral: true });
+
+    const db = await GetJsonBin();
+    const guildId = interaction.guild.id;
+
+    if (!db.ServerConfig?.[guildId]?.GroupId)
+      return interaction.editReply({ content: 'Group ID not set. Run /config first.' });
+
+    const groupId = db.ServerConfig[guildId].GroupId;
+    const username = interaction.options.getString('username');
+    const rankName = interaction.options.getString('rankname');
+
+    let userId;
+    try {
+      userId = await GetRobloxUserId(username);
+    } catch {
+      return interaction.editReply({ content: `Roblox user "${username}" not found.` });
     }
 
-    const Sub = Interaction.options.getSubcommand();
-    const Db = await GetJsonBin();
-    if (!Db.Certifications) Db.Certifications = {};
-
-    if (Sub === "add") {
-      const Target = Interaction.options.getUser("user");
-      const Type = Interaction.options.getString("type");
-
-      if (!Db.Certifications[Target.id]) Db.Certifications[Target.id] = [];
-
-      if (Type === "Certified Host" && Db.Certifications[Target.id].includes(Type)) {
-        return Interaction.reply({
-          content: `${Target.username} already has ${Type}.`,
-          ephemeral: true
-        });
-      }
-
-      Db.Certifications[Target.id].push(Type);
-      await SaveJsonBin(Db);
-
-      try {
-        await Target.send(`Hello ${Target.username}, a new certification has been granted to you: **${Type}**.`);
-      } catch {}
-
-      await SendCertificationLog(Interaction.client, Interaction.guild.id, Interaction.user.id, Target.id, "Certification Added", Type);
-
-      return Interaction.reply({
-        content: `Added ${Type} to ${Target.username}.`,
-        ephemeral: true
-      });
-    }
-
-    if (Sub === "remove") {
-      const Target = Interaction.options.getUser("user");
-      const UserCerts = Db.Certifications[Target.id] || [];
-
-      if (UserCerts.length === 0) {
-        return Interaction.reply({
-          content: `${Target.username} has no certificates.`,
-          ephemeral: true
-        });
-      }
-
-      const Select = new StringSelectMenuBuilder()
-        .setCustomId(`RemoveCert_${Target.id}`)
-        .setPlaceholder("Select a certificate to remove")
-        .addOptions(UserCerts.map(c => ({ label: c, value: c })));
-
-      const Row = new ActionRowBuilder().addComponents(Select);
-
-      await Interaction.reply({
-        content: `Select a certificate to remove from ${Target.username}:`,
-        components: [Row],
-        ephemeral: true
-      });
-
-      const Collector = Interaction.channel.createMessageComponentCollector({
-        time: 60000,
-        filter: i => i.user.id === Interaction.user.id
-      });
-
-      Collector.on("collect", async i => {
-        const CertToRemove = i.values[0];
-        Db.Certifications[Target.id] = Db.Certifications[Target.id].filter(c => c !== CertToRemove);
-        await SaveJsonBin(Db);
-
-        try {
-          await Target.send(`Hello ${Target.username}, the following certification has been removed from your account: **${CertToRemove}**.`);
-        } catch {}
-
-        await SendCertificationLog(Interaction.client, Interaction.guild.id, Interaction.user.id, Target.id, "Certification Removed", CertToRemove);
-
-        await i.update({
-          content: `Removed ${CertToRemove} from ${Target.username}.`,
-          components: [],
-          ephemeral: true
-        });
-      });
-
-      Collector.on("end", async Collected => {
-        if (Collected.size === 0) {
-          try {
-            await Interaction.editReply({
-              content: "No certificate was selected.",
-              components: [],
-              ephemeral: true
-            });
-          } catch {}
-        }
-      });
+    try {
+      await SetRank(groupId, userId, rankName, interaction.user.id, guildId);
+      await SendRankLog(guildId, interaction.client, interaction.user.id, userId, "Set Rank", rankName);
+      return interaction.editReply({ content: `Successfully set ${username} to rank ${rankName}` });
+    } catch (err) {
+      return interaction.editReply({ content: `Error: ${err.message}` });
     }
   }
 };
