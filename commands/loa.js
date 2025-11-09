@@ -1,9 +1,8 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const { GetJsonBin, SaveJsonBin, GetRobloxUserId } = require('../roblox');
 
 const AllowedRoles = ["1431333433539563531", "1423226365498494996"];
 const LoARoleId = "1437079732708442112";
-const LoALogChannelId = "1433025723932741694";
 
 function ConvertToDate(string) {
     const [day, month, year] = string.split('/').map(Number);
@@ -14,7 +13,8 @@ function ConvertToDate(string) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('loa')
-        .setDescription('Put yourself on Leave of Absence')
+        .setDescription('Put a user on Leave of Absence')
+        .addUserOption(opt => opt.setName('user').setDescription('Select a user').setRequired(true))
         .addStringOption(opt => opt.setName('start_date').setDescription('Start date DD/MM/YYYY').setRequired(true))
         .addStringOption(opt => opt.setName('end_date').setDescription('End date DD/MM/YYYY').setRequired(true))
         .addStringOption(opt => opt.setName('reason').setDescription('Reason for LoA').setRequired(true)),
@@ -28,8 +28,8 @@ module.exports = {
 
         try {
             const Db = await GetJsonBin();
-            const GuildId = interaction.guild.id;
-
+            const Target = interaction.options.getUser('user');
+            const Member = await interaction.guild.members.fetch(Target.id);
             const StartDateStr = interaction.options.getString('start_date');
             const EndDateStr = interaction.options.getString('end_date');
             const Reason = interaction.options.getString('reason');
@@ -40,46 +40,55 @@ module.exports = {
             if (!StartDate || !EndDate) return interaction.editReply({ content: "Invalid date format. Use DD/MM/YYYY." });
             if (EndDate < StartDate) return interaction.editReply({ content: "End date cannot be before start date." });
 
-            const UserId = await GetRobloxUserId(interaction.user.username);
+            const UserId = await GetRobloxUserId(Target.username);
 
             if (!Db.LoAs) Db.LoAs = {};
             Db.LoAs[UserId] = {
                 StartDate: StartDate.getTime(),
                 EndDate: EndDate.getTime(),
                 Reason: Reason,
-                Active: true
+                Active: true,
+                DiscordId: Target.id
             };
             await SaveJsonBin(Db);
 
-            const Member = interaction.member;
             await Member.roles.add(LoARoleId).catch(() => {});
 
-            const LoAEmbed = new EmbedBuilder()
-                .setTitle('Leave of Absence Issued')
-                .setColor(0xff9900)
-                .setDescription(`Dear <@${Member.id}>,\nYou have been put on Leave of Absence starting from **${StartDateStr}** and it shall end on **${EndDateStr}**.\nReason: ${Reason}`);
-
-            try { await Member.send({ embeds: [LoAEmbed] }); } catch {}
-
-            const LogChannel = await interaction.client.channels.fetch(LoALogChannelId).catch(() => null);
-            if (LogChannel?.isTextBased()) {
-                const LogEmbed = new EmbedBuilder()
-                    .setTitle('LoA Issued')
-                    .setColor(0xff9900)
-                    .addFields(
-                        { name: 'User', value: `<@${Member.id}>`, inline: true },
-                        { name: 'Start Date', value: StartDateStr, inline: true },
-                        { name: 'End Date', value: EndDateStr, inline: true },
-                        { name: 'Reason', value: Reason, inline: false }
-                    )
-                    .setTimestamp(new Date());
-                await LogChannel.send({ embeds: [LogEmbed] });
-            }
+            const message = `Dear @${Member.user.username},\n\nYou have been put on Leave of Absence starting from ${StartDateStr} and it shall end on ${EndDateStr} with the reason (${Reason})`;
+            try { await Member.send(message); } catch {}
 
             await interaction.editReply({ content: `Successfully issued LoA for <@${Member.id}>.` });
 
         } catch (err) {
             return interaction.editReply({ content: `Error: ${err.message}` });
         }
+    },
+
+    async StartAutoCheck(client) {
+        setInterval(async () => {
+            const Db = await GetJsonBin();
+            const Now = Date.now();
+
+            if (!Db.LoAs) return;
+
+            for (const UserId in Db.LoAs) {
+                const LoA = Db.LoAs[UserId];
+                if (LoA.Active && LoA.EndDate <= Now) {
+                    LoA.Active = false;
+
+                    try {
+                        const Guild = client.guilds.cache.first();
+                        const Member = await Guild.members.fetch(LoA.DiscordId).catch(() => null);
+                        if (Member) {
+                            await Member.roles.remove(LoARoleId).catch(() => {});
+                            const message = `Dear @${Member.user.username},\n\nYour Leave of Absence which was issued on ${new Date(LoA.StartDate).toLocaleDateString()} has come to an end you may resume your normal duties starting from today.`;
+                            try { await Member.send(message); } catch {}
+                        }
+                    } catch {}
+
+                    await SaveJsonBin(Db);
+                }
+            }
+        }, 30000);
     }
 };
