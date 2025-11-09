@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { GetJsonBin, SaveJsonBin, GetRobloxUserId } = require('../roblox');
+const { GetJsonBin, SaveJsonBin } = require('../roblox');
 
 const AllowedRoles = ["1431333433539563531", "1423226365498494996"];
 const LoARoleId = "1437079732708442112";
@@ -41,10 +41,8 @@ module.exports = {
             if (!StartDate || !EndDate) return interaction.editReply({ content: "Invalid date format. Use DD/MM/YYYY." });
             if (EndDate < StartDate) return interaction.editReply({ content: "End date cannot be before start date." });
 
-            const UserId = await GetRobloxUserId(Target.username);
-
             if (!Db.LoAs) Db.LoAs = {};
-            Db.LoAs[UserId] = {
+            Db.LoAs[Target.id] = {
                 StartDate: StartDate.getTime(),
                 EndDate: EndDate.getTime(),
                 Reason: Reason,
@@ -72,8 +70,8 @@ module.exports = {
 
             if (!Db.LoAs) return;
 
-            for (const UserId in Db.LoAs) {
-                const LoA = Db.LoAs[UserId];
+            for (const DiscordId in Db.LoAs) {
+                const LoA = Db.LoAs[DiscordId];
                 if (LoA.Active && LoA.EndDate <= Now) {
                     LoA.Active = false;
 
