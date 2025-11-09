@@ -3,6 +3,7 @@ const path = require('path');
 const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType } = require('discord.js');
 const Roblox = require('./roblox');
 const { StartApi } = require('./api');
+const loaCommand = require('./commands/loa.js');
 
 const BotToken = process.env.BOT_TOKEN;
 const ClientId = process.env.CLIENT_ID;
@@ -49,6 +50,8 @@ ClientBot.once('ready', async () => {
   ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
   await RefreshCommands();
   StartApi();
+
+  loaCommand.StartAutoCheck(ClientBot);
 });
 
 ClientBot.on('interactionCreate', async interaction => {
