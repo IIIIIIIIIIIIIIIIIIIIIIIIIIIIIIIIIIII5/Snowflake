@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, SaveJsonBin } = require('../roblox');
 
 const AllowedRoles = ["1431333433539563531", "1423226365498494996"];
@@ -53,8 +53,12 @@ module.exports = {
 
             await Member.roles.add(LoARoleId).catch(() => {});
 
-            const message = `Dear @${Member.user.username},\n\nYou have been put on Leave of Absence starting from ${StartDateStr} and it shall end on ${EndDateStr} with the reason (${Reason})`;
-            try { await Member.send(message); } catch {}
+            const embed = new EmbedBuilder()
+                .setTitle('Leave of Absence Issued')
+                .setColor(0xff9900)
+                .setDescription(`Dear <@${Member.id}>,\n\nYou have been put on Leave of Absence starting from **${StartDateStr}** and it shall end on **${EndDateStr}**.\nReason: ${Reason}`);
+
+            try { await Member.send({ embeds: [embed] }); } catch {}
 
             await interaction.editReply({ content: `Successfully issued LoA for <@${Member.id}>.` });
 
@@ -80,8 +84,11 @@ module.exports = {
                         const Member = await Guild.members.fetch(LoA.DiscordId).catch(() => null);
                         if (Member) {
                             await Member.roles.remove(LoARoleId).catch(() => {});
-                            const message = `Dear @${Member.user.username},\n\nYour Leave of Absence which was issued on ${new Date(LoA.StartDate).toLocaleDateString()} has come to an end you may resume your normal duties starting from today.`;
-                            try { await Member.send(message); } catch {}
+                            const embed = new EmbedBuilder()
+                                .setTitle('Leave of Absence Ended')
+                                .setColor(0x00ff00)
+                                .setDescription(`Dear <@${Member.id}>,\n\nYour Leave of Absence which was issued on ${new Date(LoA.StartDate).toLocaleDateString()} has come to an end. You may resume your normal duties starting from today.`);
+                            try { await Member.send({ embeds: [embed] }); } catch {}
                         }
                     } catch {}
 
