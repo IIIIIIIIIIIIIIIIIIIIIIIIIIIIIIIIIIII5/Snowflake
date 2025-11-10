@@ -1,8 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { GetJsonBin, GetRobloxUserId, GetCurrentRank, FetchRoles, SetRank, SendRankLog } = require('../roblox');
 
-const ALLOWED_ROLE = '1423332095001890908';
-const SFPLeadershipRole = '1386369108408406096';
+const Roles = ["1423332095001890908", "1386369108408406096", "1418979785165766717"];
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -11,8 +10,9 @@ module.exports = {
     .addStringOption(opt => opt.setName('username').setDescription('Roblox username').setRequired(true)),
 
   async execute(interaction) {
-    if (!interaction.member.roles.cache.has(ALLOWED_ROLE) && !interaction.member.roles.cache.has(SFPLeadershipRole))
-      return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
+     if (!interaction.member.roles.cache.some(r => Roles.includes(r.id))) {
+       return interaction.reply({ content: "You don't have permission.", ephemeral: true });
+     }
 
     await interaction.deferReply({ ephemeral: true });
     const db = await GetJsonBin();
