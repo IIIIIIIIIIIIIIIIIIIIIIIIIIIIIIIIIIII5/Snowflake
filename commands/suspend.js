@@ -109,7 +109,7 @@ module.exports = {
                 Interaction.user.id,
                 GuildId,
                 Interaction.client,
-                DurationMs,
+                DurationKey,
                 Reason
             );
 
