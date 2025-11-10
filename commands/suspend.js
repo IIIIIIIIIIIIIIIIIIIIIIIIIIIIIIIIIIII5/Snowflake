@@ -6,11 +6,11 @@ const DiscordRoleId = "1402233297786109952";
 const SuspensionLogChannelId = "1433025723932741694";
 
 const DurationOptions = {
-    '12 hours': 12 * 60 * 60 * 1000,
-    '1 day': 24 * 60 * 60 * 1000,
-    '3 days': 3 * 24 * 60 * 60 * 1000,
-    '7 days': 7 * 24 * 60 * 60 * 1000,
-    '1 month': 30 * 24 * 60 * 60 * 1000
+    '12h': 12 * 60 * 60 * 1000,
+    '1d': 24 * 60 * 60 * 1000,
+    '3d': 3 * 24 * 60 * 60 * 1000,
+    '7d': 7 * 24 * 60 * 60 * 1000,
+    '1m': 30 * 24 * 60 * 60 * 1000
 };
 
 function FormatDuration(ms) {
@@ -22,6 +22,7 @@ function FormatDuration(ms) {
     const minutes = Math.floor(remaining / (60 * 1000));
     remaining -= minutes * 60 * 1000;
     const seconds = Math.floor(remaining / 1000);
+
     let result = [];
     if (days) result.push(`${days} day${days > 1 ? 's' : ''}`);
     if (hours) result.push(`${hours} hour${hours > 1 ? 's' : ''}`);
@@ -47,13 +48,15 @@ module.exports = {
                 .setDescription('Duration of suspension')
                 .setRequired(true)
                 .addChoices(
-                    { name: '12 hours', value: '12 hours' },
-                    { name: '1 day', value: '1 day' },
-                    { name: '3 days', value: '3 days' },
-                    { name: '7 days', value: '7 days' },
-                    { name: '1 month', value: '1 month' }
+                    { name: '12 hours', value: '12h' },
+                    { name: '1 day', value: '1d' },
+                    { name: '3 days', value: '3d' },
+                    { name: '7 days', value: '7d' },
+                    { name: '1 month', value: '1m' }
                 ))
-        .addStringOption(opt => opt.setName('discordid').setDescription('Optional Discord ID')),
+        .addStringOption(opt =>
+            opt.setName('discordid')
+                .setDescription('Optional Discord ID')),
 
     async execute(Interaction) {
         if (!Interaction.member.roles.cache.some(r => Roles.includes(r.id)))
@@ -65,7 +68,9 @@ module.exports = {
             const Db = await GetJsonBin();
             const GuildId = Interaction.guild.id;
             const GroupId = Db.ServerConfig?.[GuildId]?.GroupId;
-            if (!GroupId) return Interaction.editReply({ content: 'Group ID not set. Run /config first.' });
+
+            if (!GroupId)
+                return Interaction.editReply({ content: 'Group ID not set. Run /config first.' });
 
             const Username = Interaction.options.getString('username');
             const Reason = Interaction.options.getString('reason');
@@ -73,21 +78,33 @@ module.exports = {
             const DurationMs = DurationOptions[DurationKey];
             const DiscordIdOption = Interaction.options.getString('discordid');
 
-            if (!DurationMs) return Interaction.editReply({ content: 'Invalid duration.' });
+            if (!DurationMs)
+                return Interaction.editReply({ content: 'Invalid duration.' });
 
             const UserId = await GetRobloxUserId(Username);
             const TargetCurrentRank = await GetCurrentRank(GroupId, UserId);
 
-            const IssuerRobloxEntry = Object.keys(Db.VerifiedUsers || {}).find(k => Db.VerifiedUsers[k] === Interaction.user.id);
+            const IssuerRobloxEntry = Object.keys(Db.VerifiedUsers || {})
+                .find(k => Db.VerifiedUsers[k] === Interaction.user.id);
 
             if (IssuerRobloxEntry) {
-                if (IssuerRobloxEntry === UserId) return Interaction.editReply({ content: 'You cannot suspend yourself.' });
+                if (IssuerRobloxEntry === UserId)
+                    return Interaction.editReply({ content: 'You cannot suspend yourself.' });
+
                 const IssuerRank = await GetCurrentRank(GroupId, IssuerRobloxEntry);
                 if (TargetCurrentRank.Rank >= IssuerRank.Rank)
                     return Interaction.editReply({ content: 'You cannot suspend a user with equal or higher rank.' });
             }
 
-            await SuspendUser(GroupId, UserId, Interaction.user.id, GuildId, Interaction.client, DurationMs, Reason);
+            await SuspendUser(
+                GroupId,
+                UserId,
+                Interaction.user.id,
+                GuildId,
+                Interaction.client,
+                DurationMs,
+                Reason
+            );
 
             Db.Suspensions = Db.Suspensions || {};
             Db.Suspensions[UserId] = {
@@ -129,14 +146,21 @@ module.exports = {
                 )
                 .setTimestamp();
 
-            let TargetDiscordId = DiscordIdOption || Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === UserId);
+            let TargetDiscordId =
+                DiscordIdOption ||
+                Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === UserId);
 
             if (TargetDiscordId) {
                 const Member = await Interaction.guild.members.fetch(TargetDiscordId).catch(() => null);
+
                 if (Member) {
-                    const OldRoles = Member.roles.cache.map(r => r.id).filter(id => id !== Interaction.guild.id);
+                    const OldRoles = Member.roles.cache
+                        .map(r => r.id)
+                        .filter(id => id !== Interaction.guild.id);
+
                     if (OldRoles.length) await Member.roles.remove(OldRoles).catch(() => {});
                     await Member.roles.add(DiscordRoleId).catch(() => {});
+
                     try { await Member.send({ embeds: [UserEmbed] }); } catch {}
                 } else {
                     try {
@@ -146,10 +170,15 @@ module.exports = {
                 }
             }
 
-            const LogChannel = await Interaction.client.channels.fetch(SuspensionLogChannelId).catch(() => null);
-            if (LogChannel?.isTextBased()) await LogChannel.send({ embeds: [LogEmbed] });
+            const LogChannel =
+                await Interaction.client.channels.fetch(SuspensionLogChannelId).catch(() => null);
 
-            await Interaction.editReply({ content: `Successfully suspended ${Username} for ${DurationKey}.` });
+            if (LogChannel?.isTextBased())
+                await LogChannel.send({ embeds: [LogEmbed] });
+
+            await Interaction.editReply({
+                content: `Successfully suspended ${Username} for ${DurationKey}.`
+            });
 
         } catch (Err) {
             return Interaction.editReply({ content: `Error: ${Err.message}` });
