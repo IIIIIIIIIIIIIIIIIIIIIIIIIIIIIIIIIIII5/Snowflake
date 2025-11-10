@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, SaveJsonBin, GetRobloxUserId, GetCurrentRank, SuspendUser } = require('../roblox');
 
-const Roles = ["1398691449939169331","1418979785165766717"];
+const Roles = ["1398691449939169331", "1418979785165766717"];
 const DiscordRoleId = "1402233297786109952";
 const SuspensionLogChannelId = "1433025723932741694";
 
@@ -78,8 +78,10 @@ module.exports = {
             const DurationMs = DurationOptions[DurationKey];
             const DiscordIdOption = Interaction.options.getString('discordid');
 
-            if (!DurationMs)
-                return Interaction.editReply({ content: 'Invalid duration.' });
+            if (!DurationMs) {
+                const validKeys = Object.keys(DurationOptions).map(k => `\`${k}\``).join(', ');
+                return Interaction.editReply({ content: `Invalid duration. Valid options are: ${validKeys}` });
+            }
 
             const UserId = await GetRobloxUserId(Username);
             const TargetCurrentRank = await GetCurrentRank(GroupId, UserId);
