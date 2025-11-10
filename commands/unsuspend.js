@@ -4,7 +4,6 @@ const { GetJsonBin, SaveJsonBin, GetRobloxUserId, SetRank } = require('../roblox
 const AllowedRoles = [
     "1398691449939169331",
     "1386369108408406096",
-    "1402233297786109952",
     "1418979785165766717"
 ];
 const SuspensionLogChannelId = "1433025723932741694";
