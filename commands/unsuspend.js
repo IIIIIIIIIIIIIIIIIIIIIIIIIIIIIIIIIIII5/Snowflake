@@ -6,7 +6,7 @@ const AllowedRoles = [
     "1386369108408406096",
     "1418979785165766717"
 ];
-const DiscordRoleId = "1402233297786109952";
+const SuspensionRoleId = "1402233297786109952";
 const SuspensionLogChannelId = "1433025723932741694";
 
 function FormatDuration(Ms) {
@@ -58,7 +58,6 @@ module.exports = {
                 return interaction.editReply({ content: `${Username} is not currently suspended.` });
 
             const EndsAt = Suspension.EndsAt ? Number(Suspension.EndsAt) : null;
-            
             Suspension.Active = false;
             await SaveJsonBin(Db);
 
@@ -88,9 +87,8 @@ module.exports = {
             if (TargetDiscordId) {
                 const Member = await interaction.guild.members.fetch(TargetDiscordId).catch(() => null);
                 if (Member) {
-                    const OldRoles = Member.roles.cache.map(r => r.id).filter(id => id !== interaction.guild.id);
-                    if (OldRoles.length) await Member.roles.remove(OldRoles).catch(() => {});
-                    await Member.roles.add(DiscordRoleId).catch(() => {});
+                    await Member.roles.remove(SuspensionRoleId).catch(() => {});
+                    if (Suspension.OldRoles?.length) await Member.roles.add(Suspension.OldRoles).catch(() => {});
                     try { await Member.send({ embeds: [UserEmbed] }); } catch {}
                 } else {
                     try {
