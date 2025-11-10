@@ -39,9 +39,18 @@ for (const file of CommandFiles) {
 async function RefreshCommands() {
   const rest = new REST({ version: '10' }).setToken(BotToken);
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
+
   try {
-    await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: payload });
-  } catch {}
+    console.log("Clearing old commands…");
+    await rest.put(Routes.applicationCommands(ClientId), { body: [] });
+
+    console.log("Registering commands…");
+    await rest.put(Routes.applicationCommands(ClientId), { body: payload });
+
+    console.log("Global commands deployed successfully!");
+  } catch (err) {
+    console.error("Error:", err);
+  }
 }
 
 global.ClientBot = ClientBot;
