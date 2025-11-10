@@ -6,6 +6,7 @@ const AllowedRoles = [
     "1386369108408406096",
     "1418979785165766717"
 ];
+const DiscordRoleId = "1402233297786109952";
 const SuspensionLogChannelId = "1433025723932741694";
 
 function FormatDuration(Ms) {
