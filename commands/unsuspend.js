@@ -1,8 +1,11 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, SaveJsonBin, GetRobloxUserId, SetRank } = require('../roblox');
 
-const AllowedRole = "1398691449939169331";
-const SfpLeadershipRole = "1386369108408406096";
+const AllowedRoles = [
+    "1398691449939169331",
+    "1386369108408406096",
+    "1402233297786109952"
+];
 const DiscordRoleId = "1402233297786109952";
 const SuspensionLogChannelId = "1433025723932741694";
 
@@ -32,7 +35,7 @@ module.exports = {
         .addStringOption(opt => opt.setName('discordid').setDescription('Optional Discord ID to DM / role-manage')),
 
     async execute(interaction) {
-        if (!interaction.member.roles.cache.has(AllowedRole) && !interaction.member.roles.cache.has(SfpLeadershipRole)) {
+        if (!interaction.member.roles.cache.some(r => AllowedRoles.includes(r.id))) {
             return interaction.reply({ content: "You don't have permission.", ephemeral: true });
         }
 
