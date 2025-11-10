@@ -75,10 +75,15 @@ module.exports = {
             const Username = Interaction.options.getString('username');
             const Reason = Interaction.options.getString('reason');
             const DurationKey = Interaction.options.getString('duration');
+            console.log('Received duration key:', DurationKey);
+
             const DurationMs = DurationOptions[DurationKey];
+            console.log('Resolved duration in ms:', DurationMs);
+
             const DiscordIdOption = Interaction.options.getString('discordid');
 
             if (!DurationMs) {
+                console.log('Duration key is invalid:', DurationKey);
                 const validKeys = Object.keys(DurationOptions).map(k => `\`${k}\``).join(', ');
                 return Interaction.editReply({ content: `Invalid duration. Valid options are: ${validKeys}` });
             }
@@ -125,6 +130,7 @@ module.exports = {
             await SaveJsonBin(Db);
 
             const FullDuration = FormatDuration(DurationMs);
+            console.log('Formatted duration string:', FullDuration);
 
             const UserEmbed = new EmbedBuilder()
                 .setTitle('YOU HAVE BEEN SUSPENDED')
