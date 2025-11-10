@@ -1,8 +1,8 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { GetJsonBin, SaveJsonBin, GetRobloxUserId, GetCurrentRank, SuspendUser } = require('../roblox');
+const { GetJsonBin, SaveJsonBin, GetRobloxUserId, GetCurrentRank } = require('../roblox');
 
 const Roles = ["1398691449939169331", "1418979785165766717", "1386369108408406096"];
-const DiscordRoleId = "1402233297786109952";
+const SuspensionRoleId = "1402233297786109952";
 const SuspensionLogChannelId = "1433025723932741694";
 
 const DurationOptions = {
@@ -75,15 +75,10 @@ module.exports = {
             const Username = Interaction.options.getString('username');
             const Reason = Interaction.options.getString('reason');
             const DurationKey = Interaction.options.getString('duration');
-            console.log('Received duration key:', DurationKey);
-
             const DurationMs = DurationOptions[DurationKey];
-            console.log('Resolved duration in ms:', DurationMs);
-
             const DiscordIdOption = Interaction.options.getString('discordid');
 
             if (!DurationMs) {
-                console.log('Duration key is invalid:', DurationKey);
                 const validKeys = Object.keys(DurationOptions).map(k => `\`${k}\``).join(', ');
                 return Interaction.editReply({ content: `Invalid duration. Valid options are: ${validKeys}` });
             }
@@ -103,15 +98,18 @@ module.exports = {
                     return Interaction.editReply({ content: 'You cannot suspend a user with equal or higher rank.' });
             }
 
-            await SuspendUser(
-                GroupId,
-                UserId,
-                Interaction.user.id,
-                GuildId,
-                Interaction.client,
-                DurationKey,
-                Reason
-            );
+            let OldRoles = [];
+            let Member;
+            if (DiscordIdOption) {
+                Member = await Interaction.guild.members.fetch(DiscordIdOption).catch(() => null);
+                if (Member) {
+                    OldRoles = Member.roles.cache
+                        .map(r => r.id)
+                        .filter(id => id !== Interaction.guild.id && id !== SuspensionRoleId);
+                    if (OldRoles.length) await Member.roles.remove(OldRoles).catch(() => {});
+                    await Member.roles.add(SuspensionRoleId).catch(() => {});
+                }
+            }
 
             Db.Suspensions = Db.Suspensions || {};
             Db.Suspensions[UserId] = {
@@ -123,6 +121,7 @@ module.exports = {
                 GuildId,
                 OldRankName: TargetCurrentRank.Name,
                 OldRankValue: TargetCurrentRank.Rank,
+                OldRoles,
                 Reason,
                 Active: true
             };
@@ -130,7 +129,6 @@ module.exports = {
             await SaveJsonBin(Db);
 
             const FullDuration = FormatDuration(DurationMs);
-            console.log('Formatted duration string:', FullDuration);
 
             const UserEmbed = new EmbedBuilder()
                 .setTitle('YOU HAVE BEEN SUSPENDED')
@@ -154,33 +152,16 @@ module.exports = {
                 )
                 .setTimestamp();
 
-            let TargetDiscordId =
-                DiscordIdOption ||
-                Object.keys(Db.VerifiedUsers || {}).find(id => Db.VerifiedUsers[id] === UserId);
-
-            if (TargetDiscordId) {
-                const Member = await Interaction.guild.members.fetch(TargetDiscordId).catch(() => null);
-
-                if (Member) {
-                    const OldRoles = Member.roles.cache
-                        .map(r => r.id)
-                        .filter(id => id !== Interaction.guild.id);
-
-                    if (OldRoles.length) await Member.roles.remove(OldRoles).catch(() => {});
-                    await Member.roles.add(DiscordRoleId).catch(() => {});
-
-                    try { await Member.send({ embeds: [UserEmbed] }); } catch {}
-                } else {
-                    try {
-                        const TargetUser = await Interaction.client.users.fetch(TargetDiscordId);
-                        await TargetUser.send({ embeds: [UserEmbed] }).catch(() => {});
-                    } catch {}
-                }
+            if (Member) {
+                try { await Member.send({ embeds: [UserEmbed] }); } catch {}
+            } else if (DiscordIdOption) {
+                try {
+                    const TargetUser = await Interaction.client.users.fetch(DiscordIdOption);
+                    await TargetUser.send({ embeds: [UserEmbed] }).catch(() => {});
+                } catch {}
             }
 
-            const LogChannel =
-                await Interaction.client.channels.fetch(SuspensionLogChannelId).catch(() => null);
-
+            const LogChannel = await Interaction.client.channels.fetch(SuspensionLogChannelId).catch(() => null);
             if (LogChannel?.isTextBased())
                 await LogChannel.send({ embeds: [LogEmbed] });
 
