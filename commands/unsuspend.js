@@ -58,10 +58,7 @@ module.exports = {
                 return interaction.editReply({ content: `${Username} is not currently suspended.` });
 
             const EndsAt = Suspension.EndsAt ? Number(Suspension.EndsAt) : null;
-
-            if (EndsAt && Date.now() < EndsAt)
-                return interaction.editReply({ content: `${Username} is still within their suspension period.` });
-
+            
             Suspension.Active = false;
             await SaveJsonBin(Db);
 
