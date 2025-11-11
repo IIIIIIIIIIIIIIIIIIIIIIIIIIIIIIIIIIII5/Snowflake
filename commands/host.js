@@ -22,6 +22,23 @@ module.exports = {
     const cohost = interaction.options.getUser('cohost');
     const supervisor = interaction.options.getUser('supervisor');
 
+    db.Cooldowns = db.Cooldowns || {};
+    db.Cooldowns[host.id] = db.Cooldowns[host.id] || { dates: {}, lastTimestamp: null };
+
+    const isExempt = interaction.member.roles.cache.has(SFPLeadershipRole);
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const userCd = db.Cooldowns[host.id];
+    const usedToday = userCd.dates[todayKey] || 0;
+
+    if (!isExempt && usedToday >= 2) {
+      return interaction.editReply({
+        content: `You have hosted 2 times today.\nCooldown ends: ${userCd.lastTimestamp || 'N/A'}`
+      });
+    }
+
+    userCd.dates[todayKey] = usedToday + 1;
+    userCd.lastTimestamp = new Date().toLocaleString();
+
     const channelId = '1398706795840536696';
     const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
     if (!channel) return interaction.editReply({ content: 'Channel not found.' });
@@ -54,6 +71,7 @@ module.exports = {
     addTraining(host.id, 'hosted');
     if (cohost) addTraining(cohost.id, 'cohosted');
     if (supervisor) addTraining(supervisor.id, 'supervised');
+
     await SaveJsonBin(db);
 
     return interaction.editReply({ content: `Training announcement sent to ${channel.name}.` });
