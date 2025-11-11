@@ -25,21 +25,16 @@ const PredefinedDurations = {
   '1M': 30 * 24 * 60 * 60 * 1000
 };
 
-let LoggedIn = false;
-let FullCookie = process.env.ROBLOSECURITY?.trim();
-
 async function loginRoblox() {
-  if (LoggedIn) return;
-  if (!FullCookie) throw new Error("ROBLOSECURITY cookie not set");
-  const warningPrefix = '_|WARNING:';
-  const splitIndex = FullCookie.indexOf('|_');
-  let rawCookie = FullCookie;
-  if (FullCookie.startsWith(warningPrefix) && splitIndex !== -1) {
-    rawCookie = FullCookie.slice(splitIndex + 2).trim();
+  const fullCookie = process.env.ROBLOSECURITY;
+  if (!fullCookie) throw new Error("ROBLOSECURITY cookie not set");
+  let rawCookie = fullCookie;
+  if (fullCookie.startsWith("_|WARNING:")) {
+    const endIndex = fullCookie.indexOf("|_");
+    if (endIndex !== -1) rawCookie = fullCookie.slice(endIndex + 2);
   }
-  rawCookie = rawCookie.replace(/\s/g, '');
+  rawCookie = rawCookie.trim();
   await noblox.setCookie(rawCookie);
-  LoggedIn = true;
 }
 
 async function GetJsonBin() {
@@ -56,7 +51,6 @@ async function SaveJsonBin(Data) {
 }
 
 async function FetchRoles(GroupId) {
-  await loginRoblox();
   const roles = await noblox.getRoles(GroupId);
   const Roles = {};
   roles.forEach(r => Roles[r.name.toLowerCase()] = { Name: r.name, Rank: r.rank, RoleId: r.id });
@@ -64,14 +58,12 @@ async function FetchRoles(GroupId) {
 }
 
 async function GetCurrentRank(GroupId, UserId) {
-  await loginRoblox();
   const rankName = await noblox.getRankNameInGroup(GroupId, UserId);
   const rankNumber = await noblox.getRankInGroup(GroupId, UserId);
   return { Name: rankName, Rank: rankNumber };
 }
 
 async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Client = global.ClientBot) {
-  await loginRoblox();
   const Roles = await FetchRoles(GroupId);
   let RoleInfo = typeof RankOrId === 'number' ? Object.values(Roles).find(r => r.Rank === RankOrId) : Roles[RankOrId.toLowerCase()];
   if (!RoleInfo) throw new Error('Invalid rank specified');
@@ -93,17 +85,14 @@ async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Clie
 }
 
 async function GetRobloxUserId(Username) {
-  await loginRoblox();
   return await noblox.getIdFromUsername(Username);
 }
 
 async function GetRobloxUsername(UserId) {
-  await loginRoblox();
   return await noblox.getUsernameFromId(UserId);
 }
 
 async function GetRobloxDescription(UserId) {
-  await loginRoblox();
   const info = await noblox.getPlayerInfo(UserId);
   return info?.blurb || '';
 }
@@ -118,22 +107,17 @@ async function SendRankLog(GuildId, Client, ActionBy, TargetRobloxId, Action, Ne
     if (!Channel || !Channel.isTextBased()) return;
     const Username = await GetRobloxUsername(TargetRobloxId).catch(() => 'Unknown');
     const FieldActionBy = ActionBy === 'SYSTEM' ? 'SYSTEM' : `<@${ActionBy}>`;
-    const Embed = new EmbedBuilder()
-      .setTitle('Rank Updated')
-      .setColor(0x2b2d31)
-      .addFields(
-        { name: 'Action By:', value: FieldActionBy, inline: true },
-        { name: 'Action On:', value: Username, inline: true },
-        { name: 'Action:', value: Action, inline: true },
-        { name: 'New Rank:', value: NewRank, inline: false }
-      )
-      .setTimestamp();
+    const Embed = new EmbedBuilder().setTitle('Rank Updated').setColor(0x2b2d31).addFields(
+      { name: 'Action By:', value: FieldActionBy, inline: true },
+      { name: 'Action On:', value: Username, inline: true },
+      { name: 'Action:', value: Action, inline: true },
+      { name: 'New Rank:', value: NewRank, inline: false }
+    ).setTimestamp();
     await Channel.send({ embeds: [Embed] }).catch(() => {});
   } catch {}
 }
 
 async function SuspendUser(GroupId, UserId, IssuerDiscordId, GuildId, Client = global.ClientBot, DurationKey = '1d', Reason = null) {
-  await loginRoblox();
   const DbData = await GetJsonBin();
   const Roles = await FetchRoles(GroupId);
   const SuspendedRole = Roles['suspended'];
@@ -142,25 +126,14 @@ async function SuspendUser(GroupId, UserId, IssuerDiscordId, GuildId, Client = g
   if (!IssuerRobloxId) throw new Error('You must verify first.');
   const IssuerRank = await GetCurrentRank(GroupId, IssuerRobloxId);
   const TargetRank = await GetCurrentRank(GroupId, UserId);
-  if (String(UserId) === String(IssuerRobloxId)) throw new Error('Cannot suspend yourself.');
+  if (String(UserId) === String(IssuerRobloxId)) throw new Error('You cannot suspend yourself.');
   if (TargetRank.Rank >= IssuerRank.Rank) throw new Error('Cannot suspend a user with equal or higher rank.');
   const DurationMs = PredefinedDurations[DurationKey];
   if (DurationMs === undefined) throw new Error('Invalid suspension duration.');
   await noblox.setRank(GroupId, UserId, SuspendedRole.Rank);
   const Username = await GetRobloxUsername(UserId);
   DbData.Suspensions = DbData.Suspensions || {};
-  DbData.Suspensions[UserId] = {
-    Username,
-    IssuedBy: IssuerDiscordId,
-    IssuedAt: Date.now(),
-    EndsAt: Date.now() + DurationMs,
-    GroupId,
-    GuildId,
-    OldRankName: TargetRank.Name,
-    OldRankValue: TargetRank.Rank,
-    Reason,
-    Active: true
-  };
+  DbData.Suspensions[UserId] = { Username, IssuedBy: IssuerDiscordId, IssuedAt: Date.now(), EndsAt: Date.now() + DurationMs, GroupId, GuildId, OldRankName: TargetRank.Name, OldRankValue: TargetRank.Rank, Reason, Active: true };
   await SaveJsonBin(DbData);
   ScheduleAutoUnsuspend(UserId, DbData.Suspensions[UserId], Client);
 }
