@@ -14,6 +14,6 @@
     "discord.js": "^14.14.0",
     "express": "^4.18.2",
     "firebase-admin": "^12.0.0",
-    "noblox.js": "^4.2.3"
+    "noblox.js": "^6.2.0"
   }
 }
