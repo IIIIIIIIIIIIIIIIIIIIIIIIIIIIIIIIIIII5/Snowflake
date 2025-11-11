@@ -1,8 +1,11 @@
 {
-  "name": "Roblox Rank API",
+  "name": "roblox-rank-api",
   "version": "1.0.0",
   "description": "Rank API",
   "main": "index.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "start": "node index.js"
   },
