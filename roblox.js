@@ -29,12 +29,24 @@ let LoggedIn = false;
 
 async function loginRoblox() {
   if (LoggedIn) return;
+
   let cookie = process.env.ROBLOSECURITY?.trim();
+  if (!cookie) throw new Error("ROBLOSECURITY cookie not set");
+
   const warningPrefix = '_|WARNING:';
   const splitIndex = cookie.indexOf('|_');
-  if (cookie.startsWith(warningPrefix) && splitIndex !== -1) cookie = cookie.slice(splitIndex + 2);
-  await noblox.setCookie(cookie);
-  LoggedIn = true;
+  if (cookie.startsWith(warningPrefix) && splitIndex !== -1) {
+    cookie = cookie.slice(splitIndex + 2).trim();
+  }
+
+  try {
+    const username = await noblox.setCookie(cookie);
+    console.log(`Logged in as ${username}`);
+    LoggedIn = true;
+  } catch (err) {
+    console.error("Failed to log in to Roblox:", err.message);
+    throw new Error("Invalid ROBLOSECURITY cookie or unable to log in");
+  }
 }
 
 async function GetJsonBin() {
