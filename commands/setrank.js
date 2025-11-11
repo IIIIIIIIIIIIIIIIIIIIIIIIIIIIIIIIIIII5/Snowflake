@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { GetJsonBin, GetRobloxUserId, SetRank, SendRankLog, FetchRoles } = require('../roblox');
+const { GetJsonBin, GetRobloxUserId, SetRank, SendRankLog, FetchRoles, loginRoblox } = require('../roblox');
 
 const ALLOWED_ROLE = '1423332095001890908';
 const SFPLeadershipRole = '1386369108408406096';
@@ -31,16 +31,14 @@ module.exports = {
     const groupId = db.ServerConfig[guildId].GroupId;
 
     try {
+      await loginRoblox();
       const roles = await FetchRoles(groupId);
       const allRoles = Object.values(roles);
-
       const filtered = allRoles
         .filter(r => r.Name.toLowerCase().includes(focused))
         .slice(0, 25);
 
-      return interaction.respond(
-        filtered.map(r => ({ name: `${r.Name} (${r.Rank})`, value: r.Name }))
-      );
+      return interaction.respond(filtered.map(r => ({ name: `${r.Name} (${r.Rank})`, value: r.Name })));
     } catch {
       return interaction.respond([]);
     }
@@ -51,6 +49,7 @@ module.exports = {
       return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
 
     await interaction.deferReply({ ephemeral: true });
+    await loginRoblox();
 
     const db = await GetJsonBin();
     const guildId = interaction.guild.id;
