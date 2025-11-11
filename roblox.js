@@ -31,7 +31,13 @@ let FullCookie = process.env.ROBLOSECURITY?.trim();
 async function loginRoblox() {
   if (LoggedIn) return;
   if (!FullCookie) throw new Error("ROBLOSECURITY cookie not set");
-  let rawCookie = FullCookie.replace(/\s/g, ''); 
+  const warningPrefix = '_|WARNING:';
+  const splitIndex = FullCookie.indexOf('|_');
+  let rawCookie = FullCookie;
+  if (FullCookie.startsWith(warningPrefix) && splitIndex !== -1) {
+    rawCookie = FullCookie.slice(splitIndex + 2).trim();
+  }
+  rawCookie = rawCookie.replace(/\s/g, '');
   await noblox.setCookie(rawCookie);
   LoggedIn = true;
 }
