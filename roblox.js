@@ -31,6 +31,9 @@ async function loginRoblox() {
   if (loggedIn) return;
   const fullCookie = process.env.ROBLOSECURITY;
   if (!fullCookie) throw new Error("ROBLOSECURITY cookie not set");
+
+  console.log(fullCookie);
+
   await noblox.setCookie(fullCookie);
   loggedIn = true;
 }
