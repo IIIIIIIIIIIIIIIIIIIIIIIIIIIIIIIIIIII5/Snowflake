@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { GetJsonBin, GetRobloxUserId, GetCurrentRank, FetchRoles, SetRank, SendRankLog } = require('../roblox');
+const { GetJsonBin, GetRobloxUserId, GetCurrentRank, FetchRoles, SetRank, SendRankLog, loginRoblox } = require('../roblox');
 
 const Roles = ["1423332095001890908", "1386369108408406096", "1418979785165766717"];
 
@@ -15,6 +15,7 @@ module.exports = {
     }
 
     await interaction.deferReply({ ephemeral: true });
+    await loginRoblox();
 
     const db = await GetJsonBin();
     const guildId = interaction.guild.id;
@@ -34,7 +35,6 @@ module.exports = {
       if (index <= 0) throw new Error('Cannot demote further');
 
       const newRole = roles[index - 1];
-
       await SetRank(groupId, userId, newRole.Name, interaction.user.id, guildId);
       await SendRankLog(guildId, interaction.client, interaction.user.id, userId, "Demote", newRole.Name);
 
