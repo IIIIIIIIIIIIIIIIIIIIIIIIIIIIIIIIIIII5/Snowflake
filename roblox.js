@@ -38,6 +38,20 @@ async function loginRoblox() {
   loggedIn = true;
 }
 
+
+async function testCookie() {
+    const cookie = process.env.ROBLOSECURITY;
+    console.log("Cookie being used:", cookie);
+    try {
+        await noblox.setCookie(cookie);
+        console.log("Login successful!");
+    } catch (err) {
+        console.error("Failed to login:", err.message);
+    }
+}
+
+testCookie();
+
 async function ensureLogin() {
   if (!loggedIn) await loginRoblox();
 }
