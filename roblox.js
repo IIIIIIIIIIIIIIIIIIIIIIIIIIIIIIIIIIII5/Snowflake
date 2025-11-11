@@ -26,15 +26,15 @@ const PredefinedDurations = {
 };
 
 async function loginRoblox() {
-  const fullCookie = process.env.ROBLOSECURITY;
+  let fullCookie = process.env.ROBLOSECURITY;
   if (!fullCookie) throw new Error("ROBLOSECURITY cookie not set");
-  let rawCookie = fullCookie;
+
   if (fullCookie.startsWith("_|WARNING:")) {
     const endIndex = fullCookie.indexOf("|_");
-    if (endIndex !== -1) rawCookie = fullCookie.slice(endIndex + 2);
+    fullCookie = fullCookie.slice(endIndex + 2);
   }
-  rawCookie = rawCookie.trim();
-  await noblox.setCookie(rawCookie);
+
+  await noblox.setCookie(fullCookie);
 }
 
 async function GetJsonBin() {
