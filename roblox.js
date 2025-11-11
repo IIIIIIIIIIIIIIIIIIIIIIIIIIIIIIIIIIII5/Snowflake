@@ -1,6 +1,6 @@
-const axios = require('axios');
 const admin = require('firebase-admin');
 const { EmbedBuilder } = require('discord.js');
+const noblox = require('noblox.js');
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -19,41 +19,17 @@ const ScheduledTimers = {};
 const MaxTimeout = 2147483647;
 const PredefinedDurations = {
   '12h': 12 * 60 * 60 * 1000,
-  '1d': 24 * 60 * 60 * 1000,
+  '1d': 24 * 60 * 60 * 60 * 1000,
   '3d': 3 * 24 * 60 * 60 * 1000,
   '7d': 7 * 24 * 60 * 60 * 1000,
   '1M': 30 * 24 * 60 * 60 * 1000
 };
 
-async function axiosWithRetry(config, retries = 3, timeout = 15000, delay = 1000) {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const source = axios.CancelToken.source();
-      const timer = setTimeout(() => source.cancel(`Timeout of ${timeout}ms exceeded`), timeout);
-
-      const response = await axios({
-        ...config,
-        timeout,
-        cancelToken: source.token
-      });
-
-      clearTimeout(timer);
-      return response;
-
-    } catch (err) {
-      if (attempt === retries) throw err;
-      const isNetworkError = !err.response;
-      if (!isNetworkError) throw err;
-      await new Promise(r => setTimeout(r, delay));
-    }
-  }
-}
-
 async function GetJsonBin() {
   try {
-    const Doc = await Db.collection('botData').doc('main').get();
-    return Doc.exists ? Doc.data() : {};
-  } catch (Err) {
+    const doc = await Db.collection('botData').doc('main').get();
+    return doc.exists ? doc.data() : {};
+  } catch {
     return {};
   }
 }
@@ -61,67 +37,48 @@ async function GetJsonBin() {
 async function SaveJsonBin(Data) {
   try {
     await Db.collection('botData').doc('main').set(Data, { merge: true });
-  } catch (Err) {}
+  } catch {}
 }
 
-async function GetRobloxCookie() {
-  const cookie = process.env.ROBLOSECURITY;
-  if (!cookie) throw new Error('No ROBLOSECURITY cookie set');
-  return cookie.trim();
-}
-
-async function FetchRoles(GroupId) {
-  const Res = await axiosWithRetry({ method: 'get', url: `https://groups.roblox.com/v1/groups/${GroupId}/roles` });
-  const Roles = {};
-  Res.data.roles.forEach(r => {
-    Roles[r.name.toLowerCase()] = { Name: r.name, Rank: r.rank, RoleId: r.id };
-  });
-  return Roles;
-}
-
-async function GetXsrfToken() {
-  const Cookie = await GetRobloxCookie();
+async function LoginRoblox() {
   try {
-    const Res = await axiosWithRetry({ method: 'post', url: 'https://auth.roblox.com/v2/logout', headers: { Cookie: `.ROBLOSECURITY=${Cookie}` } });
-    return Res.headers['x-csrf-token'] || '';
-  } catch (Err) {
-    return Err.response?.headers['x-csrf-token'] || '';
+    await noblox.setCookie(process.env.ROBLOSECURITY.trim());
+    return true;
+  } catch {
+    throw new Error('Roblox login failed. Check your .ROBLOSECURITY cookie.');
   }
 }
 
+async function FetchRoles(GroupId) {
+  const roles = await noblox.getRoles(Number(GroupId));
+  const roleMap = {};
+  roles.forEach(r => roleMap[r.name.toLowerCase()] = { Name: r.name, Rank: r.rank, RoleId: r.rank });
+  return roleMap;
+}
+
 async function GetCurrentRank(GroupId, UserId) {
-  const Res = await axiosWithRetry({ method: 'get', url: `https://groups.roblox.com/v2/users/${UserId}/groups/roles` });
-  const Group = Res.data.data.find(g => g.group.id === Number(GroupId));
-  if (!Group) throw new Error('User not in group');
-  return { Rank: Group.role.rank, Name: Group.role.name };
+  const name = await noblox.getRankInGroup(Number(GroupId), Number(UserId));
+  return { Rank: name, Name: (await noblox.getRoles(Number(GroupId))).find(r => r.rank === name).name };
 }
 
 async function GetRobloxUsername(UserId) {
-  const Res = await axiosWithRetry({ method: 'get', url: `https://users.roblox.com/v1/users/${UserId}` });
-  return Res.data.name;
+  return await noblox.getUsernameFromId(Number(UserId));
 }
 
 async function GetRobloxUserId(Username) {
-  const Res = await axiosWithRetry({
-    method: 'post',
-    url: 'https://users.roblox.com/v1/usernames/users',
-    headers: { 'Content-Type': 'application/json' },
-    data: { usernames: [Username] }
-  });
-  if (!Res.data.data || !Res.data.data[0]) throw new Error('Invalid username');
-  return Res.data.data[0].id;
+  return await noblox.getIdFromUsername(Username);
 }
 
 async function GetRobloxDescription(UserId) {
-  const Res = await axiosWithRetry({ method: 'get', url: `https://users.roblox.com/v1/users/${UserId}` });
-  return Res.data.description || '';
+  const info = await noblox.getPlayerInfo(Number(UserId));
+  return info.blurb || '';
 }
 
 async function SendRankLog(GuildId, Client, ActionBy, TargetRobloxId, Action, NewRank) {
   try {
     const Data = await GetJsonBin();
     const LogChannelId = Data.ServerConfig?.[GuildId]?.RankLogChannel || '1424381038393556992';
-    const Guild = await (Client?.guilds ? Client.guilds.fetch(GuildId).catch(() => null) : null);
+    const Guild = Client?.guilds ? await Client.guilds.fetch(GuildId).catch(() => null) : null;
     if (!Guild) return;
     const Channel = Guild.channels.cache.get(LogChannelId) || null;
     if (!Channel || !Channel.isTextBased()) return;
@@ -142,9 +99,11 @@ async function SendRankLog(GuildId, Client, ActionBy, TargetRobloxId, Action, Ne
 }
 
 async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Client = global.ClientBot) {
+  await LoginRoblox();
   const Roles = await FetchRoles(GroupId);
   let RoleInfo = typeof RankOrId === 'number' ? Object.values(Roles).find(r => r.Rank === RankOrId) : Roles[RankOrId.toLowerCase()];
   if (!RoleInfo) throw new Error('Invalid rank specified');
+
   if (!IssuerDiscordId.toUpperCase().includes('SYSTEM')) {
     const DbData = await GetJsonBin();
     const IssuerRobloxId = DbData.VerifiedUsers?.[IssuerDiscordId];
@@ -155,17 +114,8 @@ async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Clie
     if (RoleInfo.Rank >= IssuerRank.Rank) throw new Error('Cannot assign a rank equal or higher than yours');
     if (Target.Rank >= IssuerRank.Rank) throw new Error('Cannot change rank of a user higher or equal to you');
   }
-  const Cookie = await GetRobloxCookie();
-  let Xsrf = await GetXsrfToken();
-  const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
-  try {
-    await axiosWithRetry({ method: 'patch', url: Url, headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, 'Content-Type': 'application/json', 'X-CSRF-TOKEN': Xsrf }, data: { roleId: RoleInfo.RoleId } });
-  } catch (err) {
-    if (err.response?.status === 403 && err.response?.headers['x-csrf-token']) {
-      Xsrf = err.response.headers['x-csrf-token'];
-      await axiosWithRetry({ method: 'patch', url: Url, headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, 'Content-Type': 'application/json', 'X-CSRF-TOKEN': Xsrf }, data: { roleId: RoleInfo.RoleId } });
-    } else throw err;
-  }
+
+  await noblox.setRank(Number(GroupId), Number(UserId), RoleInfo.Rank);
   const Data = await GetJsonBin();
   Data.RankChanges = Data.RankChanges || [];
   Data.RankChanges.push({ GroupId, UserId, NewRank: RoleInfo.Name, IssuedBy: IssuerDiscordId, Timestamp: new Date().toISOString(), GuildId });
@@ -185,17 +135,9 @@ async function SuspendUser(GroupId, UserId, IssuerDiscordId, GuildId, Client = g
   if (TargetRank.Rank >= IssuerRank.Rank) throw new Error('Cannot suspend a user with equal or higher rank.');
   const DurationMs = PredefinedDurations[DurationKey];
   if (DurationMs === undefined) throw new Error('Invalid suspension duration.');
-  const Cookie = await GetRobloxCookie();
-  let Xsrf = await GetXsrfToken();
-  const Url = `https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`;
-  try {
-    await axiosWithRetry({ method: 'patch', url: Url, headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, 'X-CSRF-TOKEN': Xsrf, 'Content-Type': 'application/json' }, data: { roleId: SuspendedRole.RoleId } });
-  } catch (Err) {
-    if (Err.response?.status === 403 && Err.response?.headers['x-csrf-token']) {
-      Xsrf = Err.response.headers['x-csrf-token'];
-      await axiosWithRetry({ method: 'patch', url: Url, headers: { Cookie: `.ROBLOSECURITY=${Cookie}`, 'X-CSRF-TOKEN': Xsrf, 'Content-Type': 'application/json' }, data: { roleId: SuspendedRole.RoleId } });
-    } else throw new Error(Err.response?.data?.errors?.[0]?.message || Err.message);
-  }
+
+  await noblox.setRank(Number(GroupId), Number(UserId), SuspendedRole.Rank);
+
   const Username = await GetRobloxUsername(UserId);
   DbData.Suspensions = DbData.Suspensions || {};
   DbData.Suspensions[UserId] = { Username, IssuedBy: IssuerDiscordId, IssuedAt: Date.now(), EndsAt: Date.now() + DurationMs, GroupId, GuildId, OldRankName: TargetRank.Name, OldRankValue: TargetRank.Rank, Reason, Active: true };
@@ -259,9 +201,8 @@ async function LoadActiveSuspensions(Client = global.ClientBot) {
 module.exports = {
   GetJsonBin,
   SaveJsonBin,
-  GetRobloxCookie,
+  LoginRoblox,
   FetchRoles,
-  GetXsrfToken,
   GetCurrentRank,
   SetRank,
   GetRobloxUserId,
