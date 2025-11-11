@@ -8,7 +8,7 @@ const loaCommand = require('./commands/loa.js');
 const BotToken = process.env.BOT_TOKEN;
 const ClientId = process.env.CLIENT_ID;
 const AdminId = process.env.ADMIN_ID;
-const GuildId = '1386275140815425557';
+const TestGuildId = '1386275140815425557';
 
 const ClientBot = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
@@ -27,36 +27,21 @@ function GetCommandFiles(dir) {
   return files;
 }
 
-const loadedCommands = new Set();
 const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
 for (const file of CommandFiles) {
   try {
     delete require.cache[require.resolve(file)];
     const cmd = require(file);
-    if (cmd && cmd.data && cmd.execute) {
-      if (!loadedCommands.has(cmd.data.name)) {
-        ClientBot.Commands.set(cmd.data.name, cmd);
-        loadedCommands.add(cmd.data.name);
-      }
-    }
-  } catch (err) {
-    console.error(`Failed to load command ${file}:`, err);
-  }
+    if (cmd && cmd.data && cmd.execute) ClientBot.Commands.set(cmd.data.name, cmd);
+  } catch {}
 }
 
 async function RefreshCommands() {
   const rest = new REST({ version: '10' }).setToken(BotToken);
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
-
   try {
-    console.log("Clearing old commands…");
-    await rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: [] });
-
-    console.log("Registering commands…");
-    await rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: payload });
-  } catch (err) {
-    console.error("Error:", err);
-  }
+    await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: payload });
+  } catch {}
 }
 
 global.ClientBot = ClientBot;
@@ -65,6 +50,7 @@ ClientBot.once('ready', async () => {
   ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
   await RefreshCommands();
   StartApi();
+
   loaCommand.StartAutoCheck(ClientBot);
 });
 
