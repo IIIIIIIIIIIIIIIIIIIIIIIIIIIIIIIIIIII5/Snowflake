@@ -27,13 +27,21 @@ function GetCommandFiles(dir) {
   return files;
 }
 
+const loadedCommands = new Set();
 const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
 for (const file of CommandFiles) {
   try {
     delete require.cache[require.resolve(file)];
     const cmd = require(file);
-    if (cmd && cmd.data && cmd.execute) ClientBot.Commands.set(cmd.data.name, cmd);
-  } catch {}
+    if (cmd && cmd.data && cmd.execute) {
+      if (!loadedCommands.has(cmd.data.name)) {
+        ClientBot.Commands.set(cmd.data.name, cmd);
+        loadedCommands.add(cmd.data.name);
+      }
+    }
+  } catch (err) {
+    console.error(`Failed to load command ${file}:`, err);
+  }
 }
 
 async function RefreshCommands() {
@@ -46,8 +54,6 @@ async function RefreshCommands() {
 
     console.log("Registering commands…");
     await rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: payload });
-
-    console.log("Global commands deployed successfully!");
   } catch (err) {
     console.error("Error:", err);
   }
@@ -59,7 +65,6 @@ ClientBot.once('ready', async () => {
   ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
   await RefreshCommands();
   StartApi();
-
   loaCommand.StartAutoCheck(ClientBot);
 });
 
