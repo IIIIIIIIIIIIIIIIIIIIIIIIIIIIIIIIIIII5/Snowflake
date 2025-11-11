@@ -8,7 +8,7 @@ const loaCommand = require('./commands/loa.js');
 const BotToken = process.env.BOT_TOKEN;
 const ClientId = process.env.CLIENT_ID;
 const AdminId = process.env.ADMIN_ID;
-const TestGuildId = '1386275140815425557';
+const GuildId = '1386275140815425557';
 
 const ClientBot = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
@@ -42,10 +42,10 @@ async function RefreshCommands() {
 
   try {
     console.log("Clearing old commands…");
-    await rest.put(Routes.applicationCommands(ClientId), { body: [] });
+    await rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: [] });
 
     console.log("Registering commands…");
-    await rest.put(Routes.applicationCommands(ClientId), { body: payload });
+    await rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: payload });
 
     console.log("Global commands deployed successfully!");
   } catch (err) {
