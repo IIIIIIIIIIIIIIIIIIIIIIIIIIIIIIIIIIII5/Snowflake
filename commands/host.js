@@ -2,7 +2,9 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, SaveJsonBin } = require('../roblox');
 
 const SFPLeadershipRole = '1386369108408406096';
-const allowedRoleId = '1424007337210937445';
+const AllowedRoleId = '1424007337210937445';
+const TrainingChannelId = '1398706795840536696';
+const MentionRoleId = '1404500986633916479';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -13,67 +15,84 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
-    const memberRole = interaction.member.roles.resolve(allowedRoleId);
-    if (!memberRole && !interaction.member.roles.cache.has(SFPLeadershipRole))
-      return interaction.editReply({ content: 'You do not have permission to host a training.' });
 
-    const db = await GetJsonBin();
-    const host = interaction.user;
-    const cohost = interaction.options.getUser('cohost');
-    const supervisor = interaction.options.getUser('supervisor');
+    const Member = interaction.member;
+    const CanHost = Member.roles.cache.has(AllowedRoleId) || Member.roles.cache.has(SFPLeadershipRole);
+    if (!CanHost) return interaction.editReply({ content: 'You do not have permission to host a training.' });
 
-    db.Cooldowns = db.Cooldowns || {};
-    db.Cooldowns[host.id] = db.Cooldowns[host.id] || { dates: {}, lastTimestamp: null };
+    const Db = await GetJsonBin();
+    Db.Cooldowns = Db.Cooldowns || {};
+    Db.Achievements = Db.Achievements || {};
 
-    const isExempt = interaction.member.roles.cache.has(SFPLeadershipRole);
-    const todayKey = new Date().toISOString().slice(0, 10);
-    const userCd = db.Cooldowns[host.id];
-    const usedToday = userCd.dates[todayKey] || 0;
+    const Host = interaction.user;
+    const CoHost = interaction.options.getUser('cohost');
+    const Supervisor = interaction.options.getUser('supervisor');
 
-    if (!isExempt && usedToday >= 2) {
-      return interaction.editReply({
-        content: `You have hosted 2 times today.\nCooldown ends: ${userCd.lastTimestamp || 'N/A'}`
-      });
+    const UserId = Host.id;
+    const Now = new Date();
+    const TodayKey = Now.toISOString().slice(0, 10);
+    const IsLeadership = Member.roles.cache.has(SFPLeadershipRole);
+    const Achievements = Db.Achievements[UserId] || [];
+    const IsCertifiedHost = Achievements.includes('Certified Host');
+
+    if (!IsCertifiedHost && !IsLeadership && !Supervisor) {
+      return interaction.editReply({ content: 'User is not certified to host without a supervisor.' });
     }
 
-    userCd.dates[todayKey] = usedToday + 1;
-    userCd.lastTimestamp = new Date().toLocaleString();
+    Db.Cooldowns[UserId] = Db.Cooldowns[UserId] || { dates: {}, lastTimestamp: null };
+    const UserCd = Db.Cooldowns[UserId];
+    UserCd.dates = UserCd.dates || {};
 
-    const channelId = '1398706795840536696';
-    const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
-    if (!channel) return interaction.editReply({ content: 'Channel not found.' });
+    const LastTimestamp = UserCd.lastTimestamp ? new Date(UserCd.lastTimestamp) : null;
+    const HoursSinceLast = LastTimestamp ? (Now - LastTimestamp) / (1000 * 60 * 60) : Infinity;
 
-    const embed = new EmbedBuilder()
+    if (HoursSinceLast >= 24) UserCd.dates = {};
+
+    const UsedToday = UserCd.dates[TodayKey] || 0;
+
+    if (!IsLeadership && UsedToday >= 2) {
+      const NextReset = 24 - Math.floor(HoursSinceLast > 0 && HoursSinceLast < 24 ? HoursSinceLast : 0);
+      return interaction.editReply({ content: `You have hosted 2 trainings today.\nCooldown resets in: ${NextReset}h` });
+    }
+
+    UserCd.dates[TodayKey] = UsedToday + 1;
+    UserCd.lastTimestamp = Now.toISOString();
+
+    const Channel = await interaction.guild.channels.fetch(TrainingChannelId).catch(() => null);
+    if (!Channel) return interaction.editReply({ content: 'Training channel not found.' });
+
+    const Embed = new EmbedBuilder()
       .setColor(0x3498db)
       .setTitle('A TRAINING IS BEING HOSTED')
       .setDescription(
-        `Host: <@${host.id}>\n` +
-        `Co-Host: ${cohost ? `<@${cohost.id}>` : 'None'}\n` +
-        `Supervisor: ${supervisor ? `<@${supervisor.id}>` : 'None'}\n` +
+        `Host: <@${Host.id}>\n` +
+        `Co-Host: ${CoHost ? `<@${CoHost.id}>` : 'None'}\n` +
+        `Supervisor: ${Supervisor ? `<@${Supervisor.id}>` : 'None'}\n\n` +
         `[Join Here](https://www.roblox.com/games/15542502077/RELEASE-Roblox-Correctional-Facility)`
-      );
+      )
+      .setTimestamp();
 
-    await channel.send({ content: '<@&1404500986633916479>', embeds: [embed] });
+    await Channel.send({ content: `<@&${MentionRoleId}>`, embeds: [Embed] });
 
-    const monthKey = new Date().toISOString().slice(0, 7);
-    const addTraining = (id, type) => {
-      db.Trainings = db.Trainings || {};
-      db.Trainings[id] = db.Trainings[id] || { hosted: {}, cohosted: {}, supervised: {} };
-      const section = db.Trainings[id][type];
-      if (section.lastMonth !== monthKey) {
-        section[monthKey] = 0;
-        section.lastMonth = monthKey;
+    const MonthKey = Now.toISOString().slice(0, 7);
+    const AddTraining = (Id, Type) => {
+      Db.Trainings = Db.Trainings || {};
+      Db.Trainings[Id] = Db.Trainings[Id] || { hosted: {}, cohosted: {}, supervised: {} };
+      const Section = Db.Trainings[Id][Type];
+      if (Section.lastMonth !== MonthKey) {
+        Section[MonthKey] = 0;
+        Section.lastMonth = MonthKey;
       }
-      section[monthKey] = (section[monthKey] || 0) + 1;
-      section.total = (section.total || 0) + 1;
+      Section[MonthKey] = (Section[MonthKey] || 0) + 1;
+      Section.total = (Section.total || 0) + 1;
     };
 
-    addTraining(host.id, 'hosted');
-    if (cohost) addTraining(cohost.id, 'cohosted');
-    if (supervisor) addTraining(supervisor.id, 'supervised');
+    AddTraining(Host.id, 'hosted');
+    if (CoHost) AddTraining(CoHost.id, 'cohosted');
+    if (Supervisor) AddTraining(Supervisor.id, 'supervised');
 
-    await SaveJsonBin(db);
+    await SaveJsonBin(Db);
 
-    return interaction.editReply({ content: `Training announcement sent to ${channel.name}.` });
+    return interaction.editReply({ content: `Training announcement sent to ${Channel.name}.` });
   }
 };
