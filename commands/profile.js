@@ -81,7 +81,7 @@ module.exports = {
 
     if (robloxId) {
       try {
-        const name = await GetRobloxUserInfo(robloxId);
+        const name = await GetRobloxUsername(robloxId);
         username = name || "Unknown User";
 
         const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=420x420&format=Png&isCircular=false`);
