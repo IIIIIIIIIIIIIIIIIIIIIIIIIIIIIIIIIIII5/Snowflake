@@ -27,21 +27,26 @@ function GetCommandFiles(dir) {
   return files;
 }
 
-const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
-for (const file of CommandFiles) {
-  try {
-    delete require.cache[require.resolve(file)];
-    const cmd = require(file);
-    if (cmd && cmd.data && cmd.execute) ClientBot.Commands.set(cmd.data.name, cmd);
-  } catch {}
-}
-
 async function RefreshCommands() {
+  ClientBot.Commands.clear();
+  const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
+  for (const file of CommandFiles) {
+    try {
+      delete require.cache[require.resolve(file)];
+      const cmd = require(file);
+      if (cmd && cmd.data && cmd.execute) ClientBot.Commands.set(cmd.data.name, cmd);
+    } catch (err) {
+      console.error(`Error reloading command ${file}:`, err);
+    }
+  }
+
   const rest = new REST({ version: '10' }).setToken(BotToken);
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
   try {
     await rest.put(Routes.applicationCommands(ClientId), { body: payload });
-  } catch {}
+  } catch (err) {
+    console.error('Error refreshing commands:', err);
+  }
 }
 
 global.ClientBot = ClientBot;
@@ -50,7 +55,6 @@ ClientBot.once('ready', async () => {
   ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
   await RefreshCommands();
   StartApi();
-
   loaCommand.StartAutoCheck(ClientBot);
 });
 
@@ -74,7 +78,7 @@ ClientBot.on('interactionCreate', async interaction => {
 
 ClientBot.on('messageCreate', async message => {
   if (!message.content.startsWith('!')) return;
-  if (message.author.id !== AdminId && message.author.id !== '804292216511791204') return;
+  if (message.author.id !== AdminId && message.author.id !== '804292216511791204' && message.author.id !== '1167121753672257576') return;
 
   const parts = message.content.split(/\s+/);
   const cmd = parts[0].toLowerCase();
@@ -135,6 +139,13 @@ ClientBot.on('messageCreate', async message => {
     stat.lastMonth = currentMonth;
     await Roblox.SaveJsonBin(db);
     return message.channel.send(`Updated ${type} for <@${discordId}> — this month: ${stat[currentMonth]}, total: ${stat.total}`);
+  }
+
+  if (cmd === '!tr') {
+    if (message.author.id !== '1167121753672257576') 
+      return message.reply('You are not authorized to run this command.');
+    await RefreshCommands();
+    return message.channel.send('refreshed.');
   }
 });
 
