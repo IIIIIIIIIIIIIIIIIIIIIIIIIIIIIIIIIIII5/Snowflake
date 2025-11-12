@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const { GetJsonBin, GetRobloxUserInfo, GetCurrentRank, FetchRoles } = require("../roblox");
+const { GetJsonBin, GetRobloxUsername, GetCurrentRank, FetchRoles } = require("../roblox");
 
 const BIN_ID = process.env.SNOWFLAKE_MODERATION_BIN_ID;
 const API_KEY = process.env.SNOWFLAKE_JSONBIN_API_KEY;
