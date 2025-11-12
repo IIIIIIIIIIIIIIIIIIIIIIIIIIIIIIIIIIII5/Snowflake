@@ -12,44 +12,42 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    const target = interaction.options.getUser('user') || interaction.user;
-    const member = interaction.guild.members.cache.get(target.id);
+    const Target = interaction.options.getUser('user') || interaction.user;
+    const Member = interaction.guild.members.cache.get(Target.id);
+    const UserId = Target.id;
+    const Db = await GetJsonBin();
+    Db.Cooldowns = Db.Cooldowns || {};
 
-    const db = await GetJsonBin();
-    db.Cooldowns = db.Cooldowns || {};
-
-    if (member && member.roles.cache.has(SFPLeadershipRole)) {
+    if (Member && Member.roles.cache.has(SFPLeadershipRole)) {
       return interaction.editReply({
         content: `Cooldown resets in: N/A\nTrainings left until cooldown: N/A`
       });
     }
 
-    const userId = target.id;
-    const cd = db.Cooldowns[userId];
-
-    if (!cd || !cd.lastTimestamp) {
+    const Cd = Db.Cooldowns[UserId];
+    if (!Cd || !Cd.lastTimestamp) {
       return interaction.editReply({
-        content: `Cooldown resets in: N/A\nTrainings left until cooldown: 2/2`
+        content: `Cooldown resets in: Ready now!\nTrainings left until cooldown: 0/2`
       });
     }
 
-    const now = new Date();
-    const last = new Date(cd.lastTimestamp);
-    const difference = (now - last) / (1000 * 60 * 60);
+    const Now = new Date();
+    const LastTimestamp = new Date(Cd.lastTimestamp);
+    const HoursSinceLast = (Now - LastTimestamp) / (1000 * 60 * 60);
+    const TodayKey = Now.toISOString().slice(0, 10);
+    const UsedToday = Cd.dates?.[TodayKey] || 0;
 
-    if (difference >= 24) {
+    if (HoursSinceLast >= 24) {
       return interaction.editReply({
-        content: `Cooldown resets in: Ready now!\nTrainings left until cooldown: 2/2`
+        content: `Cooldown resets in: Ready now!\nTrainings left until cooldown: 0/2`
       });
     }
 
-    const remaining = 24 - Math.floor(difference);
-    const todayKey = new Date().toISOString().slice(0, 10);
-    const usedToday = cd.dates?.[todayKey] || 0;
-    const trainingsLeft = 2 - usedToday;
+    const RemainingHours = Math.max(0, Math.floor(24 - HoursSinceLast));
+    const TrainingsLeft = `${UsedToday}/2`;
 
     return interaction.editReply({
-      content: `Cooldown resets in: ${remaining}h\nTrainings left until cooldown: ${trainingsLeft}/2`
+      content: `Cooldown resets in: ${RemainingHours}h\nTrainings left until cooldown: ${TrainingsLeft}`
     });
   }
 };
