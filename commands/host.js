@@ -22,7 +22,7 @@ module.exports = {
 
     const Db = await GetJsonBin();
     Db.Cooldowns = Db.Cooldowns || {};
-    Db.Achievements = Db.Achievements || {};
+    Db.Certifications = Db.Certifications || {};
 
     const Host = interaction.user;
     const CoHost = interaction.options.getUser('cohost');
@@ -32,8 +32,8 @@ module.exports = {
     const Now = new Date();
     const TodayKey = Now.toISOString().slice(0, 10);
     const IsLeadership = Member.roles.cache.has(SFPLeadershipRole);
-    const Achievements = Db.Achievements[UserId] || [];
-    const IsCertifiedHost = Achievements.includes('Certified Host');
+    const Certifications = Db.Certifications[UserId] || [];
+    const IsCertifiedHost = Certifications.includes('Certified Host');
 
     if (!IsCertifiedHost && !IsLeadership && !Supervisor) {
       return interaction.editReply({ content: 'User is not certified to host without a supervisor.' });
