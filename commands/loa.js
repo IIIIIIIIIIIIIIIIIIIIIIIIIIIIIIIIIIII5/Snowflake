@@ -54,17 +54,24 @@ module.exports = {
 
             await Member.roles.add(LoARoleId).catch(() => {});
 
-            const embed = new EmbedBuilder()
+            const DMEmbed = new EmbedBuilder()
                 .setTitle('Leave of Absence Issued')
                 .setColor(0xff9900)
                 .setDescription(`Dear <@${Member.id}>,\n\nYou have been put on Leave of Absence starting from **${StartDateStr}** and it shall end on **${EndDateStr}**.\nReason: ${Reason}`);
+            try { await Member.send({ embeds: [DMEmbed] }); } catch {}
 
-            try { await Member.send({ embeds: [embed] }); } catch {}
-
+            const LogEmbed = new EmbedBuilder()
+                .setTitle('Leave of Absence Issued')
+                .setColor(0xff9900)
+                .setDescription(`A LoA has been issued for <@${Member.id}>.`)
+                .addFields(
+                    { name: 'Start Date', value: StartDateStr, inline: true },
+                    { name: 'End Date', value: EndDateStr, inline: true },
+                    { name: 'Reason', value: Reason, inline: false },
+                    { name: 'Issued by', value: `<@${interaction.user.id}>`, inline: true }
+                );
             const LogChannel = await interaction.guild.channels.fetch(LogChannelId);
-            if (LogChannel?.isTextBased()) {
-                LogChannel.send({ embeds: [embed] });
-            }
+            if (LogChannel?.isTextBased()) LogChannel.send({ embeds: [LogEmbed] });
 
             await interaction.editReply({ content: `Successfully issued LoA for <@${Member.id}>.` });
 
@@ -91,17 +98,18 @@ module.exports = {
                         if (Member) {
                             await Member.roles.remove(LoARoleId).catch(() => {});
 
-                            const embed = new EmbedBuilder()
+                            const DMEmbed = new EmbedBuilder()
                                 .setTitle('Leave of Absence Ended')
                                 .setColor(0x00ff00)
                                 .setDescription(`Dear <@${Member.id}>,\n\nYour Leave of Absence which was issued on ${new Date(LoA.StartDate).toLocaleDateString()} has come to an end. You may resume your normal duties starting from today.`);
+                            try { await Member.send({ embeds: [DMEmbed] }); } catch {}
 
-                            try { await Member.send({ embeds: [embed] }); } catch {}
-
+                            const LogEmbed = new EmbedBuilder()
+                                .setTitle('Leave of Absence Ended')
+                                .setColor(0x00ff00)
+                                .setDescription(`<@${Member.id}>'s Leave of Absence which was issued on ${new Date(LoA.StartDate).toLocaleDateString()} has ended.`);
                             const LogChannel = await Guild.channels.fetch(LogChannelId);
-                            if (LogChannel?.isTextBased()) {
-                                LogChannel.send({ embeds: [embed] });
-                            }
+                            if (LogChannel?.isTextBased()) LogChannel.send({ embeds: [LogEmbed] });
                         }
                     } catch {}
 
