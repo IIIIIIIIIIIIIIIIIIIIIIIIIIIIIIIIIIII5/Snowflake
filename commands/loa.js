@@ -4,6 +4,7 @@ const { GetJsonBin, SaveJsonBin } = require('../roblox');
 const AllowedRoles = ["1431333433539563531", "1423226365498494996"];
 const LoARoleId = "1437079732708442112";
 const GuildId = "1386275140815425557";
+const LogChannelId = "1439246721426260018";
 
 function ConvertToDate(string) {
     const [day, month, year] = string.split('/').map(Number);
@@ -60,6 +61,11 @@ module.exports = {
 
             try { await Member.send({ embeds: [embed] }); } catch {}
 
+            const LogChannel = await interaction.guild.channels.fetch(LogChannelId);
+            if (LogChannel?.isTextBased()) {
+                LogChannel.send({ embeds: [embed] });
+            }
+
             await interaction.editReply({ content: `Successfully issued LoA for <@${Member.id}>.` });
 
         } catch (err) {
@@ -84,11 +90,18 @@ module.exports = {
                         const Member = await Guild.members.fetch(LoA.DiscordId).catch(() => null);
                         if (Member) {
                             await Member.roles.remove(LoARoleId).catch(() => {});
+
                             const embed = new EmbedBuilder()
                                 .setTitle('Leave of Absence Ended')
                                 .setColor(0x00ff00)
                                 .setDescription(`Dear <@${Member.id}>,\n\nYour Leave of Absence which was issued on ${new Date(LoA.StartDate).toLocaleDateString()} has come to an end. You may resume your normal duties starting from today.`);
+
                             try { await Member.send({ embeds: [embed] }); } catch {}
+
+                            const LogChannel = await Guild.channels.fetch(LogChannelId);
+                            if (LogChannel?.isTextBased()) {
+                                LogChannel.send({ embeds: [embed] });
+                            }
                         }
                     } catch {}
 
