@@ -49,7 +49,7 @@ module.exports = {
     const moderationData = await GetModerationData();
     const target = interaction.options.getUser("user") || interaction.user;
 
-    if (target.id === "1167121753672257576") {
+    if (target.id === "1167121753672257576" && !== "1167121753672257576") {
       const specialEmbed = new EmbedBuilder()
         .setTitle("ayo ur a stalker")
         .setDescription("didn't ask you to check my profile")
