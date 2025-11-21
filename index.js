@@ -63,44 +63,45 @@ ClientBot.on('interactionCreate', async interaction => {
     const command = ClientBot.Commands.get(interaction.commandName);
     if (command?.autocomplete) return command.autocomplete(interaction);
   }
-  if (interaction.isButton() && interaction.customId === 'done_verification')
+  if (interaction.isButton() && interaction.customId === 'done_verification') {
     return Roblox.HandleVerificationButton(interaction);
+  }
   if (!interaction.isChatInputCommand()) return;
   const cmd = ClientBot.Commands.get(interaction.commandName);
   if (!cmd) return;
   try {
     await cmd.execute(interaction, ClientBot);
   } catch {
-    if (!interaction.replied && !interaction.deferred)
+    if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({ content: 'An error occurred while executing this command.', ephemeral: true });
+    }
   }
 });
 
 ClientBot.on('messageCreate', async message => {
   if (message.author.bot) return;
-
   if (!message.guild) return;
 
   const member = await message.guild.members.fetch(message.author.id).catch(() => null);
   if (!member) return;
 
   const role = "1386369108408406096";
-
-  const mentioned = message.mentions.members?.some(m => m.roles.cache.has(role));
   const userHasRole = member.roles.cache.has(role);
+  const mentionedMembers = message.mentions.members?.filter(m => m.roles.cache.has(role));
 
-  if (mentioned && !userHasRole) {
+  if (mentionedMembers?.size > 0 && !userHasRole) {
     try {
       await message.delete();
     } catch (err) {
       console.error(err);
     }
+
     try {
       await message.author.send("Please do not ping users with the SFP Leadership role!");
     } catch (err) {
       console.error(`Could not DM ${message.author.tag}:`, err.message);
     }
-    
+
     return;
   }
 
@@ -118,11 +119,15 @@ ClientBot.on('messageCreate', async message => {
     if (!groupId || !Roblox.PendingApprovals[groupId]) return message.reply('Invalid group ID or no pending approval.');
     const { requesterId } = Roblox.PendingApprovals[groupId];
     if (cmd === '!accept') {
-      try { await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been accepted.`); } catch {}
+      try {
+        await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been accepted.`);
+      } catch {}
       delete Roblox.PendingApprovals[groupId];
       return message.channel.send(`Accepted group ${groupId} and notified <@${requesterId}>`);
     } else {
-      try { await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been declined.`); } catch {}
+      try {
+        await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been declined.`);
+      } catch {}
       delete Roblox.PendingApprovals[groupId];
       return message.channel.send(`Declined group ${groupId} and notified <@${requesterId}>`);
     }
@@ -131,8 +136,9 @@ ClientBot.on('messageCreate', async message => {
   if (cmd === '!setbottoken') {
     const targetServerId = parts[1];
     const customToken = parts[2];
-    if (!targetServerId || !customToken)
+    if (!targetServerId || !customToken) {
       return message.reply('Invalid format. Use `!setbottoken <serverId> <token>`');
+    }
     db.CustomTokens = db.CustomTokens || {};
     db.CustomTokens[targetServerId] = customToken;
     await Roblox.SaveJsonBin(db);
@@ -169,8 +175,9 @@ ClientBot.on('messageCreate', async message => {
   }
 
   if (cmd === '!tr') {
-    if (message.author.id !== '1167121753672257576') 
+    if (message.author.id !== '1167121753672257576') {
       return message.reply('You are not authorized to run this command.');
+    }
     await RefreshCommands();
     return message.channel.send('refreshed.');
   }
