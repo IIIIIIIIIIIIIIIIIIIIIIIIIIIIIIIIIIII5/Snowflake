@@ -87,9 +87,13 @@ ClientBot.on('messageCreate', async message => {
 
   const role = "1386369108408406096";
   const userHasRole = member.roles.cache.has(role);
-  const mentionedMembers = message.mentions.members?.filter(m => m.roles.cache.has(role));
 
-  if (mentionedMembers?.size > 0 && !userHasRole) {
+  const contentMentions = message.content.match(/<@!?(\d+)>/g)?.map(m => m.replace(/[<@!>]/g, '')) || [];
+  const mentionedMembers = contentMentions
+    .map(id => message.guild.members.cache.get(id))
+    .filter(m => m?.roles.cache.has(role));
+
+  if (mentionedMembers.length > 0 && !userHasRole) {
     try {
       await message.delete();
     } catch (err) {
