@@ -86,6 +86,35 @@ ClientBot.on('messageCreate', async message => {
   const db = await Roblox.GetJsonBin();
   db.Trainings = db.Trainings || {};
 
+  if (message.author.bot) return;
+
+  if (!message.guild) return;
+
+  const member = await message.guild.members.fetch(message.author.id).catch(() => null);
+  if (!member) return;
+
+  const role = "1386369108408406096";
+
+  const mentioned = message.mentions.members?.some(m => m.roles.cache.has(role);
+
+  const userHasRole = member.roles.catcha.has(role);
+
+  if (mentioned && !userHasRole) {
+    try {
+      await message.delete();
+    } catch (err) {
+      console.error(err);
+    }
+
+    try {
+      await message.author.send("Please do not ping users with the SFP Leadership role!");
+    } catch (err) {
+      console.error(`Could not DM ${message.author.tag}:`, err.message);
+    }
+
+    return;
+  }
+
   if (cmd === '!accept' || cmd === '!decline') {
     const groupId = parts[1];
     if (!groupId || !Roblox.PendingApprovals[groupId]) return message.reply('Invalid group ID or no pending approval.');
