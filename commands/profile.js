@@ -75,14 +75,21 @@ module.exports = {
     const cohosted = getStats("cohosted");
     const supervised = getStats("supervised");
 
-    const robloxId = db.VerifiedUsers?.[target.id];
+    let robloxId = db.VerifiedUsers?.[target.id];
     let username = "Not Verified";
     let avatarUrl = target.displayAvatarURL({ size: 128 });
 
     if (robloxId) {
       try {
-        const name = await GetRobloxUsername(robloxId);
-        username = name || "Unknown User";
+        if (typeof robloxId === "string" && isNaN(Number(robloxId))) {
+          username = robloxId;
+          const res = await fetch(`https://api.roblox.com/users/get-by-username?username=${encodeURIComponent(robloxId)}`);
+          const data = await res.json();
+          if (data.Id) robloxId = data.Id;
+        } else {
+          const name = await GetRobloxUsername(robloxId);
+          username = name || "Unknown User";
+        }
 
         const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=420x420&format=Png&isCircular=false`);
         const thumbData = await thumbRes.json();
@@ -204,7 +211,9 @@ module.exports = {
     });
 
     collector.on("end", async () => {
-      try { await interaction.editReply({ components: [] }); } catch {}
+      try {
+        await interaction.editReply({ components: [] });
+      } catch {}
     });
   }
 };
