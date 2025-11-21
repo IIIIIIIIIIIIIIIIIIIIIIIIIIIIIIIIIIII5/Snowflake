@@ -77,15 +77,6 @@ ClientBot.on('interactionCreate', async interaction => {
 });
 
 ClientBot.on('messageCreate', async message => {
-  if (!message.content.startsWith('!')) return;
-  if (message.author.id !== AdminId && message.author.id !== '804292216511791204' && message.author.id !== '1167121753672257576') return;
-
-  const parts = message.content.split(/\s+/);
-  const cmd = parts[0].toLowerCase();
-
-  const db = await Roblox.GetJsonBin();
-  db.Trainings = db.Trainings || {};
-
   if (message.author.bot) return;
 
   if (!message.guild) return;
@@ -95,9 +86,8 @@ ClientBot.on('messageCreate', async message => {
 
   const role = "1386369108408406096";
 
-  const mentioned = message.mentions.members?.some(m => m.roles.cache.has(role);
-
-  const userHasRole = member.roles.catcha.has(role);
+  const mentioned = message.mentions.members?.some(m => m.roles.cache.has(role));
+  const userHasRole = member.roles.cache.has(role);
 
   if (mentioned && !userHasRole) {
     try {
@@ -105,15 +95,23 @@ ClientBot.on('messageCreate', async message => {
     } catch (err) {
       console.error(err);
     }
-
     try {
       await message.author.send("Please do not ping users with the SFP Leadership role!");
     } catch (err) {
       console.error(`Could not DM ${message.author.tag}:`, err.message);
     }
-
+    
     return;
   }
+
+  if (!message.content.startsWith('!')) return;
+  if (message.author.id !== AdminId && message.author.id !== '804292216511791204' && message.author.id !== '1167121753672257576') return;
+
+  const parts = message.content.split(/\s+/);
+  const cmd = parts[0].toLowerCase();
+
+  const db = await Roblox.GetJsonBin();
+  db.Trainings = db.Trainings || {};
 
   if (cmd === '!accept' || cmd === '!decline') {
     const groupId = parts[1];
