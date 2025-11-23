@@ -94,9 +94,9 @@ module.exports = {
       }
 
       const dmEmbed = new EmbedBuilder()
-        .setTitle("You Have Been Terminated")
+        .setTitle("You have been Terminated")
         .setDescription(
-          `You have been terminated from your position **${current.Name}** for the reason of:**${reason}**\n\nYou have been ranked to **Superintendent**.`
+          `You have been terminated from your position **${current.Name}** for the reason of:**${reason}**\n\nYou have been ranked to **${chosenRole}**.`
         )
         .setColor("Red");
 
