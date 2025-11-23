@@ -1,15 +1,32 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, GetRobloxUserId, GetCurrentRank, FetchRoles, SetRank, SendRankLog, loginRoblox } = require('../roblox');
 
-const WhitelistedRoles = ["1386369108408406096", "1405917224430080001", "1431333433539563531", "1418979785165766717"];
+const WhitelistedRoles = ["1386369108408406096", "1405917224430080001", "1431333433539563531"];
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('fire')
     .setDescription('Fire a user from the group')
-    .addStringOption(o => o.setName('user').setDescription('Roblox username').setRequired(true))
-    .addStringOption(o => o.setName('reason').setDescription('Reason for termination').setRequired(true))
-    .addStringOption(o => o.setName('new_rank').setDescription('New rank after firing').setRequired(true)),
+    .addStringOption(o =>
+      o.setName('user')
+        .setDescription('Roblox username')
+        .setRequired(true)
+    )
+    .addStringOption(o =>
+      o.setName('discord_id')
+        .setDescription('Discord ID of the user being fired')
+        .setRequired(true)
+    )
+    .addStringOption(o =>
+      o.setName('reason')
+        .setDescription('Reason for termination')
+        .setRequired(true)
+    )
+    .addStringOption(o =>
+      o.setName('new_rank')
+        .setDescription('New rank after firing')
+        .setRequired(true)
+    ),
 
   async execute(interaction) {
     if (!interaction.member.roles.cache.some(r => WhitelistedRoles.includes(r.id)))
@@ -24,9 +41,12 @@ module.exports = {
       return interaction.editReply({ content: 'Group ID not set. Run /config first.' });
 
     const groupId = db.ServerConfig[guildId].GroupId;
+
     const username = interaction.options.getString('user');
+    const discordId = interaction.options.getString('discord_id');
     const reason = interaction.options.getString('reason');
     const newRankReq = interaction.options.getString('new_rank');
+
     const userId = await GetRobloxUserId(username);
 
     try {
@@ -45,28 +65,36 @@ module.exports = {
         "Inspector",
         "Deputy Superintendent",
         "Superintendent"
-      ].map(r => r.toLowerCase());
+      ].map(n => n.toLowerCase());
 
       const filtered = allRoles.filter(r => validNames.includes(r.Name.toLowerCase()));
       const chosenRole = filtered.find(r => r.Name.toLowerCase() === newRankReq.toLowerCase());
       if (!chosenRole) throw new Error("Rank not found.");
 
       await SetRank(groupId, userId, chosenRole.Name, interaction.user.id, guildId);
-      await SendRankLog(guildId, interaction.client, interaction.user.id, userId, "Fire", chosenRole.Name, reason);
+
+      const logChannel = interaction.guild.channels.cache.get("1435157510930698300");
+      if (logChannel) {
+        logChannel.send({
+          content: `${username} has been fired by <@${interaction.user.id}> from ${current.Name} for the reason (${reason}).`
+        }).catch(() => {});
+      }
 
       const dmEmbed = new EmbedBuilder()
         .setTitle("You Have Been Terminated")
         .setDescription(
-          `<@${interaction.user.id}>,\n\nYou have been terminated from your position **${current.Name}** for the reason:\n**${reason}**\n\nYou have been ranked to **Superintendent**.`
+          `You have been terminated from your position **${current.Name}** for the reason:\n**${reason}**\n\nYou have been ranked to **Superintendent**.`
         )
         .setColor("Red");
 
       try {
-        const dUser = await interaction.client.users.fetch(interaction.user.id);
-        await dUser.send({ embeds: [dmEmbed] });
+        const targetUser = await interaction.client.users.fetch(discordId);
+        await targetUser.send({ embeds: [dmEmbed] });
       } catch {}
 
-      return interaction.editReply({ content: `${username} has been fired by <@${interaction.user.id}> from ${current.Name} for the reason (${reason}).` });
+      return interaction.editReply({
+        content: `${username} has been fired and ranked to ${chosenRole.Name}.`
+      });
 
     } catch (err) {
       return interaction.editReply({ content: `Error: ${err.message}` });
