@@ -26,6 +26,19 @@ module.exports = {
       o.setName('new_rank')
         .setDescription('New rank after firing')
         .setRequired(true)
+        .addChoices(
+          { name: 'Inmate', value: 'Inmate' },
+          { name: 'Suspended', value: 'Suspended' },
+          { name: 'Respected Inmate', value: 'Respected Inmate' },
+          { name: 'Cadet Officer', value: 'Cadet Officer' },
+          { name: 'Correctional Officer', value: 'Correctional Officer' },
+          { name: 'Infirmary Staff', value: 'Infirmary Staff' },
+          { name: 'Emergency Response Team', value: 'Emergency Response Team' },
+          { name: 'Commander', value: 'Commander' },
+          { name: 'Inspector', value: 'Inspector' },
+          { name: 'Deputy Superintendent', value: 'Deputy Superintendent' },
+          { name: 'Superintendent', value: 'Superintendent' }
+        )
     ),
 
   async execute(interaction) {
