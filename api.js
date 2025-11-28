@@ -15,8 +15,8 @@ function CheckAuth(Req, Res, Next) {
 
 App.post('/api/verify', CheckAuth, async (Req, Res) => {
     try {
-        const { DiscordId, RobloxUsername, Code } = Req.body;
-        if (!DiscordId || !RobloxUsername || !Code) 
+        const { DiscordId, RobloxUsername } = Req.body;
+        if (!DiscordId || !RobloxUsername) 
             return Res.status(400).json({ error: 'Missing fields' });
 
         const RobloxId = await Roblox.GetRobloxUserId(RobloxUsername);
