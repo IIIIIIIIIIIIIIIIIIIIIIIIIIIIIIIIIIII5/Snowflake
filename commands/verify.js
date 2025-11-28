@@ -1,43 +1,44 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const crypto = require('crypto');
-const { GetRobloxUserId, StartVerification, HandleVerificationButton, GetJsonBin } = require('../roblox');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('verify')
-    .setDescription('Verify your Roblox account')
-    .addStringOption(opt => opt.setName('username').setDescription('Your Roblox username').setRequired(true)),
+    .setDescription('Verify your Roblox account via OAuth'),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    const db = await GetJsonBin();
-    if (db.VerifiedUsers?.[interaction.user.id]) {
-      return interaction.editReply(
-        "You're already verified. If you want to switch accounts, use `/reverify`."
-      );
-    }
+    const state = crypto.randomBytes(16).toString('hex');
 
-    try {
-      const username = interaction.options.getString('username');
-      const userId = await GetRobloxUserId(username);
+    await fetch(`${process.env.WORKER_BASE_URL}/store-state`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        state,
+        discordId: interaction.user.id,
+        secret: process.env.WORKER_SHARED_SECRET
+      })
+    });
 
-      const code = 'VERIFY-' + crypto.randomBytes(3).toString('hex').toUpperCase();
-      StartVerification(interaction.user.id, userId, code);
+    const url =
+      `https://apis.roblox.com/oauth/v1/authorize?` +
+      `client_id=${process.env.ROBLOX_CLIENT_ID}` +
+      `&redirect_uri=${encodeURIComponent(process.env.REDIRECT_URI)}` +
+      `&scope=openid+profile` +
+      `&response_type=code` +
+      `&state=${state}`;
 
-      const button = new ButtonBuilder()
-        .setCustomId('done_verification')
-        .setLabel('Done')
-        .setStyle(ButtonStyle.Primary);
-      const row = new ActionRowBuilder().addComponents(button);
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel("Verify via Roblox")
+        .setStyle(ButtonStyle.Link)
+        .setURL(url)
+    );
 
-      await interaction.editReply({
-        content: `Put this code in your Roblox profile description:\n\`${code}\`\nThen click the Done button when finished.`,
-        components: [row]
-      });
-    } catch (err) {
-      console.error('Verify command error:', err);
-      return interaction.editReply({ content: 'Could not verify that Roblox username. Make sure it is valid.' });
-    }
+    return interaction.editReply({
+      content: "Click the button below to verify your Roblox account via OAuth:",
+      components: [row]
+    });
   }
 };
