@@ -1,6 +1,5 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const Crypto = require('crypto');
-const { GetJsonBin, SaveJsonBin } = require('../roblox');
 
 async function CreateOAuthState(DiscordId) {
     const State = Crypto.randomBytes(16).toString('hex');
@@ -45,12 +44,3 @@ module.exports = {
         });
     }
 };
-
-async function FinalizeVerification(DiscordId, RobloxId, RobloxName) {
-    const Db = await GetJsonBin();
-    Db.VerifiedUsers = Db.VerifiedUsers || {};
-    Db.VerifiedUsers[DiscordId] = { RobloxId, RobloxName };
-    await SaveJsonBin(Db);
-}
-
-module.exports.FinalizeVerification = FinalizeVerification;
