@@ -1,43 +1,44 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const crypto = require('crypto');
-const { GetRobloxUserId, StartVerification, GetJsonBin, SaveJsonBin } = require('../roblox');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('reverify')
-    .setDescription('Switch your linked Roblox account')
-    .addStringOption(opt => opt.setName('username').setDescription('Your new Roblox username').setRequired(true)),
+    .setDescription('Switch your linked Roblox account'),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    try {
-      const username = interaction.options.getString('username');
-      const userId = await GetRobloxUserId(username);
+    const state = crypto.randomBytes(16).toString("hex");
 
-      const db = await GetJsonBin();
-      db.VerifiedUsers = db.VerifiedUsers || {}
-      if (db.VerifiedUsers[interaction.user.id]) {
-        delete db.VerifiedUsers[interaction.user.id];
-        await SaveJsonBin(db);
-      }
+    await fetch(`${process.env.WORKER_BASE_URL}/store-state`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        state,
+        discordId: interaction.user.id,
+        secret: process.env.WORKER_SHARED_SECRET
+      })
+    });
 
-      const code = 'VERIFY-' + crypto.randomBytes(3).toString('hex').toUpperCase();
-      StartVerification(interaction.user.id, userId, code);
+    const url =
+      `https://apis.roblox.com/oauth/v1/authorize?` +
+      `client_id=${process.env.ROBLOX_CLIENT_ID}` +
+      `&redirect_uri=${encodeURIComponent(process.env.REDIRECT_URI)}` +
+      `&scope=openid+profile` +
+      `&response_type=code` +
+      `&state=${state}`;
 
-      const button = new ButtonBuilder()
-        .setCustomId('done_verification')
-        .setLabel('Done')
-        .setStyle(ButtonStyle.Primary);
-      const row = new ActionRowBuilder().addComponents(button);
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel("Reverify via Roblox")
+        .setStyle(ButtonStyle.Link)
+        .setURL(url)
+    );
 
-      await interaction.editReply({
-        content: `Switching verification! Put this code in your Roblox profile description:\n\`${code}\`\nThen click the Done button when finished.`,
-        components: [row]
-      });
-    } catch (err) {
-      console.error('Reverify command error:', err);
-      return interaction.editReply({ content: 'Could not switch verification. Make sure the Roblox username is valid.' });
-    }
+    return interaction.editReply({
+      content: "Click the button below to switch your linked Roblox account via OAuth:",
+      components: [row]
+    });
   }
 };
