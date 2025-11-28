@@ -1,6 +1,6 @@
 const Express = require('express');
 const Roblox = require('./roblox');
-const { FinalizeVerification } = require('./commands/verify');
+const VerifyCommand = require('./commands/verify');
 
 const App = Express();
 App.use(Express.json());
@@ -21,9 +21,9 @@ App.post('/api/verify', CheckAuth, async (Req, Res) => {
 
         const RobloxId = await Roblox.GetRobloxUserId(RobloxUsername);
 
-        await FinalizeVerification(DiscordId, RobloxId, RobloxUsername);
+        await VerifyCommand.FinalizeVerification(DiscordId, RobloxId, RobloxUsername);
 
-        return Res.json({ success: true, message: 'Verification completed', RobloxId });
+        return Res.json({ success: true, message: 'Verification completed', RobloxId, RobloxUsername });
     } catch (Err) {
         return Res.status(500).json({ error: Err.message });
     }
@@ -41,7 +41,7 @@ App.post('/api/verify/force', CheckAuth, async (Req, Res) => {
         Db.VerifiedUsers[DiscordId] = { RobloxId, RobloxName: RobloxUsername };
         await Roblox.SaveJsonBin(Db);
 
-        return Res.json({ success: true, message: 'Force verified', RobloxId });
+        return Res.json({ success: true, message: 'Force verified', RobloxId, RobloxUsername });
     } catch (Err) {
         return Res.status(500).json({ error: Err.message });
     }
