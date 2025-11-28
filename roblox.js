@@ -167,10 +167,6 @@ async function autoUnsuspend(UserId, Client = global.ClientBot) {
   try { await SetRank(Suspension.GroupId, UserId, Suspension.OldRankName || Suspension.OldRankValue, 'SYSTEM', Suspension.GuildId, Client); } catch {}
 }
 
-function StartVerification(DiscordId, RobloxUserId, Code) {
-  Verifications[DiscordId] = { RobloxUserId, Code };
-}
-
 async function HandleVerificationButton(Interaction) {
   await Interaction.deferReply({ ephemeral: true });
   const Data = Verifications[Interaction.user.id];
