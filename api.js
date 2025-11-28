@@ -1,65 +1,71 @@
-const express = require('express');
+const Express = require('express');
 const Roblox = require('./roblox');
+const { FinalizeVerification } = require('./commands/verify');
 
-const app = express();
-app.use(express.json());
+const App = Express();
+App.use(Express.json());
 
-const API_KEY = process.env.AUTHKEY;
+const ApiKey = process.env.AUTHKEY;
 
-function CheckAuth(req, res, next) {
-  const key = req.headers.authorization;
-  if (key !== `Bearer ${API_KEY}`) return res.status(403).json({ error: 'Unauthorized' });
-  next();
+function CheckAuth(Req, Res, Next) {
+    const Key = Req.headers.authorization;
+    if (Key !== `Bearer ${ApiKey}`) return Res.status(403).json({ error: 'Unauthorized' });
+    Next();
 }
 
-app.post('/api/verify', CheckAuth, async (req, res) => {
-  try {
-    const { discordId, robloxUsername, code } = req.body;
-    if (!discordId || !robloxUsername || !code) return res.status(400).json({ error: 'Missing fields' });
+App.post('/api/verify', CheckAuth, async (Req, Res) => {
+    try {
+        const { DiscordId, RobloxUsername, Code } = Req.body;
+        if (!DiscordId || !RobloxUsername || !Code) 
+            return Res.status(400).json({ error: 'Missing fields' });
 
-    const robloxId = await Roblox.GetRobloxUserId(robloxUsername);
-    Roblox.startVerification(discordId, robloxId, code);
-    return res.json({ success: true, message: 'Verification started', robloxId });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+        const RobloxId = await Roblox.GetRobloxUserId(RobloxUsername);
+
+        await FinalizeVerification(DiscordId, RobloxId, RobloxUsername);
+
+        return Res.json({ success: true, message: 'Verification completed', RobloxId });
+    } catch (Err) {
+        return Res.status(500).json({ error: Err.message });
+    }
 });
 
-app.post('/api/verify/force', CheckAuth, async (req, res) => {
-  try {
-    const { discordId, robloxUsername } = req.body;
-    if (!discordId || !robloxUsername) return res.status(400).json({ error: 'Missing fields' });
+App.post('/api/verify/force', CheckAuth, async (Req, Res) => {
+    try {
+        const { DiscordId, RobloxUsername } = Req.body;
+        if (!DiscordId || !RobloxUsername)
+            return Res.status(400).json({ error: 'Missing fields' });
 
-    const robloxId = await Roblox.GetRobloxUserId(robloxUsername);
-    const db = await Roblox.GetJsonBin();
-    db.VerifiedUsers = db.VerifiedUsers || {};
-    db.VerifiedUsers[discordId] = robloxId;
-    await Roblox.SaveJsonBin(db);
+        const RobloxId = await Roblox.GetRobloxUserId(RobloxUsername);
+        const Db = await Roblox.GetJsonBin();
+        Db.VerifiedUsers = Db.VerifiedUsers || {};
+        Db.VerifiedUsers[DiscordId] = { RobloxId, RobloxName: RobloxUsername };
+        await Roblox.SaveJsonBin(Db);
 
-    return res.json({ success: true, message: 'Force verified', robloxId });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+        return Res.json({ success: true, message: 'Force verified', RobloxId });
+    } catch (Err) {
+        return Res.status(500).json({ error: Err.message });
+    }
 });
 
-app.post('/api/setrank', CheckAuth, async (req, res) => {
-  try {
-    const { groupId, userId, newRankName, discordId, guildId } = req.body;
-    if (!groupId || !userId || !newRankName || !discordId || !guildId)
-      return res.status(400).json({ error: 'Missing fields' });
+App.post('/api/setrank', CheckAuth, async (Req, Res) => {
+    try {
+        const { GroupId, UserId, NewRankName, DiscordId, GuildId } = Req.body;
+        if (!GroupId || !UserId || !NewRankName || !DiscordId || !GuildId)
+            return Res.status(400).json({ error: 'Missing fields' });
 
-    if (!global.ClientBot) return res.status(500).json({ error: 'Discord client not ready' });
+        if (!global.ClientBot) return Res.status(500).json({ error: 'Discord client not ready' });
 
-    await Roblox.SetRank(groupId, userId, newRankName, discordId, guildId, global.ClientBot);
-    return res.json({ success: true, message: `Rank updated to ${newRankName}` });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+        await Roblox.SetRank(GroupId, UserId, NewRankName, DiscordId, GuildId, global.ClientBot);
+
+        return Res.json({ success: true, message: `Rank updated to ${NewRankName}` });
+    } catch (Err) {
+        return Res.status(500).json({ error: Err.message });
+    }
 });
 
 function StartApi() {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => console.log(`API running on port ${PORT}`));
+    const Port = process.env.PORT || 3000;
+    App.listen(Port, () => console.log(`API running on port ${Port}`));
 }
 
-module.exports = { app, StartApi };
+module.exports = { App, StartApi };
