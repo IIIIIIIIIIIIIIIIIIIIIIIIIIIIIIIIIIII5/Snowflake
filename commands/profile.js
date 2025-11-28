@@ -16,13 +16,9 @@ function FormatCertifications(certArray) {
   if (!certArray || certArray.length === 0) return ["None"];
   const Result = [];
   const Counts = {};
-
   for (const Cert of certArray) {
-    if (Cert !== "Certified Host") {
-      Counts[Cert] = (Counts[Cert] || 0) + 1;
-    }
+    if (Cert !== "Certified Host") Counts[Cert] = (Counts[Cert] || 0) + 1;
   }
-
   const Added = new Set();
   for (const Cert of certArray) {
     if (Cert !== "Certified Host" && !Added.has(Cert)) {
@@ -31,7 +27,6 @@ function FormatCertifications(certArray) {
       Added.add(Cert);
     }
   }
-
   if (certArray.includes("Certified Host")) Result.push("Certified Host");
   return Result;
 }
@@ -80,22 +75,15 @@ module.exports = {
     let avatarUrl = target.displayAvatarURL({ size: 128 });
     let robloxId = null;
 
-    if (verifiedEntry) {
-      if (!isNaN(Number(verifiedEntry))) {
-        robloxId = Number(verifiedEntry);
-        try {
-          const name = await GetRobloxUsername(robloxId);
-          username = name || "Unknown User";
+    if (verifiedEntry?.robloxId) {
+      robloxId = verifiedEntry.robloxId;
+      username = verifiedEntry.robloxName || "Unknown User";
+    }
 
-          const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=420x420&format=Png&isCircular=false`);
-          const thumbData = await thumbRes.json();
-          avatarUrl = thumbData?.data?.[0]?.imageUrl || avatarUrl;
-        } catch {
-          username = "Unknown User";
-        }
-      } else {
-        username = verifiedEntry;
-      }
+    if (robloxId) {
+      const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=420x420&format=Png&isCircular=false`);
+      const thumbData = await thumbRes.json();
+      avatarUrl = thumbData?.data?.[0]?.imageUrl || avatarUrl;
     }
 
     const hostingEmbed = new EmbedBuilder()
@@ -210,7 +198,9 @@ module.exports = {
     });
 
     collector.on("end", async () => {
-      try { await interaction.editReply({ components: [] }); } catch {}
+      try {
+        await interaction.editReply({ components: [] });
+      } catch {}
     });
   }
 };
