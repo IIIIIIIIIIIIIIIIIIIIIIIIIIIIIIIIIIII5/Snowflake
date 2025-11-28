@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const Crypto = require('crypto');
+const { GetJsonBin, SaveJsonBin } = require('../roblox');
 
 async function CreateOAuthState(DiscordId) {
     const State = Crypto.randomBytes(16).toString('hex');
@@ -21,12 +22,19 @@ function GetOAuthUrl(State) {
            `&scope=openid+profile&response_type=code&state=${State}`;
 }
 
+async function FinalizeVerification(DiscordId, RobloxId, RobloxName) {
+    const Db = await GetJsonBin();
+    Db.VerifiedUsers = Db.VerifiedUsers || {};
+    Db.VerifiedUsers[DiscordId] = { RobloxId, RobloxName };
+    await SaveJsonBin(Db);
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('verify')
         .setDescription('Verify your Roblox account via OAuth'),
 
-    async execute(Interaction) {
+    execute: async function(Interaction) {
         await Interaction.deferReply({ ephemeral: true });
         const State = await CreateOAuthState(Interaction.user.id);
         const Url = GetOAuthUrl(State);
@@ -42,5 +50,7 @@ module.exports = {
             content: "Click the button below to verify your Roblox account via OAuth:",
             components: [Row]
         });
-    }
+    },
+
+    FinalizeVerification
 };
