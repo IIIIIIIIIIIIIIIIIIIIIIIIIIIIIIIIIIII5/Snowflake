@@ -1,71 +1,61 @@
-const Express = require('express');
+const express = require('express');
 const Roblox = require('./roblox');
 const VerifyCommand = require('./commands/verify');
 
-const App = Express();
-App.use(Express.json());
+const app = express();
+app.use(express.json());
 
-const ApiKey = process.env.AUTHKEY;
+const API_KEY = process.env.AUTHKEY;
 
-function CheckAuth(Req, Res, Next) {
-    const Key = Req.headers.authorization;
-    if (Key !== `Bearer ${ApiKey}`) return Res.status(403).json({ error: 'Unauthorized' });
-    Next();
+function checkAuth(req, res, next) {
+    const key = req.headers.authorization;
+    if (key !== `Bearer ${API_KEY}`) return res.status(403).json({ error: 'Unauthorized' });
+    next();
 }
 
-App.post('/api/verify', CheckAuth, async (Req, Res) => {
+app.post('/api/verify', checkAuth, async (req, res) => {
     try {
-        const { DiscordId, RobloxUsername } = Req.body;
-        if (!DiscordId || !RobloxUsername) 
-            return Res.status(400).json({ error: 'Missing fields' });
-
+        const { DiscordId, RobloxUsername } = req.body;
+        if (!DiscordId || !RobloxUsername) return res.status(400).json({ error: 'Missing fields' });
         const RobloxId = await Roblox.GetRobloxUserId(RobloxUsername);
-
         await VerifyCommand.FinalizeVerification(DiscordId, RobloxId, RobloxUsername);
-
-        return Res.json({ success: true, message: 'Verification completed', RobloxId, RobloxUsername });
-    } catch (Err) {
-        return Res.status(500).json({ error: Err.message });
+        return res.json({ success: true, message: 'Verification completed', RobloxId, RobloxUsername });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
     }
 });
 
-App.post('/api/verify/force', CheckAuth, async (Req, Res) => {
+app.post('/api/verify/force', checkAuth, async (req, res) => {
     try {
-        const { DiscordId, RobloxUsername } = Req.body;
-        if (!DiscordId || !RobloxUsername)
-            return Res.status(400).json({ error: 'Missing fields' });
-
+        const { DiscordId, RobloxUsername } = req.body;
+        if (!DiscordId || !RobloxUsername) return res.status(400).json({ error: 'Missing fields' });
         const RobloxId = await Roblox.GetRobloxUserId(RobloxUsername);
-        const Db = await Roblox.GetJsonBin();
-        Db.VerifiedUsers = Db.VerifiedUsers || {};
-        Db.VerifiedUsers[DiscordId] = { RobloxId, RobloxName: RobloxUsername };
-        await Roblox.SaveJsonBin(Db);
-
-        return Res.json({ success: true, message: 'Force verified', RobloxId, RobloxUsername });
-    } catch (Err) {
-        return Res.status(500).json({ error: Err.message });
+        const db = await Roblox.GetJsonBin();
+        db.VerifiedUsers = db.VerifiedUsers || {};
+        db.VerifiedUsers[DiscordId] = { RobloxId, RobloxName: RobloxUsername };
+        await Roblox.SaveJsonBin(db);
+        return res.json({ success: true, message: 'Force verified', RobloxId, RobloxUsername });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
     }
 });
 
-App.post('/api/setrank', CheckAuth, async (Req, Res) => {
+app.post('/api/setrank', checkAuth, async (req, res) => {
     try {
-        const { GroupId, UserId, NewRankName, DiscordId, GuildId } = Req.body;
+        const { GroupId, UserId, NewRankName, DiscordId, GuildId } = req.body;
         if (!GroupId || !UserId || !NewRankName || !DiscordId || !GuildId)
-            return Res.status(400).json({ error: 'Missing fields' });
-
-        if (!global.ClientBot) return Res.status(500).json({ error: 'Discord client not ready' });
-
+            return res.status(400).json({ error: 'Missing fields' });
+        if (!global.ClientBot) return res.status(500).json({ error: 'Discord client not ready' });
         await Roblox.SetRank(GroupId, UserId, NewRankName, DiscordId, GuildId, global.ClientBot);
-
-        return Res.json({ success: true, message: `Rank updated to ${NewRankName}` });
-    } catch (Err) {
-        return Res.status(500).json({ error: Err.message });
+        return res.json({ success: true, message: `Rank updated to ${NewRankName}` });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
     }
 });
 
-function StartApi() {
-    const Port = process.env.PORT || 3000;
-    App.listen(Port, () => console.log(`API running on port ${Port}`));
+function startApi() {
+    const port = process.env.PORT || 3000;
+    app.listen(port, () => console.log(`API running on port ${port}`));
 }
 
-module.exports = { App, StartApi };
+module.exports = { app, startApi };
