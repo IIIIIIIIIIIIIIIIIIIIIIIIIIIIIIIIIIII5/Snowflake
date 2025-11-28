@@ -190,8 +190,6 @@ module.exports = {
   SuspendUser,
   autoUnsuspend,
   ScheduleAutoUnsuspend,
-  StartVerification,
-  HandleVerificationButton,
   LoadActiveSuspensions,
   Verifications,
   PendingApprovals,
