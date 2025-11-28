@@ -11,15 +11,27 @@ module.exports = {
 
     const state = crypto.randomBytes(16).toString('hex');
 
-    await fetch(`${process.env.WORKER_BASE_URL}/store-state`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        state,
-        discordId: interaction.user.id,
-        secret: process.env.WORKER_SHARED_SECRET
-      })
-    });
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
+      await fetch(`${process.env.WORKER_BASE_URL}/store-state`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          state,
+          discordId: interaction.user.id,
+          secret: process.env.WORKER_SHARED_SECRET
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+    } catch (err) {
+      return interaction.editReply({
+        content: "Failed to initiate verification. Make sure the Worker URL is correct."
+      });
+    }
 
     const url =
       `https://apis.roblox.com/oauth/v1/authorize?` +
