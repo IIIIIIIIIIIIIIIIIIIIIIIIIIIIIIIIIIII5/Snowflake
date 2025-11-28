@@ -167,22 +167,6 @@ async function autoUnsuspend(UserId, Client = global.ClientBot) {
   try { await SetRank(Suspension.GroupId, UserId, Suspension.OldRankName || Suspension.OldRankValue, 'SYSTEM', Suspension.GuildId, Client); } catch {}
 }
 
-async function HandleVerificationButton(Interaction) {
-  await Interaction.deferReply({ ephemeral: true });
-  const Data = Verifications[Interaction.user.id];
-  if (!Data) return Interaction.editReply({ content: "You haven't started verification yet." });
-  try {
-    const Desc = await GetRobloxDescription(Data.RobloxUserId);
-    if (!Desc.includes(Data.Code)) return Interaction.editReply({ content: "Code not found in your profile." });
-    const DbData = await GetJsonBin();
-    DbData.VerifiedUsers = DbData.VerifiedUsers || {};
-    DbData.VerifiedUsers[Interaction.user.id] = Data.RobloxUserId;
-    await SaveJsonBin(DbData);
-    delete Verifications[Interaction.user.id];
-    return Interaction.editReply({ content: `Verified! Linked to Roblox ID ${Data.RobloxUserId}` });
-  } catch { return Interaction.editReply({ content: "An error occurred during verification." }); }
-}
-
 async function LoadActiveSuspensions(Client = global.ClientBot) {
   const Data = await GetJsonBin();
   for (const UserId of Object.keys(Data.Suspensions || {})) {
