@@ -1,56 +1,43 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const Crypto = require('crypto');
-const { GetJsonBin, SaveJsonBin } = require('../roblox');
-
-async function CreateOAuthState(DiscordId) {
-    const State = Crypto.randomBytes(16).toString('hex');
-    await fetch(`${process.env.WORKER_BASE_URL}/store-state`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            state: State,
-            discordId: DiscordId,
-            secret: process.env.WORKER_SHARED_SECRET
-        })
-    });
-    return State;
-}
-
-function GetOAuthUrl(State) {
-    return `https://apis.roblox.com/oauth/v1/authorize?client_id=${process.env.ROBLOX_CLIENT_ID}` +
-           `&redirect_uri=${encodeURIComponent(process.env.REDIRECT_URI)}` +
-           `&scope=openid+profile&response_type=code&state=${State}`;
-}
+const crypto = require('crypto');
+const { GetRobloxUserId, StartVerification, HandleVerificationButton, GetJsonBin } = require('../roblox');
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('verify')
-        .setDescription('Verify your Roblox account via OAuth'),
+  data: new SlashCommandBuilder()
+    .setName('verify')
+    .setDescription('Verify your Roblox account')
+    .addStringOption(opt => opt.setName('username').setDescription('Your Roblox username').setRequired(true)),
 
-    async execute(Interaction) {
-        await Interaction.deferReply({ ephemeral: true });
-        const State = await CreateOAuthState(Interaction.user.id);
-        const Url = GetOAuthUrl(State);
+  async execute(interaction) {
+    await interaction.deferReply({ ephemeral: true });
 
-        const Row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setLabel("Verify via Roblox")
-                .setStyle(ButtonStyle.Link)
-                .setURL(Url)
-        );
-
-        return Interaction.editReply({
-            content: "Click the button below to verify your Roblox account via OAuth:",
-            components: [Row]
-        });
+    const db = await GetJsonBin();
+    if (db.VerifiedUsers?.[interaction.user.id]) {
+      return interaction.editReply(
+        "You're already verified. If you want to switch accounts, use `/reverify`."
+      );
     }
+
+    try {
+      const username = interaction.options.getString('username');
+      const userId = await GetRobloxUserId(username);
+
+      const code = 'VERIFY-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+      StartVerification(interaction.user.id, userId, code);
+
+      const button = new ButtonBuilder()
+        .setCustomId('done_verification')
+        .setLabel('Done')
+        .setStyle(ButtonStyle.Primary);
+      const row = new ActionRowBuilder().addComponents(button);
+
+      await interaction.editReply({
+        content: `Put this code in your Roblox profile description:\n\`${code}\`\nThen click the Done button when finished.`,
+        components: [row]
+      });
+    } catch (err) {
+      console.error('Verify command error:', err);
+      return interaction.editReply({ content: 'Could not verify that Roblox username. Make sure it is valid.' });
+    }
+  }
 };
-
-async function FinalizeVerification(DiscordId, RobloxId, RobloxName) {
-    const Db = await GetJsonBin();
-    Db.VerifiedUsers = Db.VerifiedUsers || {};
-    Db.VerifiedUsers[DiscordId] = { RobloxId, RobloxName };
-    await SaveJsonBin(Db);
-}
-
-module.exports.FinalizeVerification = FinalizeVerification;
