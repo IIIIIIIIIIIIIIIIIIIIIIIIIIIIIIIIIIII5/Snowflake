@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType } = require('discord.js');
 const Roblox = require('./roblox');
-const { StartApi } = require('./api');
+const { startApi } = require('./api');
 const loaCommand = require('./commands/loa.js');
 
 const BotToken = process.env.BOT_TOKEN;
