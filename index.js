@@ -54,7 +54,7 @@ global.ClientBot = ClientBot;
 ClientBot.once('ready', async () => {
   ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
   await RefreshCommands();
-  StartApi();
+  startApi();
   loaCommand.StartAutoCheck(ClientBot);
 });
 
