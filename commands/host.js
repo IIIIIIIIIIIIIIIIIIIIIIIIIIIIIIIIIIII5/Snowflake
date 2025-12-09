@@ -16,7 +16,7 @@ module.exports = {
     await interaction.deferReply({ ephemeral: true });
 
     const Member = interaction.member;
-    const CanHost = AllowedRoleIds.some(roleId => Member.roles.cache.has(roleId);
+    const CanHost = AllowedRoleIds.some(roleId => Member.roles.cache.has(roleId));
     if (!CanHost) return interaction.editReply({ content: 'You do not have permission to host a training.' });
 
     const Db = await GetJsonBin();
