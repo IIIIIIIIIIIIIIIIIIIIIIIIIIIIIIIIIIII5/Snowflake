@@ -101,10 +101,7 @@ module.exports = {
         { name: "RAP", value: `${formatNumber(info.rap)}`, inline: true },
 
         { name: "Past Usernames", value: pastNames, inline: false },
-        {
-          name: "Description",
-          value: info.description.length > 1024 ? info.description.slice(0, 1021) + "..." : info.description
-        }
+        { name: "Description", value: info.description.length > 1024 ? info.description.slice(0, 1021) + "..." : info.description }
       )
       .setTimestamp();
 
