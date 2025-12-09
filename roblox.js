@@ -106,38 +106,13 @@ async function GetRobloxUserInfo(UserId) {
 
   const info = await noblox.getPlayerInfo(UserId);
 
-  let createdDate = null;
-  if (info.joinDate) {
-    createdDate =
-      typeof info.joinDate === "string"
-        ? info.joinDate.split("T")[0]
-        : info.joinDate instanceof Date
-        ? info.joinDate.toISOString().split("T")[0]
-        : String(info.joinDate).split("T")[0];
-  }
-
-  let badgeCount = 0;
-  try {
-    const badges = await noblox.getPlayerBadges({ userId: UserId, limit: 100 });
-    badgeCount = Array.isArray(badges) ? badges.length : 0;
-  } catch {}
-
-  let rap = 0;
-  try {
-    const collectibles = await noblox.getCollectibles({ userId: UserId });
-    if (Array.isArray(collectibles)) rap = collectibles.reduce((sum, x) => sum + (x.recentAveragePrice || 0), 0);
-  } catch {}
-
   return {
     id: UserId,
     username: info.username || "Unknown",
-    displayName: info.displayName || info.username || "Unknown",
     description: info.blurb || "No description.",
     created: createdDate,
     isBanned: info.isBanned || false,
     friendsCount: info.friendCount || 0,
-    badgeCount,
-    rap
   };
 }
 
