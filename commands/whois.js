@@ -1,5 +1,9 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { GetJsonBin, GetRobloxUserInfo } = require('../roblox');
+
+function formatNumber(num) {
+  return num.toLocaleString();
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -41,15 +45,39 @@ module.exports = {
       });
     }
 
-    let groupList = "None";
-    if (info.groups.length > 0) {
-      groupList = info.groups
-        .slice(0, 5)
-        .map(g => `• **${g.name}** — ${g.role} (${g.rank})`)
-        .join("\n");
+    const ageDays = Math.floor((Date.now() - new Date(info.created).getTime()) / (1000 * 60 * 60 * 24));
+
+    const pastNames = info.pastUsernames.length > 0
+      ? info.pastUsernames.slice(0, 10).join(", ")
+      : "None";
+
+    const primaryGroup = info.groups.length > 0
+      ? `${info.groups[0].name} — ${info.groups[0].role} (${info.groups[0].rank})`
+      : "None";
+
+    let components = [];
+    if (info.presence.includes("In Game")) {
+      const gameIdMatch = info.presence.match(/gameId=(\d+)/);
+      let gameId = gameIdMatch ? gameIdMatch[1] : null;
+      if (gameId) {
+        const button = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setLabel("Join Game")
+            .setStyle(ButtonStyle.Link)
+            .setURL(`https://www.roblox.com/games/${gameId}`)
+        );
+        components.push(button);
+      }
     }
 
-    const pastNames = info.pastUsernames.length > 0 ? info.pastUsernames.slice(0, 10).join(", "): "None";
+    components.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel("Copy Roblox ID")
+          .setStyle(ButtonStyle.Secondary)
+          .setCustomId("copy_id")
+      )
+    );
 
     const embed = new EmbedBuilder()
       .setTitle(`${info.displayName} (${info.username})`)
@@ -59,29 +87,30 @@ module.exports = {
       .addFields(
         { name: "User ID", value: `${info.id}`, inline: true },
         { name: "Created", value: info.created || "Unknown", inline: true },
-        { name: "Banned", value: info.isBanned ? "Yes" : "No", inline: true },
+        { name: "Account Age", value: `${ageDays} days`, inline: true },
 
         { name: "Presence", value: info.presence || "Unknown", inline: true },
-        { name: "Badges", value: `${info.badgeCount}`, inline: true },
-        { name: "RAP", value: `${info.rap}`, inline: true },
+        { name: "Banned", value: info.isBanned ? "Yes" : "No", inline: true },
+        { name: "Primary Group", value: primaryGroup, inline: true },
 
         { name: "Friends", value: `${info.friendsCount}`, inline: true },
         { name: "Followers", value: `${info.followersCount}`, inline: true },
         { name: "Following", value: `${info.followingCount}`, inline: true },
 
-        { name: "Past Usernames", value: pastNames, inline: false },
-        { name: "Groups", value: groupList, inline: false },
+        { name: "Badge Count", value: `${info.badgeCount}`, inline: true },
+        { name: "RAP", value: `${formatNumber(info.rap)}`, inline: true },
 
+        { name: "Past Usernames", value: pastNames, inline: false },
         {
           name: "Description",
-          value:
-            info.description.length > 1024
-              ? info.description.slice(0, 1021) + "..."
-              : info.description
+          value: info.description.length > 1024 ? info.description.slice(0, 1021) + "..." : info.description
         }
       )
       .setTimestamp();
 
-    return interaction.editReply({ embeds: [embed] });
+    return interaction.editReply({
+      embeds: [embed],
+      components
+    });
   }
 };
