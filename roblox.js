@@ -104,56 +104,17 @@ async function GetRobloxDescription(UserId) {
 async function GetRobloxUserInfo(UserId) {
   await loginRoblox();
 
-  let info;
-  try {
-    info = await noblox.getPlayerInfo(UserId);
-  } catch {
-    throw new Error("Failed to fetch player info from Roblox.");
-  }
-
-  let avatar = null;
-  try {
-    const avatarResult = await noblox.getPlayerThumbnail([UserId], "headshot", 180, "png", false);
-    avatar = avatarResult[0]?.imageUrl ?? null;
-  } catch {}
+  const info = await noblox.getPlayerInfo(UserId);
 
   let createdDate = null;
   if (info.joinDate) {
-    if (typeof info.joinDate == "string") {
-      createdDate = info.joinDate.split("T")[0];
-    } else if (info.joinDate instanceof Date) {
-      createdDate = info.joinDate.toISOString().split("T")[0];
-    } else {
-      createdDate = String(info.joinDate).split("T")[0];
-    }
+    createdDate =
+      typeof info.joinDate === "string"
+        ? info.joinDate.split("T")[0]
+        : info.joinDate instanceof Date
+        ? info.joinDate.toISOString().split("T")[0]
+        : String(info.joinDate).split("T")[0];
   }
-  
-  let usernames = [];
-  try {
-    const history = await noblox.getUsernameHistory(UserId);
-    usernames = Array.isArray(history) ? history.map(x => x.name) : [];
-  } catch { usernames = []; }
-
-  let groups = [];
-  try {
-    const rawGroups = await noblox.getGroups(UserId);
-    if (Array.isArray(rawGroups)) {
-      groups = rawGroups.map(g => ({
-        name: g.Name || "Unknown",
-        id: g.Id || 0,
-        role: g.Role || "Member",
-        rank: g.Rank || 0
-      }));
-    }
-  } catch { groups = []; }
-
-  let presence = "Unknown";
-  try {
-    const pres = await noblox.getPlayerPresence(UserId);
-    if (pres.userPresenceType === 0) presence = "Offline";
-    else if (pres.userPresenceType === 1) presence = "Online";
-    else if (pres.userPresenceType === 2) presence = `In Game: ${pres.lastLocation || "Unknown"}`;
-  } catch {}
 
   let badgeCount = 0;
   try {
@@ -164,9 +125,7 @@ async function GetRobloxUserInfo(UserId) {
   let rap = 0;
   try {
     const collectibles = await noblox.getCollectibles({ userId: UserId });
-    if (Array.isArray(collectibles)) {
-      rap = collectibles.reduce((sum, x) => sum + (x.recentAveragePrice || 0), 0);
-    }
+    if (Array.isArray(collectibles)) rap = collectibles.reduce((sum, x) => sum + (x.recentAveragePrice || 0), 0);
   } catch {}
 
   return {
@@ -177,14 +136,8 @@ async function GetRobloxUserInfo(UserId) {
     created: createdDate,
     isBanned: info.isBanned || false,
     friendsCount: info.friendCount || 0,
-    followersCount: info.followerCount || 0,
-    followingCount: info.followingCount || 0,
-    avatar: avatar,
-    pastUsernames: usernames,
-    groups: groups,
-    presence: presence,
-    badgeCount: badgeCount,
-    rap: rap
+    badgeCount,
+    rap
   };
 }
 
