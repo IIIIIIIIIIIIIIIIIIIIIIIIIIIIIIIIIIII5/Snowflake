@@ -7,7 +7,7 @@ module.exports = {
     .setDescription('Lookup a Roblox user from a Discord user')
     .addUserOption(opt =>
       opt.setName('user')
-        .setDescription('The Discord user to look up')
+        .setDescription('Discord user to look up')
         .setRequired(false)
     ),
 
@@ -41,6 +41,16 @@ module.exports = {
       });
     }
 
+    let groupList = "None";
+    if (info.groups.length > 0) {
+      groupList = info.groups
+        .slice(0, 5)
+        .map(g => `• **${g.name}** — ${g.role} (${g.rank})`)
+        .join("\n");
+    }
+
+    const pastNames = info.pastUsernames.length > 0 ? info.pastUsernames.slice(0, 10).join(", "): "None";
+
     const embed = new EmbedBuilder()
       .setTitle(`${info.displayName} (${info.username})`)
       .setURL(`https://www.roblox.com/users/${robloxId}/profile`)
@@ -49,13 +59,26 @@ module.exports = {
       .addFields(
         { name: "User ID", value: `${info.id}`, inline: true },
         { name: "Created", value: info.created || "Unknown", inline: true },
-        { name: "Banned?", value: info.isBanned ? "Yes" : "No", inline: true },
+        { name: "Banned", value: info.isBanned ? "Yes" : "No", inline: true },
 
-        { name: "Friends", value: `${info.friendsCount}`, inline: false },
+        { name: "Presence", value: info.presence || "Unknown", inline: true },
+        { name: "Badges", value: `${info.badgeCount}`, inline: true },
+        { name: "RAP", value: `${info.rap}`, inline: true },
+
+        { name: "Friends", value: `${info.friendsCount}`, inline: true },
         { name: "Followers", value: `${info.followersCount}`, inline: true },
         { name: "Following", value: `${info.followingCount}`, inline: true },
 
-        { name: "Description", value: info.description.length > 1024 ? info.description.slice(0, 1021) + "..." : info.description }
+        { name: "Past Usernames", value: pastNames, inline: false },
+        { name: "Groups", value: groupList, inline: false },
+
+        {
+          name: "Description",
+          value:
+            info.description.length > 1024
+              ? info.description.slice(0, 1021) + "..."
+              : info.description
+        }
       )
       .setTimestamp();
 
