@@ -5,7 +5,8 @@ const Roles = [
   "1386369108408406096",
   "1431333433539563531",
   "1423226365498494996",
-  "1418979785165766717"
+  "1418979785165766717",
+  "1443622126203572304"
 ];
 
 async function SendCertificationLog(Client, GuildId, ActionBy, ActionOn, Action, Certification) {
