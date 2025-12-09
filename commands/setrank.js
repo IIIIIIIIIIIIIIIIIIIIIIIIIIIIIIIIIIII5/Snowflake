@@ -1,9 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { GetJsonBin, GetRobloxUserId, SetRank, SendRankLog, FetchRoles, loginRoblox } = require('../roblox');
 
-const ALLOWED_ROLE = '1423332095001890908';
-const SFPLeadershipRole = '1386369108408406096';
-
 const AllowedRoles = ["1443622126203572304", "1423332095001890908", "1386369108408406096"];
 
 module.exports = {
@@ -36,18 +33,25 @@ module.exports = {
       await loginRoblox();
       const roles = await FetchRoles(groupId);
       const allRoles = Object.values(roles);
+
       const filtered = allRoles
         .filter(r => r.Name.toLowerCase().includes(focused))
         .slice(0, 25);
 
-      return interaction.respond(filtered.map(r => ({ name: `${r.Name} (${r.Rank})`, value: r.Name })));
+      return interaction.respond(
+        filtered.map(r => ({ name: `${r.Name} (${r.Rank})`, value: r.Name }))
+      );
     } catch {
       return interaction.respond([]);
     }
   },
 
   async execute(interaction) {
-    const CanUse = AllowedRoleIds.some(roleId => Member.roles.cache.has(roleId));
+
+    const Member = interaction.member;
+
+    const CanUse = AllowedRoles.some(roleId => Member.roles.cache.has(roleId));
+
     if (!CanUse)
       return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
 
@@ -61,6 +65,7 @@ module.exports = {
       return interaction.editReply({ content: 'Group ID not set. Run /config first.' });
 
     const groupId = db.ServerConfig[guildId].GroupId;
+
     const username = interaction.options.getString('username');
     const rankName = interaction.options.getString('rankname');
 
