@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { GetJsonBin, GetRobloxUserId, GetCurrentRank, FetchRoles, SetRank, SendRankLog, loginRoblox } = require('../roblox');
 
-const Roles = ["1423332095001890908", "1386369108408406096", "1418979785165766717"];
+const Roles = ["1423332095001890908", "1386369108408406096", "1418979785165766717", "1443622126203572304"];
 
 module.exports = {
   data: new SlashCommandBuilder()
