@@ -7,12 +7,15 @@ const GuildId = "1386275140815425557";
 const LogChannelId = "1439246721426260018";
 
 function ConvertToDate(string, endOfDay = false) {
-    const [day, month, year] = string.split('/').map(Number);
-    if (!day || !month || !year) return null;
+    const [day, month, yearRaw] = string.split('/').map(Number);
+    if (!day || !month || !yearRaw) return null;
+
+    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
 
     if (endOfDay) {
         return new Date(year, month - 1, day, 23, 59, 59, 999);
     }
+
     return new Date(year, month - 1, day);
 }
 
