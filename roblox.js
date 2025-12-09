@@ -106,11 +106,54 @@ async function GetRobloxUserInfo(UserId) {
 
   const info = await noblox.getPlayerInfo(UserId);
 
-  const avatar = await noblox.getPlayerThumbnail(UserId, "headshot", 180, "png", false);
+  const avatar = await noblox.getPlayerThumbnail(UserId, "headshot", "180x180", "png", false);
 
-  let createdDate = null;
-  if (info.joinDate) {
-    createdDate = info.joinDate.split("T")[0];
+  const createdDate = info.joinDate ? info.joinDate.split("T")[0] : null;
+
+  let usernames = [];
+  try {
+    const history = await noblox.getUsernameHistory(UserId);
+    usernames = history.data?.map(x => x.name) || [];
+  } catch {
+    usernames = [];
+  }
+
+  let groups = [];
+  try {
+    const rawGroups = await noblox.getGroups(UserId);
+    groups = rawGroups.map(g => ({
+      name: g.Name,
+      id: g.Id,
+      role: g.Role,
+      rank: g.Rank
+    }));
+  } catch {
+    groups = [];
+  }
+
+  let presence = "Unknown";
+  try {
+    const pres = await noblox.getPlayerPresence(UserId);
+    if (pres.userPresenceType === 0) presence = "Offline";
+    else if (pres.userPresenceType === 1) presence = "Online";
+    else if (pres.userPresenceType === 2) presence = `In Game: ${pres.lastLocation}`;
+  } catch {}
+
+  let badgeCount = 0;
+  try {
+    const badges = await noblox.getPlayerBadges({
+      userId: UserId,
+      limit: 10
+    });
+    badgeCount = badges.data?.length || 0;
+  } catch {}
+
+  let rap = 0;
+  try {
+    rap = await noblox.getCollectibles({ userId: UserId })
+      .then(items => items.data.reduce((sum, x) => sum + (x.recentAveragePrice || 0), 0));
+  } catch {
+    rap = 0;
   }
 
   return {
@@ -123,7 +166,13 @@ async function GetRobloxUserInfo(UserId) {
     friendsCount: info.friendCount || 0,
     followersCount: info.followerCount || 0,
     followingCount: info.followingCount || 0,
-    avatar: avatar?.[0]?.imageUrl || null
+    avatar: avatar?.[0]?.imageUrl ?? null,
+
+    pastUsernames: usernames,
+    groups: groups,
+    presence: presence,
+    badgeCount: badgeCount,
+    rap: rap
   };
 }
 
