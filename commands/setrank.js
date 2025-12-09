@@ -4,6 +4,8 @@ const { GetJsonBin, GetRobloxUserId, SetRank, SendRankLog, FetchRoles, loginRobl
 const ALLOWED_ROLE = '1423332095001890908';
 const SFPLeadershipRole = '1386369108408406096';
 
+const AllowedRoles = ["1443622126203572304", "1423332095001890908", "1386369108408406096"];
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('setrank')
@@ -45,7 +47,8 @@ module.exports = {
   },
 
   async execute(interaction) {
-    if (!interaction.member.roles.cache.has(ALLOWED_ROLE) && !interaction.member.roles.cache.has(SFPLeadershipRole))
+    const CanUse = AllowedRoleIds.some(roleId => Member.roles.cache.has(roleId));
+    if (!CanUse)
       return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
 
     await interaction.deferReply({ ephemeral: true });
