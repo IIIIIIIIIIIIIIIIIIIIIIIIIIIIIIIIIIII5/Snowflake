@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, SaveJsonBin, GetRobloxUserId, GetCurrentRank } = require('../roblox');
 
-const Roles = ["1398691449939169331", "1418979785165766717", "1386369108408406096"];
+const Roles = ["1398691449939169331", "1418979785165766717", "1386369108408406096", "1443622126203572304"];
 const SuspensionRoleId = "1402233297786109952";
 const SuspensionLogChannelId = "1433025723932741694";
 
