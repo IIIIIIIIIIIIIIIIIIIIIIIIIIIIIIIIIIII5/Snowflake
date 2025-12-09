@@ -6,9 +6,13 @@ const LoARoleId = "1437079732708442112";
 const GuildId = "1386275140815425557";
 const LogChannelId = "1439246721426260018";
 
-function ConvertToDate(string) {
+function ConvertToDate(string, endOfDay = false) {
     const [day, month, year] = string.split('/').map(Number);
     if (!day || !month || !year) return null;
+
+    if (endOfDay) {
+        return new Date(year, month - 1, day, 23, 59, 59, 999);
+    }
     return new Date(year, month - 1, day);
 }
 
