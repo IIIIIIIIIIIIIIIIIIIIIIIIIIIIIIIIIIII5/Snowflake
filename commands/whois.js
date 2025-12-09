@@ -19,7 +19,7 @@ module.exports = {
       db = await GetJsonBin();
     } catch (err) {
       return interaction.editReply({
-        content: `Failed to load verification database: ${err.message}`
+        content: `Failed to load verification: ${err.message}`
       });
     }
 
