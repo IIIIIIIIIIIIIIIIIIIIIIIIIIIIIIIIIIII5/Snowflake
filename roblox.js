@@ -106,17 +106,15 @@ async function GetRobloxUserInfo(UserId) {
 
   const info = await noblox.getPlayerInfo(UserId);
 
-  const avatar = await noblox.getPlayerThumbnail(UserId, "headshot", "180x180", "png", false);
+  const avatar = await noblox.getPlayerThumbnail(UserId, "headshot", 180, "png", false);
 
   const createdDate = info.joinDate ? info.joinDate.split("T")[0] : null;
 
   let usernames = [];
   try {
     const history = await noblox.getUsernameHistory(UserId);
-    usernames = history.data?.map(x => x.name) || [];
-  } catch {
-    usernames = [];
-  }
+    usernames = history.map(x => x.name) || [];
+  } catch { usernames = []; }
 
   let groups = [];
   try {
@@ -127,9 +125,7 @@ async function GetRobloxUserInfo(UserId) {
       role: g.Role,
       rank: g.Rank
     }));
-  } catch {
-    groups = [];
-  }
+  } catch { groups = []; }
 
   let presence = "Unknown";
   try {
@@ -141,20 +137,15 @@ async function GetRobloxUserInfo(UserId) {
 
   let badgeCount = 0;
   try {
-    const badges = await noblox.getPlayerBadges({
-      userId: UserId,
-      limit: 10
-    });
-    badgeCount = badges.data?.length || 0;
+    const badges = await noblox.getPlayerBadges({ userId: UserId, limit: 100 });
+    badgeCount = badges.length || 0;
   } catch {}
 
   let rap = 0;
   try {
-    rap = await noblox.getCollectibles({ userId: UserId })
-      .then(items => items.data.reduce((sum, x) => sum + (x.recentAveragePrice || 0), 0));
-  } catch {
-    rap = 0;
-  }
+    const collectibles = await noblox.getCollectibles({ userId: UserId });
+    rap = collectibles.reduce((sum, x) => sum + (x.recentAveragePrice || 0), 0);
+  } catch {}
 
   return {
     id: UserId,
@@ -167,7 +158,6 @@ async function GetRobloxUserInfo(UserId) {
     followersCount: info.followerCount || 0,
     followingCount: info.followingCount || 0,
     avatar: avatar?.[0]?.imageUrl ?? null,
-
     pastUsernames: usernames,
     groups: groups,
     presence: presence,
