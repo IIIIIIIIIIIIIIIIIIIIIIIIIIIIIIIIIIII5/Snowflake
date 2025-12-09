@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, GetRobloxUserId, GetCurrentRank, FetchRoles, SetRank, SendRankLog, loginRoblox } = require('../roblox');
 
-const WhitelistedRoles = ["1386369108408406096", "1405917224430080001", "1431333433539563531"];
+const WhitelistedRoles = ["1386369108408406096", "1405917224430080001", "1431333433539563531", "1443622126203572304"];
 
 module.exports = {
   data: new SlashCommandBuilder()
