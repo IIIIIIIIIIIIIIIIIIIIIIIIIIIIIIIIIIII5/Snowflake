@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, SaveJsonBin } = require('../roblox');
 
-const AllowedRoles = ["1431333433539563531", "1423226365498494996"];
+const AllowedRoles = ["1431333433539563531", "1423226365498494996", "1443622126203572304"];
 const LoARoleId = "1437079732708442112";
 const GuildId = "1386275140815425557";
 const LogChannelId = "1439246721426260018";
