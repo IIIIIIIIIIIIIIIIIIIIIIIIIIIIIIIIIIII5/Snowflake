@@ -16,6 +16,14 @@ function ConvertToDate(string, endOfDay = false) {
     return new Date(year, month - 1, day);
 }
 
+function FormatDate(timestamp) {
+    const d = new Date(timestamp);
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('loa')
@@ -107,13 +115,13 @@ module.exports = {
                             const DMEmbed = new EmbedBuilder()
                                 .setTitle('Leave of Absence Ended')
                                 .setColor(0x00ff00)
-                                .setDescription(`Dear <@${Member.id}>,\n\nYour Leave of Absence which was issued on ${new Date(LoA.StartDate).toLocaleDateString()} has come to an end. You may resume your normal duties starting from today.`);
+                                .setDescription(`Dear <@${Member.id}>,\n\nYour Leave of Absence which was issued on ${FormatDate(LoA.StartDate)} has come to an end. You may resume your normal duties starting from today.`);
                             try { await Member.send({ embeds: [DMEmbed] }); } catch {}
 
                             const LogEmbed = new EmbedBuilder()
                                 .setTitle('Leave of Absence Ended')
                                 .setColor(0x00ff00)
-                                .setDescription(`<@${Member.id}>'s Leave of Absence which was issued on ${new Date(LoA.StartDate).toLocaleDateString()} has ended.`);
+                                .setDescription(`<@${Member.id}>'s Leave of Absence which was issued on ${FormatDate(LoA.StartDate)} has ended.`);
                             const LogChannel = await Guild.channels.fetch(LogChannelId);
                             if (LogChannel?.isTextBased()) LogChannel.send({ embeds: [LogEmbed] });
                         }
