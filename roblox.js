@@ -117,8 +117,17 @@ async function GetRobloxUserInfo(UserId) {
     avatar = avatarResult[0]?.imageUrl ?? null;
   } catch {}
 
-  const createdDate = info.joinDate ? info.joinDate.split("T")[0] : null;
-
+  let createdDate = null;
+  if (info.joinDate) {
+    if (typeof info.joinDate == "string") {
+      createdDate = info.joinDate.split("T")[0];
+    } else if (info.joinDate instanceof Date) {
+      createdDate = info.joinDate.toISOString().split("T")[0];
+    } else {
+      createdDate = String(info.joinDate).split("T")[0];
+    }
+  }
+  
   let usernames = [];
   try {
     const history = await noblox.getUsernameHistory(UserId);
