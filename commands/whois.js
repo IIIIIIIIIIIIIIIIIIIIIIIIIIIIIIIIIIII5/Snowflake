@@ -88,19 +88,10 @@ module.exports = {
         { name: "User ID", value: `${info.id}`, inline: true },
         { name: "Created", value: info.created || "Unknown", inline: true },
         { name: "Account Age", value: `${ageDays} days`, inline: true },
-
-        { name: "Presence", value: info.presence || "Unknown", inline: true },
+        
         { name: "Banned", value: info.isBanned ? "Yes" : "No", inline: true },
-        { name: "Primary Group", value: primaryGroup, inline: true },
 
         { name: "Friends", value: `${info.friendsCount}`, inline: true },
-        { name: "Followers", value: `${info.followersCount}`, inline: true },
-        { name: "Following", value: `${info.followingCount}`, inline: true },
-
-        { name: "Badge Count", value: `${info.badgeCount}`, inline: true },
-        { name: "RAP", value: `${formatNumber(info.rap)}`, inline: true },
-
-        { name: "Past Usernames", value: pastNames, inline: false },
         { name: "Description", value: info.description.length > 1024 ? info.description.slice(0, 1021) + "..." : info.description }
       )
       .setTimestamp();
