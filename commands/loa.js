@@ -41,7 +41,7 @@ module.exports = {
             const Reason = interaction.options.getString('reason');
 
             const StartDate = ConvertToDate(StartDateStr);
-            const EndDate = ConvertToDate(EndDateStr);
+            const EndDate = ConvertToDate(EndDateStr, true);
 
             if (!StartDate || !EndDate) return interaction.editReply({ content: "Invalid date format. Use DD/MM/YYYY." });
             if (EndDate < StartDate) return interaction.editReply({ content: "End date cannot be before start date." });
@@ -62,7 +62,9 @@ module.exports = {
                 .setTitle('Leave of Absence Issued')
                 .setColor(0xff9900)
                 .setDescription(`Dear <@${Member.id}>,\n\nYou have been put on Leave of Absence starting from **${StartDateStr}** and it shall end on **${EndDateStr}**.\nReason: ${Reason}`);
-            try { await Member.send({ embeds: [DMEmbed] }); } catch {}
+            try {
+                await Member.send({ embeds: [DMEmbed] });
+            } catch {}
 
             const LogEmbed = new EmbedBuilder()
                 .setTitle('Leave of Absence Issued')
