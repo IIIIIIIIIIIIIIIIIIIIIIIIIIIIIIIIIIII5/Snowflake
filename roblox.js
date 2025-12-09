@@ -101,6 +101,32 @@ async function GetRobloxDescription(UserId) {
   return info?.blurb || ''; 
 }
 
+async function GetRobloxUserInfo(UserId) {
+  await loginRoblox();
+
+  const info = await noblox.getPlayerInfo(UserId);
+
+  const avatar = await noblox.getPlayerThumbnail(UserId, "headshot", 180, "png", false);
+
+  let createdDate = null;
+  if (info.joinDate) {
+    createdDate = info.joinDate.split("T")[0];
+  }
+
+  return {
+    id: UserId,
+    username: info.username,
+    displayName: info.displayName || info.username,
+    description: info.blurb || "No description.",
+    created: createdDate,
+    isBanned: info.isBanned || false,
+    friendsCount: info.friendCount || 0,
+    followersCount: info.followerCount || 0,
+    followingCount: info.followingCount || 0,
+    avatar: avatar?.[0]?.imageUrl || null
+  };
+}
+
 async function SendRankLog(GuildId, Client, ActionBy, TargetRobloxId, Action, NewRank) {
   try {
     const Data = await GetJsonBin();
@@ -206,6 +232,7 @@ module.exports = {
   GetRobloxUserId,
   GetRobloxUsername,
   GetRobloxDescription,
+  GetRobloxUserInfo,
   SendRankLog,
   SuspendUser,
   autoUnsuspend,
