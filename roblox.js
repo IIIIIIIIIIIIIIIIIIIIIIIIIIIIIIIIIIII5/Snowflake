@@ -104,27 +104,38 @@ async function GetRobloxDescription(UserId) {
 async function GetRobloxUserInfo(UserId) {
   await loginRoblox();
 
-  const info = await noblox.getPlayerInfo(UserId);
+  let info;
+  try {
+    info = await noblox.getPlayerInfo(UserId);
+  } catch {
+    throw new Error("Failed to fetch player info from Roblox.");
+  }
 
-  const avatar = await noblox.getPlayerThumbnail(UserId, "headshot", 180, "png", false);
+  let avatar = null;
+  try {
+    const avatarResult = await noblox.getPlayerThumbnail([UserId], "headshot", 180, "png", false);
+    avatar = avatarResult[0]?.imageUrl ?? null;
+  } catch {}
 
   const createdDate = info.joinDate ? info.joinDate.split("T")[0] : null;
 
   let usernames = [];
   try {
     const history = await noblox.getUsernameHistory(UserId);
-    usernames = history.map(x => x.name) || [];
+    usernames = Array.isArray(history) ? history.map(x => x.name) : [];
   } catch { usernames = []; }
 
   let groups = [];
   try {
     const rawGroups = await noblox.getGroups(UserId);
-    groups = rawGroups.map(g => ({
-      name: g.Name,
-      id: g.Id,
-      role: g.Role,
-      rank: g.Rank
-    }));
+    if (Array.isArray(rawGroups)) {
+      groups = rawGroups.map(g => ({
+        name: g.Name || "Unknown",
+        id: g.Id || 0,
+        role: g.Role || "Member",
+        rank: g.Rank || 0
+      }));
+    }
   } catch { groups = []; }
 
   let presence = "Unknown";
@@ -132,32 +143,34 @@ async function GetRobloxUserInfo(UserId) {
     const pres = await noblox.getPlayerPresence(UserId);
     if (pres.userPresenceType === 0) presence = "Offline";
     else if (pres.userPresenceType === 1) presence = "Online";
-    else if (pres.userPresenceType === 2) presence = `In Game: ${pres.lastLocation}`;
+    else if (pres.userPresenceType === 2) presence = `In Game: ${pres.lastLocation || "Unknown"}`;
   } catch {}
 
   let badgeCount = 0;
   try {
     const badges = await noblox.getPlayerBadges({ userId: UserId, limit: 100 });
-    badgeCount = badges.length || 0;
+    badgeCount = Array.isArray(badges) ? badges.length : 0;
   } catch {}
 
   let rap = 0;
   try {
     const collectibles = await noblox.getCollectibles({ userId: UserId });
-    rap = collectibles.reduce((sum, x) => sum + (x.recentAveragePrice || 0), 0);
+    if (Array.isArray(collectibles)) {
+      rap = collectibles.reduce((sum, x) => sum + (x.recentAveragePrice || 0), 0);
+    }
   } catch {}
 
   return {
     id: UserId,
-    username: info.username,
-    displayName: info.displayName || info.username,
+    username: info.username || "Unknown",
+    displayName: info.displayName || info.username || "Unknown",
     description: info.blurb || "No description.",
     created: createdDate,
     isBanned: info.isBanned || false,
     friendsCount: info.friendCount || 0,
     followersCount: info.followerCount || 0,
     followingCount: info.followingCount || 0,
-    avatar: avatar?.[0]?.imageUrl ?? null,
+    avatar: avatar,
     pastUsernames: usernames,
     groups: groups,
     presence: presence,
