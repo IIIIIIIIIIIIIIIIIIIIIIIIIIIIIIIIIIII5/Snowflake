@@ -7,8 +7,8 @@ const MentionRoleId = '1404500986633916479';
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('testhost')
-    .setDescription('Host a training session [TESTING ONE]')
+    .setName('host')
+    .setDescription('Host a training session')
     .addUserOption(opt => opt.setName('cohost').setDescription('Co-host (optional)'))
     .addUserOption(opt => opt.setName('supervisor').setDescription('Supervisor (optional)')),
 
@@ -71,7 +71,7 @@ module.exports = {
       )
       .setTimestamp();
 
-    await Channel.send({ embeds: [Embed] });
+    await Channel.send({ content: `<@&${MentionRoleId}>`, embeds: [Embed] });
 
     const MonthKey = Now.toISOString().slice(0, 7);
     const AddTraining = (Id, Type) => {
