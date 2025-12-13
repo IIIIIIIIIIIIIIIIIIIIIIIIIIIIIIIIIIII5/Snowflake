@@ -4,6 +4,7 @@ const { GetJsonBin, SaveJsonBin } = require('../roblox');
 const AllowedRoleIds = ['1424007337210937445', '1386369108408406096', '1443622126203572304'];
 const TrainingChannelId = '1398706795840536696';
 const MentionRoleId = '1404500986633916479';
+const SFPLeadershipRole = '1386369108408406096';
 
 module.exports = {
   data: new SlashCommandBuilder()
