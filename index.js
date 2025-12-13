@@ -26,6 +26,7 @@ function GetCommandFiles(dir) {
   }
   return files;
 }
+
 async function RefreshCommands() {
   ClientBot.Commands.clear();
 
@@ -42,13 +43,16 @@ async function RefreshCommands() {
     }
   }
 
-  console.log('Loaded commands:', Array.from(ClientBot.Commands.keys()));
+  console.log('Loaded commands (in memory):', Array.from(ClientBot.Commands.keys()));
 
   const rest = new REST({ version: '10' }).setToken(BotToken);
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
 
   await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: [] });
   await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: payload });
+
+  const registered = await rest.get(Routes.applicationGuildCommands(ClientId, TestGuildId));
+  console.log('Registered guild commands (Discord):', registered.map(c => c.name));
 }
 
 global.ClientBot = ClientBot;
