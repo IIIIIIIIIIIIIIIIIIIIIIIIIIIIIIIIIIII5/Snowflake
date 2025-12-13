@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { GetJsonBin, SaveJsonBin } = require('../roblox');
 
 const AllowedRoleIds = ['1424007337210937445', '1386369108408406096', '1443622126203572304'];
+const SFPLeadershipRole = '1424007337210937445';
 const TrainingChannelId = '1398706795840536696';
 const MentionRoleId = '1404500986633916479';
 
