@@ -26,36 +26,29 @@ function GetCommandFiles(dir) {
   }
   return files;
 }
-
 async function RefreshCommands() {
   ClientBot.Commands.clear();
+
   const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
   for (const file of CommandFiles) {
     try {
       delete require.cache[require.resolve(file)];
       const cmd = require(file);
-      if (cmd && cmd.data && cmd.execute) ClientBot.Commands.set(cmd.data.name, cmd);
+      if (cmd && cmd.data && cmd.execute) {
+        ClientBot.Commands.set(cmd.data.name, cmd);
+      }
     } catch (err) {
-      console.error(`Error reloading command ${file}:`, err);
+      console.error(`Error loading command file ${file}:`, err);
     }
   }
+
+  console.log('Loaded commands:', Array.from(ClientBot.Commands.keys()));
 
   const rest = new REST({ version: '10' }).setToken(BotToken);
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
 
-  try {
-    await rest.put(
-      Routes.applicationGuildCommands(ClientId, TestGuildId),
-      { body: [] }
-    );
-
-    await rest.put(
-      Routes.applicationGuildCommands(ClientId, TestGuildId),
-      { body: payload }
-    );
-  } catch (err) {
-    console.error('Error refreshing commands:', err);
-  }
+  await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: [] });
+  await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: payload });
 }
 
 global.ClientBot = ClientBot;
