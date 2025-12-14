@@ -7,7 +7,7 @@ const TrainingChannelId = '1398706795840536696';
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('testhost')
-    .setDescription('Host a simplified test training session')
+    .setDescription('Host a training session [TEST]')
     .addUserOption(opt => opt.setName('cohost').setDescription('Co-host (optional)'))
     .addUserOption(opt => opt.setName('supervisor').setDescription('Supervisor (optional)')),
 
@@ -50,15 +50,11 @@ module.exports = {
     const Collector = Message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 3600000 });
 
     Collector.on('collect', async i => {
-      if (i.user.id !== Host.id) {
-        await i.deferUpdate().catch(() => {});
-        return i.followUp({ content: 'Only host can use these buttons.', ephemeral: true }).catch(() => {});
-      }
+      if (i.user.id !== Host.id) return i.reply({ content: 'Only host can use these buttons.', ephemeral: true });
 
       if (i.customId === 'cancel') {
-        await i.deferUpdate().catch(() => {});
         await Message.delete().catch(() => {});
-        return i.followUp({ content: 'Test training cancelled.', ephemeral: true }).catch(() => {});
+        return i.reply({ content: 'Test training cancelled.', ephemeral: true });
       }
 
       if (i.customId === 'edit') {
@@ -85,7 +81,6 @@ module.exports = {
       }
 
       if (i.customId === 'end_training') {
-        await i.deferUpdate().catch(() => {});
         const MonthKey = new Date().toISOString().slice(0, 7);
         const AddTraining = (Id, Type) => {
           Db.Trainings[Id] = Db.Trainings[Id] || { hosted: {}, cohosted: {}, supervised: {} };
@@ -100,7 +95,7 @@ module.exports = {
 
         await SaveJsonBin(Db);
         await Message.delete().catch(() => {});
-        return i.followUp({ content: 'Test training ended.', ephemeral: true }).catch(() => {});
+        return i.reply({ content: 'Test training ended.', ephemeral: true });
       }
     });
 
@@ -108,9 +103,7 @@ module.exports = {
 
     ModalCollector.on('collect', async m => {
       if (m.customId !== 'edit_training_modal' || m.user.id !== Host.id) 
-        return m.reply({ content: 'Only host can edit.', ephemeral: true }).catch(() => {});
-
-      await m.deferReply({ ephemeral: true }).catch(() => {});
+        return m.reply({ content: 'Only host can edit.', ephemeral: true });
 
       const newCoHost = m.fields.getTextInputValue('new_cohost');
       const newSupervisor = m.fields.getTextInputValue('new_supervisor');
@@ -135,10 +128,10 @@ module.exports = {
         )
         .setTimestamp();
 
-      await Message.edit({ embeds: [UpdatedEmbed] }).catch(() => {});
-      await m.editReply({ content: 'Training updated.' }).catch(() => {});
+      await Message.edit({ embeds: [UpdatedEmbed] });
+      await m.reply({ content: 'Training updated.', ephemeral: true });
     });
 
-    return interaction.editReply({ content: `Test training sent to ${Channel.name}.` }).catch(() => {});
+    return interaction.editReply({ content: `Test training sent to ${Channel.name}.` });
   }
 };
