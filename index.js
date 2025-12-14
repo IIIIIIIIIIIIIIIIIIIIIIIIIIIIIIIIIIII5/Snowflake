@@ -51,7 +51,7 @@ async function RefreshCommands() {
 
   try {
     console.log('Refreshing guild commands...');
-    await rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: payload });
+    await rest.put(Routes.applicationCommands(ClientId));
     console.log(`Registered ${payload.length} guild commands.`);
   } catch (err) {
     console.error('Error refreshing guild commands:', err);
