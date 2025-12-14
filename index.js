@@ -17,19 +17,10 @@ const ClientBot = new Client({
 ClientBot.Commands = new Collection();
 ClientBot.PendingApprovals = Roblox.PendingApprovals;
 
-async function HardClearGuildCommands(rest) {
-  while (true) {
-    await rest.put(
-      Routes.applicationGuildCommands(ClientId, TestGuildId),
-      { body: [] }
-    );
-
-    const remaining = await rest.get(
-      Routes.applicationGuildCommands(ClientId, TestGuildId)
-    );
-
-    if (remaining.length === 0) break;
-    await new Promise(r => setTimeout(r, 1500));
+async function ClearGuildCommands(rest) {
+  const existing = await rest.get(Routes.applicationGuildCommands(ClientId, TestGuildId));
+  for (const cmd of existing) {
+    await rest.delete(Routes.applicationGuildCommand(ClientId, TestGuildId, cmd.id));
   }
 }
 
@@ -42,37 +33,27 @@ function GetCommandFiles(dir) {
   }
   return files;
 }
-
 async function RefreshCommands() {
   ClientBot.Commands.clear();
 
   const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
   for (const file of CommandFiles) {
-    try {
-      delete require.cache[require.resolve(file)];
-      const cmd = require(file);
-      if (cmd && cmd.data && cmd.execute) {
-        ClientBot.Commands.set(cmd.data.name, cmd);
-      }
-    } catch (err) {
-      console.error(`Error loading command file ${file}:`, err);
+    delete require.cache[require.resolve(file)];
+    const cmd = require(file);
+    if (cmd && cmd.data && cmd.execute) {
+      ClientBot.Commands.set(cmd.data.name, cmd);
     }
   }
-
-  console.log('Loaded commands (in memory):', Array.from(ClientBot.Commands.keys()));
 
   const rest = new REST({ version: '10' }).setToken(BotToken);
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
 
-  await HardClearGuildCommands(rest);
-  
-  await rest.put(
-    Routes.applicationGuildCommands(ClientId, TestGuildId),
-    { body: payload }
-  );
-  
+  await ClearGuildCommands(rest);
+
+  await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: payload });
+
   const registered = await rest.get(Routes.applicationGuildCommands(ClientId, TestGuildId));
-  console.log('Registered guild commands (Discord):', registered.map(c => c.name));
+  console.log('Registered guild commands:', registered.map(c => c.name));
 }
 
 global.ClientBot = ClientBot;
