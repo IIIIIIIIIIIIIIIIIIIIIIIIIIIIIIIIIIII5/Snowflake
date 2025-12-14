@@ -33,15 +33,24 @@ function GetCommandFiles(dir) {
   }
   return files;
 }
+
 async function RefreshCommands() {
   ClientBot.Commands.clear();
 
   const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
+
   for (const file of CommandFiles) {
     delete require.cache[require.resolve(file)];
-    const cmd = require(file);
-    if (cmd && cmd.data && cmd.execute) {
-      ClientBot.Commands.set(cmd.data.name, cmd);
+    const cmdModule = require(file);
+
+    if (Array.isArray(cmdModule)) {
+      for (const cmd of cmdModule) {
+        if (cmd && cmd.data && cmd.execute) {
+          ClientBot.Commands.set(cmd.data.name, cmd);
+        }
+      }
+    } else if (cmdModule && cmdModule.data && cmdModule.execute) {
+      ClientBot.Commands.set(cmdModule.data.name, cmdModule);
     }
   }
 
@@ -49,7 +58,6 @@ async function RefreshCommands() {
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
 
   await ClearGuildCommands(rest);
-
   await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: payload });
 
   const registered = await rest.get(Routes.applicationGuildCommands(ClientId, TestGuildId));
