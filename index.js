@@ -50,7 +50,7 @@ async function RefreshCommands() {
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
 
   try {
-    await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: payload });
+    await rest.put(Routes.applicationCommands(ClientId), { body: payload });
     console.log(`Refreshed ${payload.length} commands.`);
   } catch (err) {
     console.error('Error refreshing commands:', err);
