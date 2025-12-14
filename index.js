@@ -59,7 +59,7 @@ async function RefreshCommands() {
 
 global.ClientBot = ClientBot;
 
-ClientBot.once('ready', async () => {
+ClientBot.once('clientReady', async () => {
   console.log(`Logged in as ${ClientBot.user.tag}`);
   ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
   await RefreshCommands();
