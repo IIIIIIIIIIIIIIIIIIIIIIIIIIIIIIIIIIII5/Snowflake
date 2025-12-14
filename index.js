@@ -149,13 +149,6 @@ ClientBot.on('messageCreate', async message => {
     await Roblox.SaveJsonBin(db);
     return message.channel.send(`Updated ${type} for <@${discordId}> — this month: ${stat[currentMonth]}, total: ${stat.total}`);
   }
-
-  if (cmd === '!tr') {
-    if (message.author.id !== '1167121753672257576') 
-      return message.reply('You are not authorized to run this command.');
-    await RefreshCommands();
-    return message.channel.send('refreshed.');
-  }
 });
 
 ClientBot.login(BotToken);
