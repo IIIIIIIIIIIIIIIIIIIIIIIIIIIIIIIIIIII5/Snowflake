@@ -56,7 +56,7 @@ async function RefreshCommands() {
 
 global.ClientBot = ClientBot;
 
-ClientBot.once('ready', async () => {
+ClientBot.once('clientReady', async () => {
   ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
   await RefreshCommands();
   startApi();
@@ -144,13 +144,6 @@ ClientBot.on('messageCreate', async message => {
     stat.lastMonth = currentMonth;
     await Roblox.SaveJsonBin(db);
     return message.channel.send(`Updated ${type} for <@${discordId}> — this month: ${stat[currentMonth]}, total: ${stat.total}`);
-  }
-
-  if (cmd === '!tr') {
-    if (message.author.id !== '1167121753672257576') 
-      return message.reply('You are not authorized to run this command.');
-    await RefreshCommands();
-    return message.channel.send('refreshed.');
   }
 });
 
