@@ -17,6 +17,22 @@ const ClientBot = new Client({
 ClientBot.Commands = new Collection();
 ClientBot.PendingApprovals = Roblox.PendingApprovals;
 
+async function HardClearGuildCommands(rest) {
+  while (true) {
+    await rest.put(
+      Routes.applicationGuildCommands(ClientId, TestGuildId),
+      { body: [] }
+    );
+
+    const remaining = await rest.get(
+      Routes.applicationGuildCommands(ClientId, TestGuildId)
+    );
+
+    if (remaining.length === 0) break;
+    await new Promise(r => setTimeout(r, 1500));
+  }
+}
+
 function GetCommandFiles(dir) {
   const files = [];
   for (const f of fs.readdirSync(dir)) {
@@ -48,8 +64,13 @@ async function RefreshCommands() {
   const rest = new REST({ version: '10' }).setToken(BotToken);
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
 
-  await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: payload });
-
+  await HardClearGuildCommands(rest);
+  
+  await rest.put(
+    Routes.applicationGuildCommands(ClientId, TestGuildId),
+    { body: payload }
+  );
+  
   const registered = await rest.get(Routes.applicationGuildCommands(ClientId, TestGuildId));
   console.log('Registered guild commands (Discord):', registered.map(c => c.name));
 }
