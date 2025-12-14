@@ -8,7 +8,7 @@ const loaCommand = require('./commands/loa.js');
 const BotToken = process.env.BOT_TOKEN;
 const ClientId = process.env.CLIENT_ID;
 const AdminId = process.env.ADMIN_ID;
-const TestGuildId = '1386275140815425557';
+const GuildId = '1386275140815425557';
 
 const ClientBot = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
@@ -35,11 +35,11 @@ async function RefreshCommands() {
     try {
       delete require.cache[require.resolve(file)];
       const cmd = require(file);
-      if (cmd && cmd.data && cmd.execute) {
+      if (cmd?.data?.toJSON && cmd.execute) {
         ClientBot.Commands.set(cmd.data.name, cmd);
         console.log(`Loaded command: ${cmd.data.name}`);
       } else {
-        console.warn(`Skipped invalid command file: ${file}`);
+        console.warn(`Skipped invalid command: ${file}`);
       }
     } catch (err) {
       console.error(`Error loading command ${file}:`, err);
@@ -50,10 +50,11 @@ async function RefreshCommands() {
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
 
   try {
-    await rest.put(Routes.applicationCommands(ClientId), { body: payload });
-    console.log(`Refreshed ${payload.length} commands.`);
+    console.log('Refreshing guild commands...');
+    await rest.put(Routes.applicationGuildCommands(ClientId, GuildId), { body: payload });
+    console.log(`Registered ${payload.length} guild commands.`);
   } catch (err) {
-    console.error('Error refreshing commands:', err);
+    console.error('Error refreshing guild commands:', err);
   }
 }
 
