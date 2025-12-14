@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType } = require('discord.js');
 const Roblox = require('./roblox');
 const { startApi } = require('./api');
 const loaCommand = require('./commands/loa.js');
@@ -8,7 +8,7 @@ const loaCommand = require('./commands/loa.js');
 const BotToken = process.env.BOT_TOKEN;
 const ClientId = process.env.CLIENT_ID;
 const AdminId = process.env.ADMIN_ID;
-const GuildId = '1386275140815425557';
+const TestGuildId = '1386275140815425557';
 
 const ClientBot = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
@@ -29,39 +29,34 @@ function GetCommandFiles(dir) {
 
 async function RefreshCommands() {
   ClientBot.Commands.clear();
-  const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
 
+  const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
   for (const file of CommandFiles) {
     try {
       delete require.cache[require.resolve(file)];
       const cmd = require(file);
-      if (cmd?.data?.toJSON && cmd.execute) {
+      if (cmd && cmd.data && cmd.execute) {
         ClientBot.Commands.set(cmd.data.name, cmd);
-        console.log(`Loaded command: ${cmd.data.name}`);
-      } else {
-        console.warn(`Skipped invalid command: ${file}`);
       }
     } catch (err) {
-      console.error(`Error loading command ${file}:`, err);
+      console.error(`Error loading command file ${file}:`, err);
     }
   }
+
+  console.log('Loaded commands (in memory):', Array.from(ClientBot.Commands.keys()));
 
   const rest = new REST({ version: '10' }).setToken(BotToken);
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
 
-  try {
-    console.log('Refreshing guild commands...');
-    await rest.put(Routes.applicationCommands(ClientId));
-    console.log(`Registered ${payload.length} guild commands.`);
-  } catch (err) {
-    console.error('Error refreshing guild commands:', err);
-  }
+  await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: payload });
+
+  const registered = await rest.get(Routes.applicationGuildCommands(ClientId, TestGuildId));
+  console.log('Registered guild commands (Discord):', registered.map(c => c.name));
 }
 
 global.ClientBot = ClientBot;
 
-ClientBot.once('clientReady', async () => {
-  console.log(`Logged in as ${ClientBot.user.tag}`);
+ClientBot.once('ready', async () => {
   ClientBot.user.setActivity('Snowflake Prison Roleplay', { type: ActivityType.Watching });
   await RefreshCommands();
   startApi();
@@ -73,16 +68,14 @@ ClientBot.on('interactionCreate', async interaction => {
     const command = ClientBot.Commands.get(interaction.commandName);
     if (command?.autocomplete) return command.autocomplete(interaction);
   }
-  if (interaction.isButton() && interaction.customId === 'done_verification') {
+  if (interaction.isButton() && interaction.customId === 'done_verification')
     return Roblox.HandleVerificationButton(interaction);
-  }
   if (!interaction.isChatInputCommand()) return;
   const cmd = ClientBot.Commands.get(interaction.commandName);
   if (!cmd) return;
   try {
     await cmd.execute(interaction, ClientBot);
-  } catch (err) {
-    console.error(`Error executing command ${interaction.commandName}:`, err);
+  } catch {
     if (!interaction.replied && !interaction.deferred)
       await interaction.reply({ content: 'An error occurred while executing this command.', ephemeral: true });
   }
@@ -90,7 +83,7 @@ ClientBot.on('interactionCreate', async interaction => {
 
 ClientBot.on('messageCreate', async message => {
   if (!message.content.startsWith('!')) return;
-  if (![AdminId, '804292216511791204', '1167121753672257576'].includes(message.author.id)) return;
+  if (message.author.id !== AdminId && message.author.id !== '804292216511791204' && message.author.id !== '1167121753672257576') return;
 
   const parts = message.content.split(/\s+/);
   const cmd = parts[0].toLowerCase();
@@ -124,7 +117,7 @@ ClientBot.on('messageCreate', async message => {
     return message.channel.send(`Custom Roblox token set for server ID ${targetServerId}.`);
   }
 
-  if (['!add', '!remove', '!set'].includes(cmd)) {
+  if (cmd === '!add' || cmd === '!remove' || cmd === '!set') {
     const targetMention = parts[1];
     const type = parts[2]?.toLowerCase();
     const value = Number(parts[3]);
@@ -151,6 +144,13 @@ ClientBot.on('messageCreate', async message => {
     stat.lastMonth = currentMonth;
     await Roblox.SaveJsonBin(db);
     return message.channel.send(`Updated ${type} for <@${discordId}> — this month: ${stat[currentMonth]}, total: ${stat.total}`);
+  }
+
+  if (cmd === '!tr') {
+    if (message.author.id !== '1167121753672257576') 
+      return message.reply('You are not authorized to run this command.');
+    await RefreshCommands();
+    return message.channel.send('refreshed.');
   }
 });
 
