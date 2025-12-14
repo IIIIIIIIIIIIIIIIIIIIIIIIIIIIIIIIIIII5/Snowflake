@@ -10,15 +10,15 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('host')
     .setDescription('Host a training session')
-    .addUserOption(opt => opt.setName('cohost').setDescription('Co-host (optional)'))
-    .addUserOption(opt => opt.setName('supervisor').setDescription('Supervisor (optional)')),
+    .addUserOption(o => o.setName('cohost').setDescription('Co-host (optional)'))
+    .addUserOption(o => o.setName('supervisor').setDescription('Supervisor (optional)')),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
-    const Member = interaction.member;
-    const CanHost = AllowedRoleIds.some(id => Member.roles.cache.has(id));
-    if (!CanHost) return interaction.editReply({ content: 'You do not have permission to host a training.' });
+    if (!AllowedRoleIds.some(id => interaction.member.roles.cache.has(id))) {
+      return interaction.editReply({ content: 'You do not have permission to host a training.' });
+    }
 
     const Db = await GetJsonBin();
     Db.Cooldowns = Db.Cooldowns || {};
@@ -29,31 +29,12 @@ module.exports = {
     let CoHost = interaction.options.getUser('cohost');
     let Supervisor = interaction.options.getUser('supervisor');
 
-    const IsLeadership = Member.roles.cache.has(SFPLeadershipRole);
-    const Certifications = Db.Certifications[Host.id] || [];
-    const IsCertifiedHost = Certifications.includes('Certified Host');
+    const IsLeadership = interaction.member.roles.cache.has(SFPLeadershipRole);
+    const Certs = Db.Certifications[Host.id] || [];
 
-    if (!IsCertifiedHost && !IsLeadership && !Supervisor) {
-      return interaction.editReply({ content: 'User is not certified to host without a supervisor.' });
+    if (!IsLeadership && !Certs.includes('Certified Host') && !Supervisor) {
+      return interaction.editReply({ content: 'You are not certified to host without a supervisor.' });
     }
-
-    const Now = new Date();
-    const TodayKey = Now.toISOString().slice(0, 10);
-
-    Db.Cooldowns[Host.id] = Db.Cooldowns[Host.id] || { dates: {}, lastTimestamp: null };
-    const UserCd = Db.Cooldowns[Host.id];
-    const LastTimestamp = UserCd.lastTimestamp ? new Date(UserCd.lastTimestamp) : null;
-    const HoursSinceLast = LastTimestamp ? (Now - LastTimestamp) / (1000 * 60 * 60) : Infinity;
-
-    if (HoursSinceLast >= 24) UserCd.dates = {};
-    const UsedToday = UserCd.dates[TodayKey] || 0;
-
-    if (!IsLeadership && UsedToday >= 2) {
-      return interaction.editReply({ content: 'You have already hosted 2 trainings today.' });
-    }
-
-    UserCd.dates[TodayKey] = UsedToday + 1;
-    UserCd.lastTimestamp = Now.toISOString();
 
     const Channel = await interaction.guild.channels.fetch(TrainingChannelId).catch(() => null);
     if (!Channel) return interaction.editReply({ content: 'Training channel not found.' });
@@ -70,27 +51,18 @@ module.exports = {
         )
         .setTimestamp();
 
-    const Buttons = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('host_cancel').setLabel('Cancel').setStyle(ButtonStyle.Danger),
+    const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('host_edit').setLabel('Edit').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('host_cancel').setLabel('Cancel').setStyle(ButtonStyle.Danger),
       new ButtonBuilder().setCustomId('host_end').setLabel('End Training').setStyle(ButtonStyle.Success)
     );
 
-    const Message = await Channel.send({
-      content: `<@&${MentionRoleId}>`,
-      embeds: [buildEmbed()],
-      components: [Buttons]
-    });
+    const Message = await Channel.send({ content: `<@&${MentionRoleId}>`, embeds: [buildEmbed()], components: [row] });
 
-    const Collector = Message.createMessageComponentCollector({
-      componentType: ComponentType.Button,
-      time: 3600000
-    });
+    const Collector = Message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 3600000 });
 
     Collector.on('collect', async btn => {
-      if (btn.user.id !== Host.id) {
-        return btn.reply({ content: 'Only the host can use these buttons.', ephemeral: true });
-      }
+      if (btn.user.id !== Host.id) return btn.reply({ content: 'Only the host can use these buttons.', ephemeral: true });
 
       if (btn.customId === 'host_cancel') {
         await btn.deferUpdate();
@@ -100,57 +72,25 @@ module.exports = {
       }
 
       if (btn.customId === 'host_edit') {
-        const Modal = new ModalBuilder()
-          .setCustomId('host_edit_modal')
-          .setTitle('Edit Training');
+        const modal = new ModalBuilder()
+          .setCustomId(`host_edit_${Message.id}`)
+          .setTitle('Edit Training')
+          .addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('new_cohost').setLabel('New Co-Host (mention or ID)').setStyle(TextInputStyle.Short).setRequired(false)
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('new_supervisor').setLabel('New Supervisor (mention or ID)').setStyle(TextInputStyle.Short).setRequired(false)
+            )
+          );
 
-        const CoHostInput = new TextInputBuilder()
-          .setCustomId('new_cohost')
-          .setLabel('New Co-Host (mention or ID)')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(false);
-
-        const SupervisorInput = new TextInputBuilder()
-          .setCustomId('new_supervisor')
-          .setLabel('New Supervisor (mention or ID)')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(false);
-
-        Modal.addComponents(
-          new ActionRowBuilder().addComponents(CoHostInput),
-          new ActionRowBuilder().addComponents(SupervisorInput)
-        );
-
-        await btn.showModal(Modal);
-
-        const modal = await btn.awaitModalSubmit({
-          time: 300000,
-          filter: m => m.customId === 'host_edit_modal' && m.user.id === Host.id
-        }).catch(() => null);
-
-        if (!modal) return;
-
-        const co = modal.fields.getTextInputValue('new_cohost');
-        const sup = modal.fields.getTextInputValue('new_supervisor');
-
-        if (co) {
-          const id = co.replace(/\D/g, '');
-          CoHost = await interaction.guild.members.fetch(id).then(m => m.user).catch(() => null);
-        }
-
-        if (sup) {
-          const id = sup.replace(/\D/g, '');
-          Supervisor = await interaction.guild.members.fetch(id).then(m => m.user).catch(() => null);
-        }
-
-        await Message.edit({ embeds: [buildEmbed()] });
-        await modal.reply({ content: 'Training updated.', ephemeral: true });
+        await btn.showModal(modal);
       }
 
       if (btn.customId === 'host_end') {
         await btn.deferUpdate();
 
-        const MonthKey = Now.toISOString().slice(0, 7);
+        const MonthKey = new Date().toISOString().slice(0, 7);
         const add = (id, type) => {
           Db.Trainings[id] = Db.Trainings[id] || { hosted: {}, cohosted: {}, supervised: {} };
           const sec = Db.Trainings[id][type];
@@ -167,6 +107,28 @@ module.exports = {
         await btn.followUp({ content: 'Training ended and logged.', ephemeral: true });
         Collector.stop();
       }
+    });
+
+    interaction.client.on('interactionCreate', async modal => {
+      if (!modal.isModalSubmit()) return;
+      if (modal.customId !== `host_edit_${Message.id}`) return;
+      if (modal.user.id !== Host.id) return;
+
+      const co = modal.fields.getTextInputValue('new_cohost');
+      const sup = modal.fields.getTextInputValue('new_supervisor');
+
+      if (co) {
+        const id = co.replace(/\D/g, '');
+        CoHost = await interaction.guild.members.fetch(id).then(m => m.user).catch(() => null);
+      }
+
+      if (sup) {
+        const id = sup.replace(/\D/g, '');
+        Supervisor = await interaction.guild.members.fetch(id).then(m => m.user).catch(() => null);
+      }
+
+      await Message.edit({ embeds: [buildEmbed()] });
+      await modal.reply({ content: 'Training updated.', ephemeral: true });
     });
 
     return interaction.editReply({ content: `Training announcement sent to ${Channel.name}.` });
