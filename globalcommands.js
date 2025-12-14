@@ -1,19 +1,18 @@
 const { REST, Routes } = require('discord.js');
 
-const BotToken = process.env.BOT_TOKEN;
+const rest = new REST({ version: '10' }).setToken(process.env.BOT_TOKEN);
 const ClientId = process.env.CLIENT_ID;
-
-const rest = new REST({ version: '10' }).setToken(BotToken);
+const GuildId = '1386275140815425557';
 
 (async () => {
-  const globalCommands = await rest.get(
-    Routes.applicationCommands(ClientId)
+  const cmds = await rest.get(
+    Routes.applicationGuildCommands(ClientId, GuildId)
   );
 
-  for (const cmd of globalCommands) {
+  for (const cmd of cmds) {
     await rest.delete(
-      Routes.applicationCommand(ClientId, cmd.id)
+      Routes.applicationGuildCommand(ClientId, GuildId, cmd.id)
     );
-    console.log('Deleted global command:', cmd.name);
+    console.log('Deleted:', cmd.name);
   }
 })();
