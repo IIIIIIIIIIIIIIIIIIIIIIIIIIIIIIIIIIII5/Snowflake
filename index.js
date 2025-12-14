@@ -11,18 +11,11 @@ const AdminId = process.env.ADMIN_ID;
 const TestGuildId = '1386275140815425557';
 
 const ClientBot = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
 });
 
 ClientBot.Commands = new Collection();
 ClientBot.PendingApprovals = Roblox.PendingApprovals;
-
-async function ClearGuildCommands(rest) {
-  const existing = await rest.get(Routes.applicationGuildCommands(ClientId, TestGuildId));
-  for (const cmd of existing) {
-    await rest.delete(Routes.applicationGuildCommand(ClientId, TestGuildId, cmd.id));
-  }
-}
 
 function GetCommandFiles(dir) {
   const files = [];
@@ -36,33 +29,33 @@ function GetCommandFiles(dir) {
 
 async function RefreshCommands() {
   ClientBot.Commands.clear();
-
   const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
-  console.log('Command files found:', CommandFiles);
-
   for (const file of CommandFiles) {
     try {
       delete require.cache[require.resolve(file)];
       const cmd = require(file);
-      if (cmd && cmd.data && cmd.execute) {
-        ClientBot.Commands.set(cmd.data.name, cmd);
-        console.log(`Loaded command: ${cmd.data.name}`);
-      } else {
-        console.warn(`Skipped file (invalid structure): ${file}`);
-      }
+      if (cmd && cmd.data && cmd.execute) ClientBot.Commands.set(cmd.data.name, cmd);
     } catch (err) {
-      console.error(`Failed to load command ${file}:`, err);
+      console.error(`Error reloading command ${file}:`, err);
     }
   }
 
   const rest = new REST({ version: '10' }).setToken(BotToken);
   const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
 
-  await ClearGuildCommands(rest);
-  await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: payload });
+  try {
+    await rest.put(
+      Routes.applicationGuildCommands(ClientId, TestGuildId),
+      { body: [] }
+    );
 
-  const registered = await rest.get(Routes.applicationGuildCommands(ClientId, TestGuildId));
-  console.log('Registered guild commands:', registered.map(c => c.name));
+    await rest.put(
+      Routes.applicationGuildCommands(ClientId, TestGuildId),
+      { body: payload }
+    );
+  } catch (err) {
+    console.error('Error refreshing commands:', err);
+  }
 }
 
 global.ClientBot = ClientBot;
@@ -72,7 +65,6 @@ ClientBot.once('ready', async () => {
   await RefreshCommands();
   startApi();
   loaCommand.StartAutoCheck(ClientBot);
-  console.log(`Logged in as ${ClientBot.user.tag}`);
 });
 
 ClientBot.on('interactionCreate', async interaction => {
@@ -80,19 +72,14 @@ ClientBot.on('interactionCreate', async interaction => {
     const command = ClientBot.Commands.get(interaction.commandName);
     if (command?.autocomplete) return command.autocomplete(interaction);
   }
-
   if (interaction.isButton() && interaction.customId === 'done_verification')
     return Roblox.HandleVerificationButton(interaction);
-
   if (!interaction.isChatInputCommand()) return;
-
   const cmd = ClientBot.Commands.get(interaction.commandName);
   if (!cmd) return;
-
   try {
     await cmd.execute(interaction, ClientBot);
-  } catch (err) {
-    console.error(`Error executing command ${interaction.commandName}:`, err);
+  } catch {
     if (!interaction.replied && !interaction.deferred)
       await interaction.reply({ content: 'An error occurred while executing this command.', ephemeral: true });
   }
@@ -171,4 +158,4 @@ ClientBot.on('messageCreate', async message => {
   }
 });
 
-ClientBot.login(BotToken).catch(err => console.error('Failed to login:', err));
+ClientBot.login(BotToken);
