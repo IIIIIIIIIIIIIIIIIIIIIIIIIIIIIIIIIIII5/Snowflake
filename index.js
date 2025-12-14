@@ -11,7 +11,7 @@ const AdminId = process.env.ADMIN_ID;
 const TestGuildId = '1386275140815425557';
 
 const ClientBot = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
 
 ClientBot.Commands = new Collection();
@@ -38,19 +38,20 @@ async function RefreshCommands() {
   ClientBot.Commands.clear();
 
   const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
+  console.log('Command files found:', CommandFiles);
 
   for (const file of CommandFiles) {
-    delete require.cache[require.resolve(file)];
-    const cmdModule = require(file);
-
-    if (Array.isArray(cmdModule)) {
-      for (const cmd of cmdModule) {
-        if (cmd && cmd.data && cmd.execute) {
-          ClientBot.Commands.set(cmd.data.name, cmd);
-        }
+    try {
+      delete require.cache[require.resolve(file)];
+      const cmd = require(file);
+      if (cmd && cmd.data && cmd.execute) {
+        ClientBot.Commands.set(cmd.data.name, cmd);
+        console.log(`Loaded command: ${cmd.data.name}`);
+      } else {
+        console.warn(`Skipped file (invalid structure): ${file}`);
       }
-    } else if (cmdModule && cmdModule.data && cmdModule.execute) {
-      ClientBot.Commands.set(cmdModule.data.name, cmdModule);
+    } catch (err) {
+      console.error(`Failed to load command ${file}:`, err);
     }
   }
 
@@ -71,6 +72,7 @@ ClientBot.once('ready', async () => {
   await RefreshCommands();
   startApi();
   loaCommand.StartAutoCheck(ClientBot);
+  console.log(`Logged in as ${ClientBot.user.tag}`);
 });
 
 ClientBot.on('interactionCreate', async interaction => {
@@ -78,14 +80,19 @@ ClientBot.on('interactionCreate', async interaction => {
     const command = ClientBot.Commands.get(interaction.commandName);
     if (command?.autocomplete) return command.autocomplete(interaction);
   }
+
   if (interaction.isButton() && interaction.customId === 'done_verification')
     return Roblox.HandleVerificationButton(interaction);
+
   if (!interaction.isChatInputCommand()) return;
+
   const cmd = ClientBot.Commands.get(interaction.commandName);
   if (!cmd) return;
+
   try {
     await cmd.execute(interaction, ClientBot);
-  } catch {
+  } catch (err) {
+    console.error(`Error executing command ${interaction.commandName}:`, err);
     if (!interaction.replied && !interaction.deferred)
       await interaction.reply({ content: 'An error occurred while executing this command.', ephemeral: true });
   }
@@ -164,4 +171,4 @@ ClientBot.on('messageCreate', async message => {
   }
 });
 
-ClientBot.login(BotToken);
+ClientBot.login(BotToken).catch(err => console.error('Failed to login:', err));
