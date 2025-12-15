@@ -82,7 +82,7 @@ module.exports = {
         const MonthKey = new Date().toISOString().slice(0, 7);
         const add = (id, type) => {
           Db.Trainings[id] = Db.Trainings[id] || { hosted: {}, cohosted: {}, supervised: {} };
-          Db.Trainings[id][type] = Db.Trainings[id][type] || {}:
+          Db.Trainings[id][type] = Db.Trainings[id][type] || {};
           
           const sec = Db.Trainings[id][type];
           const MonthKey = new Date().toISOString().slice(0, 7);
