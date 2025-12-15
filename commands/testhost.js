@@ -82,8 +82,17 @@ module.exports = {
         const MonthKey = new Date().toISOString().slice(0, 7);
         const add = (id, type) => {
           Db.Trainings[id] = Db.Trainings[id] || { hosted: {}, cohosted: {}, supervised: {} };
+          Db.Trainings[id][type] = Db.Trainings[id][type] || {}:
+          
           const sec = Db.Trainings[id][type];
-          sec[MonthKey] = (sec[MonthKey] || 0) + 1;
+          const MonthKey = new Date().toISOString().slice(0, 7);
+
+          if (sec.lastMonth !== MonthKey) {
+            sec[MonthKey] = 0;
+            sec.LastMonth = MonthKey;
+          }
+          
+          sec[MonthKey] += 1;
           sec.total = (sec.total || 0) + 1;
         };
 
