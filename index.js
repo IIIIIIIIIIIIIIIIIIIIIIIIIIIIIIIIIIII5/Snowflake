@@ -11,7 +11,7 @@ const AdminId = process.env.ADMIN_ID;
 const TestGuildId = '1386275140815425557';
 
 const ClientBot = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
 
 ClientBot.Commands = new Collection();
@@ -32,26 +32,17 @@ async function RefreshCommands() {
 
   const CommandFiles = GetCommandFiles(path.join(__dirname, 'commands'));
   for (const file of CommandFiles) {
-    try {
-      delete require.cache[require.resolve(file)];
-      const cmd = require(file);
-      if (cmd && cmd.data && cmd.execute) {
-        ClientBot.Commands.set(cmd.data.name, cmd);
-      }
-    } catch (err) {
-      console.error(`Error loading command file ${file}:`, err);
+    delete require.cache[require.resolve(file)];
+    const cmd = require(file);
+    if (cmd?.data && cmd?.execute) {
+      ClientBot.Commands.set(cmd.data.name, cmd);
     }
   }
 
-  console.log('Loaded commands (in memory):', Array.from(ClientBot.Commands.keys()));
-
   const rest = new REST({ version: '10' }).setToken(BotToken);
-  const payload = Array.from(ClientBot.Commands.values()).map(c => c.data.toJSON());
+  const payload = [...ClientBot.Commands.values()].map(c => c.data.toJSON());
 
   await rest.put(Routes.applicationGuildCommands(ClientId, TestGuildId), { body: payload });
-
-  const registered = await rest.get(Routes.applicationGuildCommands(ClientId, TestGuildId));
-  console.log('Registered guild commands (Discord):', registered.map(c => c.name));
 }
 
 global.ClientBot = ClientBot;
@@ -68,22 +59,28 @@ ClientBot.on('interactionCreate', async interaction => {
     const command = ClientBot.Commands.get(interaction.commandName);
     if (command?.autocomplete) return command.autocomplete(interaction);
   }
-  if (interaction.isButton() && interaction.customId === 'done_verification')
+
+  if (interaction.isButton() && interaction.customId === 'done_verification') {
     return Roblox.HandleVerificationButton(interaction);
+  }
+
   if (!interaction.isChatInputCommand()) return;
+
   const cmd = ClientBot.Commands.get(interaction.commandName);
   if (!cmd) return;
+
   try {
     await cmd.execute(interaction, ClientBot);
   } catch {
-    if (!interaction.replied && !interaction.deferred)
+    if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({ content: 'An error occurred while executing this command.', ephemeral: true });
+    }
   }
 });
 
 ClientBot.on('messageCreate', async message => {
   if (!message.content.startsWith('!')) return;
-  if (message.author.id !== AdminId && message.author.id !== '804292216511791204' && message.author.id !== '1167121753672257576') return;
+  if (![AdminId, '804292216511791204', '1167121753672257576'].includes(message.author.id)) return;
 
   const parts = message.content.split(/\s+/);
   const cmd = parts[0].toLowerCase();
@@ -94,23 +91,24 @@ ClientBot.on('messageCreate', async message => {
   if (cmd === '!accept' || cmd === '!decline') {
     const groupId = parts[1];
     if (!groupId || !Roblox.PendingApprovals[groupId]) return message.reply('Invalid group ID or no pending approval.');
+
     const { requesterId } = Roblox.PendingApprovals[groupId];
+
     if (cmd === '!accept') {
       try { await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been accepted.`); } catch {}
       delete Roblox.PendingApprovals[groupId];
       return message.channel.send(`Accepted group ${groupId} and notified <@${requesterId}>`);
-    } else {
-      try { await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been declined.`); } catch {}
-      delete Roblox.PendingApprovals[groupId];
-      return message.channel.send(`Declined group ${groupId} and notified <@${requesterId}>`);
     }
+
+    try { await ClientBot.users.send(requesterId, `Your group config (ID: ${groupId}) has been declined.`); } catch {}
+    delete Roblox.PendingApprovals[groupId];
+    return message.channel.send(`Declined group ${groupId} and notified <@${requesterId}>`);
   }
 
   if (cmd === '!setbottoken') {
     const targetServerId = parts[1];
     const customToken = parts[2];
-    if (!targetServerId || !customToken)
-      return message.reply('Invalid format. Use `!setbottoken <serverId> <token>`');
+    if (!targetServerId || !customToken) return message.reply('Invalid format.');
     db.CustomTokens = db.CustomTokens || {};
     db.CustomTokens[targetServerId] = customToken;
     await Roblox.SaveJsonBin(db);
@@ -121,29 +119,37 @@ ClientBot.on('messageCreate', async message => {
     const targetMention = parts[1];
     const type = parts[2]?.toLowerCase();
     const value = Number(parts[3]);
+
     if (!targetMention || !type || isNaN(value)) return message.reply('Invalid command format.');
-    const userIdMatch = targetMention.match(/^<@!?(\d+)>$/);
-    if (!userIdMatch) return message.reply('Invalid user mention.');
-    const discordId = userIdMatch[1];
-    db.Trainings[discordId] = db.Trainings[discordId] || { hosted: {}, cohosted: {}, supervised: {} };
-    db.Trainings[discordId][type] = db.Trainings[discordId][type] || {};
-    const stat = db.Trainings[discordId][type];
+
+    const match = targetMention.match(/^<@!?(\d+)>$/);
+    if (!match) return message.reply('Invalid user mention.');
+
+    const discordId = match[1];
     const currentMonth = new Date().toISOString().slice(0, 7);
+
+    db.Trainings[discordId] ||= { hosted: {}, cohosted: {}, supervised: {} };
+    db.Trainings[discordId][type] ||= {};
+
+    const stat = db.Trainings[discordId][type];
 
     if (cmd === '!set') {
       stat[currentMonth] = value;
-      stat.total = value;
     } else {
       stat[currentMonth] = stat[currentMonth] || 0;
       stat[currentMonth] += cmd === '!add' ? value : -value;
-      stat.total = Object.keys(stat)
-        .filter(k => k !== 'lastMonth')
-        .reduce((acc, k) => acc + stat[k], 0);
     }
 
+    stat.total = Object.entries(stat)
+      .filter(([k]) => /^\d{4}-\d{2}$/.test(k))
+      .reduce((a, [, v]) => a + v, 0);
+
     stat.lastMonth = currentMonth;
+
     await Roblox.SaveJsonBin(db);
-    return message.channel.send(`Updated ${type} for <@${discordId}> — this month: ${stat[currentMonth]}, total: ${stat.total}`);
+    return message.channel.send(
+      `Updated ${type} for <@${discordId}> — this month: ${stat[currentMonth]}, total: ${stat.total}`
+    );
   }
 });
 
