@@ -21,9 +21,8 @@ module.exports = {
     }
 
     const Db = await GetJsonBin();
-    Db.Cooldowns = Db.Cooldowns || {};
-    Db.Certifications = Db.Certifications || {};
     Db.Trainings = Db.Trainings || {};
+    Db.Certifications = Db.Certifications || {};
 
     const Host = interaction.user;
     let CoHost = interaction.options.getUser('cohost');
@@ -57,18 +56,24 @@ module.exports = {
       new ButtonBuilder().setCustomId('host_end').setLabel('End Training').setStyle(ButtonStyle.Success)
     );
 
-    const Message = await Channel.send({ content: `<@&${MentionRoleId}>`, embeds: [buildEmbed()], components: [row] });
+    const Message = await Channel.send({
+      content: `<@&${MentionRoleId}>`,
+      embeds: [buildEmbed()],
+      components: [row]
+    });
 
     const Collector = Message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 3600000 });
 
     Collector.on('collect', async btn => {
-      if (btn.user.id !== Host.id) return btn.reply({ content: 'Only the host can use these buttons.', ephemeral: true });
+      if (btn.user.id !== Host.id) {
+        return btn.reply({ content: 'Only the host can use these buttons.', ephemeral: true });
+      }
 
       if (btn.customId === 'host_cancel') {
         await btn.deferUpdate();
         await Message.delete().catch(() => {});
-        await btn.followUp({ content: 'Training cancelled.', ephemeral: true });
         Collector.stop();
+        return;
       }
 
       if (btn.customId === 'host_edit') {
@@ -85,24 +90,47 @@ module.exports = {
           );
 
         await btn.showModal(modal);
+
+        try {
+          const modalSubmit = await interaction.awaitModalSubmit({
+            filter: i => i.customId === `host_edit_${Message.id}` && i.user.id === Host.id,
+            time: 300000
+          });
+
+          const co = modalSubmit.fields.getTextInputValue('new_cohost');
+          const sup = modalSubmit.fields.getTextInputValue('new_supervisor');
+
+          if (co) {
+            const id = co.replace(/\D/g, '');
+            CoHost = await interaction.guild.members.fetch(id).then(m => m.user).catch(() => null);
+          }
+
+          if (sup) {
+            const id = sup.replace(/\D/g, '');
+            Supervisor = await interaction.guild.members.fetch(id).then(m => m.user).catch(() => null);
+          }
+
+          await Message.edit({ embeds: [buildEmbed()] });
+          await modalSubmit.reply({ content: 'Training updated.', ephemeral: true });
+        } catch {}
       }
 
       if (btn.customId === 'host_end') {
         await btn.deferUpdate();
+        await Message.edit({ components: [] });
+        Collector.stop();
 
         const MonthKey = new Date().toISOString().slice(0, 7);
+
         const add = (id, type) => {
           Db.Trainings[id] = Db.Trainings[id] || { hosted: {}, cohosted: {}, supervised: {} };
-          Db.Trainings[id][type] = Db.Trainings[id][type] || {};
-          
-          const sec = Db.Trainings[id][type];
-          const MonthKey = new Date().toISOString().slice(0, 7);
+          const sec = Db.Trainings[id][type] ||= {};
 
           if (sec.lastMonth !== MonthKey) {
             sec[MonthKey] = 0;
             sec.lastMonth = MonthKey;
           }
-          
+
           sec[MonthKey] += 1;
           sec.total = (sec.total || 0) + 1;
         };
@@ -113,31 +141,7 @@ module.exports = {
 
         await SaveJsonBin(Db);
         await Message.delete().catch(() => {});
-        await btn.followUp({ content: 'Training ended and logged.', ephemeral: true });
-        Collector.stop();
       }
-    });
-
-    interaction.client.on('interactionCreate', async modal => {
-      if (!modal.isModalSubmit()) return;
-      if (modal.customId !== `host_edit_${Message.id}`) return;
-      if (modal.user.id !== Host.id) return;
-
-      const co = modal.fields.getTextInputValue('new_cohost');
-      const sup = modal.fields.getTextInputValue('new_supervisor');
-
-      if (co) {
-        const id = co.replace(/\D/g, '');
-        CoHost = await interaction.guild.members.fetch(id).then(m => m.user).catch(() => null);
-      }
-
-      if (sup) {
-        const id = sup.replace(/\D/g, '');
-        Supervisor = await interaction.guild.members.fetch(id).then(m => m.user).catch(() => null);
-      }
-
-      await Message.edit({ embeds: [buildEmbed()] });
-      await modal.reply({ content: 'Training updated.', ephemeral: true });
     });
 
     return interaction.editReply({ content: `Training announcement sent to ${Channel.name}.` });
