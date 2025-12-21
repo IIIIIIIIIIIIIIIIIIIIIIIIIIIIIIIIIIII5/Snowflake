@@ -21,8 +21,8 @@ module.exports = {
     }
 
     const Db = await GetJsonBin();
-    Db.Trainings = Db.Trainings || {};
-    Db.Certifications = Db.Certifications || {};
+    Db.Trainings ||= {};
+    Db.Certifications ||= {};
 
     const Host = interaction.user;
     let CoHost = interaction.options.getUser('cohost');
@@ -62,7 +62,10 @@ module.exports = {
       components: [row]
     });
 
-    const Collector = Message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 3600000 });
+    const Collector = Message.createMessageComponentCollector({
+      componentType: ComponentType.Button,
+      time: 3600000
+    });
 
     Collector.on('collect', async btn => {
       if (btn.user.id !== Host.id) {
@@ -82,17 +85,25 @@ module.exports = {
           .setTitle('Edit Training')
           .addComponents(
             new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('new_cohost').setLabel('New Co-Host (mention or ID)').setStyle(TextInputStyle.Short).setRequired(false)
+              new TextInputBuilder()
+                .setCustomId('new_cohost')
+                .setLabel('New Co-Host (mention or ID)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
             ),
             new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('new_supervisor').setLabel('New Supervisor (mention or ID)').setStyle(TextInputStyle.Short).setRequired(false)
+              new TextInputBuilder()
+                .setCustomId('new_supervisor')
+                .setLabel('New Supervisor (mention or ID)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
             )
           );
 
         await btn.showModal(modal);
 
         try {
-          const modalSubmit = await interaction.awaitModalSubmit({
+          const modalSubmit = await btn.awaitModalSubmit({
             filter: i => i.customId === `host_edit_${Message.id}` && i.user.id === Host.id,
             time: 300000
           });
@@ -113,34 +124,37 @@ module.exports = {
           await Message.edit({ embeds: [buildEmbed()] });
           await modalSubmit.reply({ content: 'Training updated.', ephemeral: true });
         } catch {}
+        return;
       }
 
       if (btn.customId === 'host_end') {
-        await btn.deferUpdate();
-        await Message.edit({ components: [] });
-        Collector.stop();
+        try {
+          await btn.deferUpdate();
+          await Message.edit({ components: [] });
+          Collector.stop();
 
-        const MonthKey = new Date().toISOString().slice(0, 7);
+          const MonthKey = new Date().toISOString().slice(0, 7);
 
-        const add = (id, type) => {
-          Db.Trainings[id] = Db.Trainings[id] || { hosted: {}, cohosted: {}, supervised: {} };
-          const sec = Db.Trainings[id][type] ||= {};
+          const add = (id, type) => {
+            Db.Trainings[id] ||= { hosted: {}, cohosted: {}, supervised: {} };
+            const sec = Db.Trainings[id][type] ||= {};
 
-          if (sec.lastMonth !== MonthKey) {
-            sec[MonthKey] = 0;
-            sec.lastMonth = MonthKey;
-          }
+            if (sec.lastMonth !== MonthKey) {
+              sec[MonthKey] = 0;
+              sec.lastMonth = MonthKey;
+            }
 
-          sec[MonthKey] += 1;
-          sec.total = (sec.total || 0) + 1;
-        };
+            sec[MonthKey] += 1;
+            sec.total = (sec.total || 0) + 1;
+          };
 
-        add(Host.id, 'hosted');
-        if (CoHost) add(CoHost.id, 'cohosted');
-        if (Supervisor) add(Supervisor.id, 'supervised');
+          add(Host.id, 'hosted');
+          if (CoHost) add(CoHost.id, 'cohosted');
+          if (Supervisor) add(Supervisor.id, 'supervised');
 
-        await SaveJsonBin(Db);
-        await Message.delete().catch(() => {});
+          await SaveJsonBin(Db);
+          await Message.delete().catch(() => {});
+        } catch {}
       }
     });
 
