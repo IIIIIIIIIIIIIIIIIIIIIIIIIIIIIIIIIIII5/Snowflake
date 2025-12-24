@@ -75,7 +75,7 @@ module.exports = {
       if (btn.customId === 'host_cancel') {
         await btn.deferUpdate();
         await Message.delete().catch(() => {});
-        Collector.stop();
+        if (!Collector.ended) Collector.stop();
         return;
       }
 
@@ -123,7 +123,9 @@ module.exports = {
 
           await Message.edit({ embeds: [buildEmbed()] });
           await modalSubmit.reply({ content: 'Training updated.', ephemeral: true });
-        } catch {}
+        } catch (err) {
+          console.error('Modal submit error:', err);
+        }
         return;
       }
 
@@ -131,7 +133,7 @@ module.exports = {
         try {
           await btn.deferUpdate();
           await Message.edit({ components: [] });
-          Collector.stop();
+          if (!Collector.ended) Collector.stop();
 
           const MonthKey = new Date().toISOString().slice(0, 7);
 
@@ -152,9 +154,18 @@ module.exports = {
           if (CoHost) add(CoHost.id, 'cohosted');
           if (Supervisor) add(Supervisor.id, 'supervised');
 
-          await SaveJsonBin(Db);
+          try {
+            await SaveJsonBin(Db);
+          } catch (err) {
+            console.error('SaveJsonBin failed:', err);
+            await btn.followUp({ content: 'Failed to save training data.', ephemeral: true });
+          }
+
           await Message.delete().catch(() => {});
-        } catch {}
+        } catch (err) {
+          console.error('Error ending training:', err);
+          await btn.followUp({ content: 'Failed to end training.', ephemeral: true });
+        }
       }
     });
 
