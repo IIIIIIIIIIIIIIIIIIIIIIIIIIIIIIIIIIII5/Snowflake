@@ -57,7 +57,7 @@ module.exports = {
     );
 
     const Message = await Channel.send({
-      // content: `<@&${MentionRoleId}>`,
+      content: `<@&${MentionRoleId}>`,
       embeds: [buildEmbed()],
       components: [row]
     });
