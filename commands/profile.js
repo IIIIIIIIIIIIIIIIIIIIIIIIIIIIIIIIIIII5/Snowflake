@@ -128,6 +128,8 @@ module.exports = {
       }
 
       if (btn.customId === `show_group_${target.id}`) {
+        await btn.deferUpdate();
+        
         let groupEmbed;
 
         if (!robloxId) {
