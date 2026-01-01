@@ -1,6 +1,6 @@
 const admin = require('firebase-admin');
 const { EmbedBuilder } = require('discord.js');
-const noblox = require('noblox.js');
+const fetch = require('node-fetch');
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -25,17 +25,6 @@ const PredefinedDurations = {
   '1M': 30 * 24 * 60 * 60 * 1000
 };
 
-let loggedIn = false;
-
-async function loginRoblox() {
-  if (loggedIn) return;
-  const fullCookie = process.env.ROBLOSECURITY;
-  if (!fullCookie) throw new Error("Cookie not set");
-
-  await noblox.setCookie(fullCookie);
-  loggedIn = true;
-}
-
 async function GetJsonBin() {
   try {
     const Doc = await Db.collection('botData').doc('main').get();
@@ -49,70 +38,73 @@ async function SaveJsonBin(Data) {
 }
 
 async function FetchRoles(GroupId) {
-  await loginRoblox();
-  const roles = await noblox.getRoles(GroupId);
+  const res = await fetch(`https://groups.roblox.com/v2/groups/${GroupId}/roles`);
+  const json = await res.json();
   const Roles = {};
-  roles.forEach(r => Roles[r.name.toLowerCase()] = { Name: r.name, Rank: r.rank, RoleId: r.id });
+  for (const r of json.roles || []) Roles[r.name.toLowerCase()] = { Name: r.name, Rank: r.rank, RoleId: r.id };
   return Roles;
 }
 
 async function GetCurrentRank(GroupId, UserId) {
-  await loginRoblox();
-  const rankName = await noblox.getRankNameInGroup(GroupId, UserId);
-  const rankNumber = await noblox.getRankInGroup(GroupId, UserId);
-  return { Name: rankName, Rank: rankNumber };
+  const res = await fetch(`https://groups.roblox.com/v2/users/${UserId}/groups/roles`);
+  const json = await res.json();
+  const grp = (json.data || []).find(g => g.group.id === GroupId);
+  if (!grp) return { Name: 'None', Rank: 0 };
+  return { Name: grp.role.name, Rank: grp.role.rank };
 }
 
 async function SetRank(GroupId, UserId, RankOrId, IssuerDiscordId, GuildId, Client = global.ClientBot) {
-  await loginRoblox();
   const Roles = await FetchRoles(GroupId);
   let RoleInfo = typeof RankOrId === 'number' ? Object.values(Roles).find(r => r.Rank === RankOrId) : Roles[RankOrId.toLowerCase()];
   if (!RoleInfo) throw new Error('Invalid rank specified');
-  if (!IssuerDiscordId.toUpperCase().includes('SYSTEM')) {
-    const DbData = await GetJsonBin();
-    const IssuerRobloxId = DbData.VerifiedUsers?.[IssuerDiscordId];
-    if (!IssuerRobloxId) throw new Error('You must verify first.');
-    const IssuerRank = await GetCurrentRank(GroupId, IssuerRobloxId);
-    const Target = await GetCurrentRank(GroupId, UserId);
-    if (String(UserId) === String(IssuerRobloxId)) throw new Error('Cannot change your own rank');
-    if (RoleInfo.Rank >= IssuerRank.Rank) throw new Error('Cannot assign a rank equal or higher than yours');
-    if (Target.Rank >= IssuerRank.Rank) throw new Error('Cannot change rank of a user higher or equal to you');
-  }
-  await noblox.setRank(GroupId, UserId, RoleInfo.Rank);
-  const Data = await GetJsonBin();
-  Data.RankChanges = Data.RankChanges || [];
-  Data.RankChanges.push({ GroupId, UserId, NewRank: RoleInfo.Name, IssuedBy: IssuerDiscordId, Timestamp: new Date().toISOString(), GuildId });
-  await SaveJsonBin(Data);
+  const DbData = await GetJsonBin();
+  const IssuerRobloxId = DbData.VerifiedUsers?.[IssuerDiscordId];
+  if (!IssuerRobloxId) throw new Error('You must verify first.');
+  const IssuerRank = await GetCurrentRank(GroupId, IssuerRobloxId);
+  const Target = await GetCurrentRank(GroupId, UserId);
+  if (String(UserId) === String(IssuerRobloxId)) throw new Error('Cannot change your own rank');
+  if (RoleInfo.Rank >= IssuerRank.Rank) throw new Error('Cannot assign a rank equal or higher than yours');
+  if (Target.Rank >= IssuerRank.Rank) throw new Error('Cannot change rank of a user higher or equal to you');
+
+  await fetch(`https://groups.roblox.com/v1/groups/${GroupId}/users/${UserId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Cookie': `.ROBLOSECURITY=${process.env.ROBLOSECURITY}` },
+    body: JSON.stringify({ roleId: RoleInfo.RoleId })
+  });
+
+  DbData.RankChanges = DbData.RankChanges || [];
+  DbData.RankChanges.push({ GroupId, UserId, NewRank: RoleInfo.Name, IssuedBy: IssuerDiscordId, Timestamp: new Date().toISOString(), GuildId });
+  await SaveJsonBin(DbData);
 }
 
-async function GetRobloxUserId(Username) { 
-  await loginRoblox(); 
-  return await noblox.getIdFromUsername(Username); 
+async function GetRobloxUserId(Username) {
+  const res = await fetch(`https://api.roblox.com/users/get-by-username?username=${encodeURIComponent(Username)}`);
+  const json = await res.json();
+  if (json && json.Id) return json.Id;
+  throw new Error('User not found');
 }
 
-async function GetRobloxUsername(UserId) { 
-  await loginRoblox(); 
-  return await noblox.getUsernameFromId(UserId); 
+async function GetRobloxUsername(UserId) {
+  const res = await fetch(`https://users.roblox.com/v1/users/${UserId}`);
+  const json = await res.json();
+  return json?.name || 'Unknown';
 }
 
-async function GetRobloxDescription(UserId) { 
-  await loginRoblox(); 
-  const info = await noblox.getPlayerInfo(UserId); 
-  return info?.blurb || ''; 
+async function GetRobloxDescription(UserId) {
+  const res = await fetch(`https://users.roblox.com/v1/users/${UserId}`);
+  const json = await res.json();
+  return json?.description || '';
 }
 
 async function GetRobloxUserInfo(UserId) {
-  await loginRoblox();
-
-  const info = await noblox.getPlayerInfo(UserId);
-
+  const res = await fetch(`https://users.roblox.com/v1/users/${UserId}`);
+  const info = await res.json();
   return {
     id: UserId,
-    username: info.username || "Unknown",
-    description: info.blurb || "No description.",
-    created: createdDate,
-    isBanned: info.isBanned || false,
-    friendsCount: info.friendCount || 0,
+    username: info?.name || "Unknown",
+    description: info?.description || "No description.",
+    created: info?.created || null,
+    isBanned: info?.isBanned || false,
   };
 }
 
