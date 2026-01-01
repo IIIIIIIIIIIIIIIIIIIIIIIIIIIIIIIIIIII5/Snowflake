@@ -15,14 +15,10 @@ async function GetModerationData() {
 
 function FormatCertifications(certArray) {
   if (!Array.isArray(certArray) || certArray.length === 0) return ["None"];
-
   const counts = {};
   for (const cert of certArray) {
-    if (cert !== "Certified Host") {
-      counts[cert] = (counts[cert] || 0) + 1;
-    }
+    if (cert !== "Certified Host") counts[cert] = (counts[cert] || 0) + 1;
   }
-
   const result = [];
   const added = new Set();
   for (const cert of certArray) {
@@ -32,7 +28,6 @@ function FormatCertifications(certArray) {
       added.add(cert);
     }
   }
-
   if (certArray.includes("Certified Host")) result.push("Certified Host");
   return result;
 }
@@ -64,15 +59,13 @@ module.exports = {
     }
 
     let verifiedEntry = db.VerifiedUsers?.[target.id] ?? null;
-    if (verifiedEntry === "" || verifiedEntry === "null" || verifiedEntry === "undefined") {
-      verifiedEntry = null;
-    }
+    if (verifiedEntry === "" || verifiedEntry === "null" || verifiedEntry === "undefined") verifiedEntry = null;
 
     let username = "Not Verified";
     let avatarUrl = target.displayAvatarURL({ size: 128 });
     let robloxId = null;
 
-    if (typeof verifiedEntry === "string" && /^\d+$/.test(verifiedEntry)) {
+    if ((typeof verifiedEntry === "string" && /^\d+$/.test(verifiedEntry)) || typeof verifiedEntry === "number") {
       robloxId = Number(verifiedEntry);
       try {
         username = (await GetRobloxUsername(robloxId)) || "Unknown User";
@@ -104,9 +97,7 @@ module.exports = {
       if (serverConfig?.GroupId) {
         const roles = await FetchRoles(serverConfig.GroupId);
         const currentRank = await GetCurrentRank(serverConfig.GroupId, robloxId).catch(() => null);
-        if (currentRank) {
-          groupRank = roles[currentRank.Name.toLowerCase()]?.Name || currentRank.Name;
-        }
+        if (currentRank) groupRank = roles[currentRank.Name.toLowerCase()]?.Name || currentRank.Name;
       }
 
       const userModeration = moderationData.filter(m => m.user === target.id);
@@ -114,9 +105,7 @@ module.exports = {
         const warnCount = userModeration.filter(m => m.type === "warn").length;
         warnings = warnCount ? String(warnCount) : "None";
         const last = userModeration[userModeration.length - 1];
-        if (last?.timestamp) {
-          lastPunishment = new Date(last.timestamp).toLocaleString("en-GB");
-        }
+        if (last?.timestamp) lastPunishment = new Date(last.timestamp).toLocaleString("en-GB");
       }
 
       const certDisplay = FormatCertifications(db.Certifications?.[target.id] || []).join("\n");
@@ -131,8 +120,7 @@ module.exports = {
 
       for (const dept of deptList) {
         const r = await GetCurrentRank(dept.id, robloxId).catch(() => null);
-        const rankId =
-          r?.Role?.Rank ?? r?.role?.Rank ?? r?.Rank ?? r?.rank ?? r?.Id ?? r?.id ?? null;
+        const rankId = r?.Role?.Rank ?? r?.role?.Rank ?? r?.Rank ?? r?.rank ?? r?.Id ?? r?.id ?? null;
         if (rankId == null) continue;
         if (dept.name === "Operations Management" && Number(rankId) < 201) continue;
         departments.push(dept.name);
@@ -153,8 +141,6 @@ module.exports = {
         );
     }
 
-    await interaction.editReply({
-      embeds: [groupEmbed]
-    });
+    await interaction.editReply({ embeds: [groupEmbed] });
   }
 };
