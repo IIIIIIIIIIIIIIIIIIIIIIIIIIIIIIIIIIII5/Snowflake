@@ -14,7 +14,7 @@ async function GetModerationData() {
 }
 
 function FormatCertifications(certArray) {
-  if (!certArray || certArray.length === 0) return ["None"];
+  if (!Array.isArray(certArray) || certArray.length === 0) return ["None"];
 
   const counts = {};
   for (const cert of certArray) {
@@ -63,12 +63,16 @@ module.exports = {
       });
     }
 
-    let verifiedEntry = db.VerifiedUsers?.[target.id];
+    let verifiedEntry = db.VerifiedUsers?.[target.id] ?? null;
+    if (verifiedEntry === "" || verifiedEntry === "null" || verifiedEntry === "undefined") {
+      verifiedEntry = null;
+    }
+
     let username = "Not Verified";
     let avatarUrl = target.displayAvatarURL({ size: 128 });
     let robloxId = null;
 
-    if (verifiedEntry && !isNaN(Number(verifiedEntry))) {
+    if (typeof verifiedEntry === "string" && /^\d+$/.test(verifiedEntry)) {
       robloxId = Number(verifiedEntry);
       try {
         username = (await GetRobloxUsername(robloxId)) || "Unknown User";
@@ -78,7 +82,7 @@ module.exports = {
         const thumbData = await thumbRes.json();
         avatarUrl = thumbData?.data?.[0]?.imageUrl || avatarUrl;
       } catch {}
-    } else if (verifiedEntry) {
+    } else if (typeof verifiedEntry === "string") {
       username = verifiedEntry;
     }
 
@@ -90,7 +94,9 @@ module.exports = {
         .setColor(0xe74c3c)
         .setDescription("This user is not verified with Roblox.");
     } else {
-      const serverConfig = db.ServerConfig?.[interaction.guild.id];
+      const guildId = interaction.guild?.id;
+      const serverConfig = guildId ? db.ServerConfig?.[guildId] : null;
+
       let groupRank = "Unknown";
       let warnings = "None";
       let lastPunishment = "No punishments found";
@@ -113,9 +119,7 @@ module.exports = {
         }
       }
 
-      const certDisplay = FormatCertifications(
-        db.Certifications?.[target.id] || []
-      ).join("\n");
+      const certDisplay = FormatCertifications(db.Certifications?.[target.id] || []).join("\n");
 
       const departments = [];
       const deptList = [
