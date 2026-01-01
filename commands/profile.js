@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const fetch = require("node-fetch");
 const { GetJsonBin, GetRobloxUsername, GetCurrentRank, FetchRoles } = require("../roblox");
 
 const BIN_ID = process.env.SNOWFLAKE_MODERATION_BIN_ID;
@@ -14,33 +15,35 @@ async function GetModerationData() {
 
 function FormatCertifications(certArray) {
   if (!certArray || certArray.length === 0) return ["None"];
-  const Result = [];
-  const Counts = {};
+  const result = [];
+  const counts = {};
 
-  for (const Cert of certArray) {
-    if (Cert !== "Certified Host") {
-      Counts[Cert] = (Counts[Cert] || 0) + 1;
+  for (const cert of certArray) {
+    if (cert !== "Certified Host") {
+      counts[cert] = (counts[cert] || 0) + 1;
     }
   }
 
-  const Added = new Set();
-  for (const Cert of certArray) {
-    if (Cert !== "Certified Host" && !Added.has(Cert)) {
-      const Count = Counts[Cert];
-      Result.push(Count > 1 ? `${Cert} **x${Count}**` : Cert);
-      Added.add(Cert);
+  const added = new Set();
+  for (const cert of certArray) {
+    if (cert !== "Certified Host" && !added.has(cert)) {
+      const count = counts[cert];
+      result.push(count > 1 ? `${cert} **x${count}**` : cert);
+      added.add(cert);
     }
   }
 
-  if (certArray.includes("Certified Host")) Result.push("Certified Host");
-  return Result;
+  if (certArray.includes("Certified Host")) result.push("Certified Host");
+  return result;
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("profile")
     .setDescription("View your training and group statistics.")
-    .addUserOption(opt => opt.setName("user").setDescription("The Discord user to view.").setRequired(false)),
+    .addUserOption(opt =>
+      opt.setName("user").setDescription("The Discord user to view.").setRequired(false)
+    ),
 
   async execute(interaction) {
     await interaction.deferReply({ ephemeral: false });
@@ -50,18 +53,20 @@ module.exports = {
     const target = interaction.options.getUser("user") || interaction.user;
 
     if (target.id === "1167121753672257576" && interaction.user.id !== "1167121753672257576") {
-      const specialEmbed = new EmbedBuilder()
-        .setTitle("ayo ur a stalker")
-        .setDescription("didn't ask you to check my profile")
-        .setColor(0xff0000)
-        .setTimestamp();
-      return interaction.editReply({ embeds: [specialEmbed] });
+      return interaction.editReply({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle("ayo ur a stalker")
+            .setDescription("didn't ask you to check my profile")
+            .setColor(0xff0000)
+        ]
+      });
     }
 
     const trainings = db.Trainings?.[target.id] || { hosted: {}, cohosted: {}, supervised: {} };
     const monthKey = new Date().toISOString().slice(0, 7);
 
-    const getStats = (type) => {
+    const getStats = type => {
       const data = trainings[type] || {};
       if (data.lastMonth !== monthKey) {
         data[monthKey] = 0;
@@ -80,22 +85,18 @@ module.exports = {
     let avatarUrl = target.displayAvatarURL({ size: 128 });
     let robloxId = null;
 
-    if (verifiedEntry) {
-      if (!isNaN(Number(verifiedEntry))) {
-        robloxId = Number(verifiedEntry);
-        try {
-          const name = await GetRobloxUsername(robloxId);
-          username = name || "Unknown User";
-
-          const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=420x420&format=Png&isCircular=false`);
-          const thumbData = await thumbRes.json();
-          avatarUrl = thumbData?.data?.[0]?.imageUrl || avatarUrl;
-        } catch {
-          username = "Unknown User";
-        }
-      } else {
-        username = verifiedEntry;
-      }
+    if (verifiedEntry && !isNaN(Number(verifiedEntry))) {
+      robloxId = Number(verifiedEntry);
+      try {
+        username = (await GetRobloxUsername(robloxId)) || "Unknown User";
+        const thumbRes = await fetch(
+          `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=420x420&format=Png&isCircular=false`
+        );
+        const thumbData = await thumbRes.json();
+        avatarUrl = thumbData?.data?.[0]?.imageUrl || avatarUrl;
+      } catch {}
+    } else if (verifiedEntry) {
+      username = verifiedEntry;
     }
 
     const hostingEmbed = new EmbedBuilder()
@@ -112,24 +113,35 @@ module.exports = {
       );
 
     const buttons = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`show_hosting_${target.id}`).setLabel("📊").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`show_group_${target.id}`).setLabel("🔗").setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder()
+        .setCustomId(`show_hosting_${target.id}`)
+        .setLabel("📊")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`show_group_${target.id}`)
+        .setLabel("🔗")
+        .setStyle(ButtonStyle.Secondary)
     );
 
-    const reply = await interaction.editReply({ embeds: [hostingEmbed], components: [buttons] });
+    const reply = await interaction.editReply({
+      embeds: [hostingEmbed],
+      components: [buttons]
+    });
 
     const collector = reply.createMessageComponentCollector({ time: 60000 });
 
     collector.on("collect", async btn => {
-      if (btn.user.id !== interaction.user.id) return btn.reply({ content: "This menu isn’t for you.", ephemeral: true });
+      if (btn.user.id !== interaction.user.id) {
+        return btn.reply({ content: "This menu isn’t for you.", ephemeral: true });
+      }
 
       if (btn.customId === `show_hosting_${target.id}`) {
-        await btn.update({ embeds: [hostingEmbed], components: [buttons] });
+        return btn.update({ embeds: [hostingEmbed], components: [buttons] });
       }
 
       if (btn.customId === `show_group_${target.id}`) {
         await btn.deferUpdate();
-        
+
         let groupEmbed;
 
         if (!robloxId) {
@@ -139,80 +151,73 @@ module.exports = {
             .setDescription("This user is not verified with Roblox.");
         } else {
           const serverConfig = db.ServerConfig?.[interaction.guild.id];
-          let groupRank = "Unknown", warnings = "None", lastPunishment = "No punishments found";
+          let groupRank = "Unknown";
+          let warnings = "None";
+          let lastPunishment = "No punishments found";
 
           if (serverConfig?.GroupId) {
             const roles = await FetchRoles(serverConfig.GroupId);
             const currentRank = await GetCurrentRank(serverConfig.GroupId, robloxId).catch(() => null);
-            if (currentRank) groupRank = roles[currentRank.Name.toLowerCase()]?.Name || currentRank.Name;
+            if (currentRank) {
+              groupRank = roles[currentRank.Name.toLowerCase()]?.Name || currentRank.Name;
+            }
           }
 
           const userModeration = moderationData.filter(m => m.user === target.id);
-          if (userModeration.length > 0) {
+          if (userModeration.length) {
             const warnCount = userModeration.filter(m => m.type === "warn").length;
-            warnings = warnCount > 0 ? String(warnCount) : "None";
-
-            const lastAction = userModeration[userModeration.length - 1];
-            if (lastAction?.timestamp) lastPunishment = new Date(lastAction.timestamp).toLocaleString('en-GB');
+            warnings = warnCount ? String(warnCount) : "None";
+            const last = userModeration[userModeration.length - 1];
+            if (last?.timestamp) {
+              lastPunishment = new Date(last.timestamp).toLocaleString("en-GB");
+            }
           }
 
-          const userCerts = db.Certifications?.[target.id] || [];
-          const certDisplay = FormatCertifications(userCerts).join("\n");
+          const certDisplay = FormatCertifications(db.Certifications?.[target.id] || []).join("\n");
 
-          const DepartmentsList = [
-            { Name: "Facility Staffing Commission", Id: 7918467 },
-            { Name: "Community Management", Id: 8565254 },
-            { Name: "Moderation Team", Id: 7010801 },
-            { Name: "Operations Management", Id: 9765582 }
+          const departments = [];
+          const deptList = [
+            { name: "Facility Staffing Commission", id: 7918467 },
+            { name: "Community Management", id: 8565254 },
+            { name: "Moderation Team", id: 7010801 },
+            { name: "Operations Management", id: 9765582 }
           ];
 
-          async function GetRankId(gid) {
-            try {
-              const r = await GetCurrentRank(gid, robloxId);
-              if (!r) return null;
-              if (typeof r === "number") return r;
-              if (typeof r === "string" && /^\d+$/.test(r)) return Number(r);
-              return r.Role?.Rank || r.role?.Rank || r.role?.rank || r.Rank || r.rank || r.Id || r.id || null;
-            } catch {
-              return null;
-            }
+          for (const dept of deptList) {
+            const r = await GetCurrentRank(dept.id, robloxId).catch(() => null);
+            const rankId =
+              r?.Role?.Rank ?? r?.role?.Rank ?? r?.Rank ?? r?.rank ?? r?.Id ?? r?.id ?? null;
+            if (rankId == null) continue;
+            if (dept.name === "Operations Management" && Number(rankId) < 201) continue;
+            departments.push(dept.name);
           }
 
-          let Departments = [];
-
-          for (const Dept of DepartmentsList) {
-            const RankId = await GetRankId(Dept.Id);
-            if (RankId == null) continue;
-
-            if (Dept.Name === "Operations Management") {
-              if (Number(RankId) >= 201) Departments.push("Operations Management");
-              continue;
-            }
-
-            Departments.push(Dept.Name);
-          }
-
-          if (Departments.length === 0) Departments = ["None"];
+          if (!departments.length) departments.push("None");
 
           groupEmbed = new EmbedBuilder()
             .setTitle(`${username}'s Group Stats`)
             .setColor(0x5865f2)
             .setThumbnail(avatarUrl)
             .addFields(
-              { name: "Group Rank", value: groupRank, inline: false },
-              { name: "Warnings", value: warnings, inline: false },
-              { name: "Last Punishment", value: lastPunishment, inline: false },
-              { name: "Certifications", value: certDisplay, inline: false },
-              { name: "Departments", value: Departments.join(", "), inline: false }
+              { name: "Group Rank", value: groupRank },
+              { name: "Warnings", value: warnings },
+              { name: "Last Punishment", value: lastPunishment },
+              { name: "Certifications", value: certDisplay },
+              { name: "Departments", value: departments.join(", ") }
             );
         }
 
-        await btn.update({ embeds: [groupEmbed], components: [buttons] });
+        await interaction.editReply({
+          embeds: [groupEmbed],
+          components: [buttons]
+        });
       }
     });
 
     collector.on("end", async () => {
-      try { await interaction.editReply({ components: [] }); } catch {}
+      try {
+        await interaction.editReply({ components: [] });
+      } catch {}
     });
   }
 };
