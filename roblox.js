@@ -129,7 +129,6 @@ async function SendRankLog(GuildId, Client, ActionBy, TargetRobloxId, Action, Ne
 }
 
 async function SuspendUser(GroupId, UserId, IssuerDiscordId, GuildId, Client = global.ClientBot, DurationKey = '1d', Reason = null) {
-  await loginRoblox();
   const DbData = await GetJsonBin();
   const Roles = await FetchRoles(GroupId);
   const SuspendedRole = Roles['suspended'];
@@ -204,7 +203,6 @@ async function LoadActiveSuspensions(Client = global.ClientBot) {
 }
 
 module.exports = {
-  loginRoblox,
   GetJsonBin,
   SaveJsonBin,
   FetchRoles,
