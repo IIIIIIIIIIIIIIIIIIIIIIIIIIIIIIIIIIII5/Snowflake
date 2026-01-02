@@ -14,6 +14,16 @@ if (!admin.apps.length) {
 
 const Db = admin.firestore();
 const Verifications = {};
+const PendingApprovals = {};
+const ScheduledTimers = {};
+const MaxTimeout = 2147483647;
+const PredefinedDurations = {
+  '12h': 12 * 60 * 60 * 1000,
+  '1d': 24 * 60 * 60 * 1000,
+  '3d': 3 * 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '1M': 30 * 24 * 60 * 60 * 1000
+};
 
 async function GetJsonBin() {
   try {
@@ -118,6 +128,52 @@ async function SendRankLog(GuildId, Client, ActionBy, TargetRobloxId, Action, Ne
   } catch {}
 }
 
+async function SuspendUser(GroupId, UserId, IssuerDiscordId, GuildId, Client = global.ClientBot, DurationKey = '1d', Reason = null) {
+  await loginRoblox();
+  const DbData = await GetJsonBin();
+  const Roles = await FetchRoles(GroupId);
+  const SuspendedRole = Roles['suspended'];
+  if (!SuspendedRole) throw new Error('Suspended rank not found.');
+  const IssuerRobloxId = DbData.VerifiedUsers?.[IssuerDiscordId];
+  if (!IssuerRobloxId) throw new Error('You must verify first.');
+  const IssuerRank = await GetCurrentRank(GroupId, IssuerRobloxId);
+  const TargetRank = await GetCurrentRank(GroupId, UserId);
+  if (String(UserId) === String(IssuerRobloxId)) throw new Error('You cannot suspend yourself.');
+  if (TargetRank.Rank >= IssuerRank.Rank) throw new Error('Cannot suspend a user with equal or higher rank.');
+  const DurationMs = PredefinedDurations[DurationKey];
+  if (DurationMs === undefined) throw new Error('Invalid suspension duration.');
+  await noblox.setRank(GroupId, UserId, SuspendedRole.Rank);
+  const Username = await GetRobloxUsername(UserId);
+  DbData.Suspensions = DbData.Suspensions || {};
+  DbData.Suspensions[UserId] = { Username, IssuedBy: IssuerDiscordId, IssuedAt: Date.now(), EndsAt: Date.now() + DurationMs, GroupId, GuildId, OldRankName: TargetRank.Name, OldRankValue: TargetRank.Rank, Reason, Active: true };
+  await SaveJsonBin(DbData);
+  ScheduleAutoUnsuspend(UserId, DbData.Suspensions[UserId], Client);
+}
+
+function ScheduleAutoUnsuspend(UserId, SuspensionRecord, Client) {
+  if (!SuspensionRecord || !SuspensionRecord.EndsAt) return;
+  const Remaining = SuspensionRecord.EndsAt - Date.now();
+  if (Remaining <= 0) return autoUnsuspend(UserId, Client);
+  let TimeoutDuration = Remaining;
+  if (TimeoutDuration > MaxTimeout) TimeoutDuration = MaxTimeout;
+  if (ScheduledTimers[UserId]) clearTimeout(ScheduledTimers[UserId]);
+  ScheduledTimers[UserId] = setTimeout(async () => {
+    const NewRemaining = SuspensionRecord.EndsAt - Date.now();
+    if (NewRemaining > MaxTimeout) ScheduleAutoUnsuspend(UserId, SuspensionRecord, Client);
+    else { await autoUnsuspend(UserId, Client); delete ScheduledTimers[UserId]; }
+  }, TimeoutDuration);
+}
+
+async function autoUnsuspend(UserId, Client = global.ClientBot) {
+  const Data = await GetJsonBin();
+  const Suspension = Data.Suspensions?.[UserId];
+  if (!Suspension || !Suspension.Active) return;
+  if (Suspension.EndsAt && Date.now() < Suspension.EndsAt) return;
+  Suspension.Active = false;
+  await SaveJsonBin(Data);
+  try { await SetRank(Suspension.GroupId, UserId, Suspension.OldRankName || Suspension.OldRankValue, 'SYSTEM', Suspension.GuildId, Client); } catch {}
+}
+
 function StartVerification(DiscordId, RobloxUserId, Code) {
   Verifications[DiscordId] = { RobloxUserId, Code };
 }
@@ -138,7 +194,17 @@ async function HandleVerificationButton(Interaction) {
   } catch { return Interaction.editReply({ content: "An error occurred during verification." }); }
 }
 
+async function LoadActiveSuspensions(Client = global.ClientBot) {
+  const Data = await GetJsonBin();
+  for (const UserId of Object.keys(Data.Suspensions || {})) {
+    const Suspension = Data.Suspensions[UserId];
+    if (!Suspension || !Suspension.Active || !Suspension.EndsAt) continue;
+    ScheduleAutoUnsuspend(UserId, Suspension, Client);
+  }
+}
+
 module.exports = {
+  loginRoblox,
   GetJsonBin,
   SaveJsonBin,
   FetchRoles,
@@ -149,7 +215,13 @@ module.exports = {
   GetRobloxDescription,
   GetRobloxUserInfo,
   SendRankLog,
+  SuspendUser,
+  autoUnsuspend,
+  ScheduleAutoUnsuspend,
   StartVerification,
   HandleVerificationButton,
-  Verifications
+  LoadActiveSuspensions,
+  Verifications,
+  PendingApprovals,
+  PredefinedDurations
 };
