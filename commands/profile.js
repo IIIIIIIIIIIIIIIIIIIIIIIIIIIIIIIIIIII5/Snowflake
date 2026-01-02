@@ -112,17 +112,14 @@ module.exports = {
 
       const departments = [];
       const deptList = [
-        { name: "Facility Staffing Commission", id: 7918467 },
-        { name: "Community Management", id: 8565254 },
-        { name: "Moderation Team", id: 7010801 },
-        { name: "Operations Management", id: 9765582 }
+        { name: "Community Support Team", id: 8565254 },
+        { name: "Community Engagement Team", id: 7010801 }
       ];
 
       for (const dept of deptList) {
         const r = await GetCurrentRank(dept.id, robloxId).catch(() => null);
         const rankId = r?.Role?.Rank ?? r?.role?.Rank ?? r?.Rank ?? r?.rank ?? r?.Id ?? r?.id ?? null;
         if (rankId == null) continue;
-        if (dept.name === "Operations Management" && Number(rankId) < 201) continue;
         departments.push(dept.name);
       }
 
