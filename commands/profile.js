@@ -102,8 +102,9 @@ module.exports = {
 
       const userModeration = moderationData.filter(m => m.user === target.id);
       if (userModeration.length) {
-        const warnCount = userModeration.filter(m => m.type === "warn").length;
-        warnings = warnCount ? String(warnCount) : "None";
+        const warnCount = userModeration.filter(m => m.user === target.id && m.type === "warn");
+        warnings = warnCount.length ? String(warnCount.length) : "None";
+        
         const last = userModeration[userModeration.length - 1];
         if (last?.timestamp) lastPunishment = new Date(last.timestamp).toLocaleString("en-GB");
       }
